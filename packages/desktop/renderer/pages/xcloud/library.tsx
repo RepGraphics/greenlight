@@ -1,4 +1,5 @@
 import React from 'react'
+import { useGameFavourites } from '../../context/gameFavourites'
 import Head from 'next/head'
 import Ipc from '../../lib/ipc'
 import Link from 'next/link'
@@ -12,6 +13,8 @@ import { useTranslation } from 'react-i18next'
 
 function xCloudLibrary() {
     const { t } = useTranslation()
+    const { favourites } = useGameFavourites()
+    const [favouritesOnly, setFavouritesOnly] = React.useState(false)
     const [searchTerm, setSearchTerm] = React.useState('')
     const [debouncedSearch, setDebouncedSearch] = React.useState('')
     const [gamePassOnly, setGamePassOnly] = React.useState(true)
@@ -33,7 +36,7 @@ function xCloudLibrary() {
         { staleTime: 60 * 1000, keepPreviousData: true }
     )
 
-    const titles: string[] = Array.isArray(titlesQuery.data) ? titlesQuery.data : []
+    const titles: string[] = (Array.isArray(titlesQuery.data) ? titlesQuery.data : []).filter(id => !favouritesOnly || favourites.includes(id))
 
     const renderContent = () => {
         if (titlesQuery.isLoading && !titlesQuery.data) {
@@ -51,7 +54,7 @@ function xCloudLibrary() {
         }
 
         return (
-            <ViewportGrid key={`library_${trimmedSearch}_${gamePassOnly}`} drawPagination={true}>
+            <ViewportGrid key={`library_${trimmedSearch}_${gamePassOnly}_${favouritesOnly}`} drawPagination={true}>
                 { titles.map((item) => (
                     <GameTitleDynamic
                         titleId={ item }
@@ -77,6 +80,7 @@ function xCloudLibrary() {
                 {t('page.xCloudLibrary.title')}</h2>
 
                 <div className="gl-library-filters">
+                    <button type='button' className={'btn ' + (favouritesOnly ? 'btn-primary' : '')} aria-pressed={favouritesOnly} onClick={() => setFavouritesOnly(!favouritesOnly)}><i className='fa-solid fa-star' aria-hidden='true' /> {t('dashboard.favourites')}</button>
                     <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer', userSelect: 'none', fontWeight: 300, minWidth: 0, paddingRight: '4px' }}>
                         <input
                             type="checkbox"

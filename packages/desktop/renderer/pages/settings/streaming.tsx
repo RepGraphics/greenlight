@@ -14,9 +14,11 @@ function SettingsStreaming() {
     const { settings, setSettings} = useSettings()
     const { t } = useTranslation()
 
-    React.useEffect(() => {
-    //
-    })
+    const presets = [{ key: 'auto', bitrate: 0 }, { key: 'dataSaver', bitrate: 4096 }, { key: 'balanced', bitrate: 10240 }, { key: 'highQuality', bitrate: 20480 }]
+    const activePreset = presets.find(preset => settings.xhome_bitrate === preset.bitrate && settings.xcloud_bitrate === preset.bitrate)
+    function applyPreset(bitrate: number) {
+        setSettings({ ...settings, xhome_bitrate: bitrate, xcloud_bitrate: bitrate })
+    }
 
     function setxCloudBitrate(e){
         console.log('Set xCloud bitrate to:', e.target.value)
@@ -84,6 +86,9 @@ function SettingsStreaming() {
                     <h1>{t('settings.streaming.title')}</h1>
 
                     <p>{t('settings.streaming.description')}</p>
+                    <h2>{t('dashboard.qualityPresets')}</h2><p>{t('dashboard.presetDescription')}</p>
+                    <div className='gl-quality-presets'>{presets.map(preset => <button type='button' key={preset.key} className={'gl-quality-preset ' + (activePreset?.key === preset.key ? 'selected' : '')} aria-pressed={activePreset?.key === preset.key} onClick={() => applyPreset(preset.bitrate)}><strong>{t('dashboard.preset_' + preset.key)}</strong><span>{preset.bitrate ? Math.floor(preset.bitrate / 1024) + ' ' + t('settings.streaming.mbpsLabel') : t('settings.streaming.unlimitedLabel')}</span></button>)}</div>
+                    {!activePreset && <p>{t('dashboard.customQuality')}</p>}
                     <p>
 
                         <label>{t('settings.streaming.xCloudStreamingBitrateLabel')}</label>

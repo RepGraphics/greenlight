@@ -290,7 +290,16 @@
       "consoleCount_other": "{{count}} consoles",
       "addFavourite": "Add to favourites",
       "removeFavourite": "Remove from favourites",
-      "noMatchingConsoles": "No consoles match your filters."
+      "noMatchingConsoles": "No consoles match your filters.",
+      "welcome": "Welcome, {{name}}",
+      "gameFavourites": "Favourite games",
+      "qualityPresets": "Streaming quality",
+      "presetDescription": "Apply a bitrate limit to both Remote Play and Cloud Gaming. Resolution and actual quality depend on Xbox and your connection.",
+      "preset_auto": "Automatic",
+      "preset_dataSaver": "Data saver",
+      "preset_balanced": "Balanced",
+      "preset_highQuality": "High quality",
+      "customQuality": "Custom bitrate settings"
     }
   }
 }

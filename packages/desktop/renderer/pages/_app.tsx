@@ -12,6 +12,7 @@ import Auth from '../components/auth'
 import SidebarFriends from '../components/sidebar/friends'
 import '../lib/i18n'
 
+import { GameFavouritesProvider } from '../context/gameFavourites'
 import { UserProvider } from '../context/userContext'
 import { LanguageProvider } from '../context/languageContext'
 
@@ -137,7 +138,9 @@ export default function MyApp({ Component, pageProps }) {
                 <QueryClientProvider client={queryClient}>
                     <UserProvider>
                         <LanguageProvider>
-                            {appBody}
+                            <GameFavouritesProvider key={prevUserState.gamertag} account={prevUserState.gamertag || 'local'}>
+                                {appBody}
+                            </GameFavouritesProvider>
                             <DashboardInput enabled={!router.pathname.startsWith('/stream/')} onBack={onDashboardBack} />
                             <Notifications />
                         </LanguageProvider>

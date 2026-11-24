@@ -309,3 +309,18 @@ div.component_gametitle .gl-art-placeholder { width: 140px; height: 140px; displ
 .gl-favourite { background:transparent; border:0; color:var(--gl-muted); font-size:20px; cursor:pointer; padding:9px; border-radius:5px; }
 .gl-favourite[aria-pressed=true] { color:#9bf00b; }
 .gl-favourite:hover { background:#383838; }
+
+.gl-dashboard-welcome { padding:24px; margin-bottom:24px; background:linear-gradient(110deg,#1e4b23,#222 80%); border:1px solid #3c5835; border-radius:8px; }
+.gl-dashboard-welcome h1 { font-size:clamp(23px,4vw,36px); overflow-wrap:anywhere; margin:8px 0 18px; }
+.gl-dashboard-links { display:flex; flex-wrap:wrap; gap:10px; }
+.gl-dashboard-cloud { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin:28px 0 12px; }
+.gl-game-section { margin:18px 0; min-width:0; }
+.gl-game-section h2 { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.gl-game-row { display:flex; gap:14px; overflow-x:auto; padding:8px 5px 14px; scroll-snap-type:x proximity; }
+.gl-game-row > .component_gametitle { flex:0 0 140px; scroll-snap-align:start; }
+.gl-game-favourite { position:absolute; top:5px; left:5px; z-index:101; background:#202020e8; color:#fff; width:30px; height:30px; border:1px solid #666; border-radius:5px; cursor:pointer; }
+.gl-game-favourite[aria-pressed=true] { color:#9bf00b; }
+.gl-quality-presets { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,125px),1fr)); gap:10px; margin:14px 0 24px; }
+.gl-quality-preset { display:flex; flex-direction:column; align-items:flex-start; gap:8px; padding:14px; background:#303030; border:1px solid #555; border-radius:6px; color:white; cursor:pointer; }
+.gl-quality-preset.selected { border-color:#9bf00b; background:#244126; }
+.gl-quality-preset span { color:#c1c1c1; font-size:12px; }

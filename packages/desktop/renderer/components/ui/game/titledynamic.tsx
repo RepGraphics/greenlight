@@ -1,4 +1,5 @@
 import React from 'react'
+import { useGameFavourites } from '../../../context/gameFavourites'
 import Link from 'next/link'
 import Image from 'next/image'
 import Ipc from '../../../lib/ipc'
@@ -26,12 +27,15 @@ function GameTitleDynamic({
 }: GameTitleProps) {
     const titleData = useQuery<titleDataState>('titledynamic_titleId_'+titleId, () => Ipc.send('xCloud', 'getTitle', { titleId: titleId }), { staleTime: 300*1000 })
     const { t } = useTranslation()
+    const { favourites, toggle } = useGameFavourites()
+    const saved = favourites.includes(titleId)
     const artwork = titleData.data?.catalogDetails?.Image_Tile?.URL
     const imageSrc = artwork?.startsWith('//') ? 'https:' + artwork : artwork?.startsWith('https://') ? artwork : undefined
 
     return (
         <React.Fragment>
             <div className={ `component_gametitle${titleData.data?.hasEntitlement === false ? ' component_gametitle_unentitled' : ''}` }>
+                <button type='button' className='gl-game-favourite' aria-pressed={saved} aria-label={t(saved ? 'dashboard.removeFavourite' : 'dashboard.addFavourite')} title={t(saved ? 'dashboard.removeFavourite' : 'dashboard.addFavourite')} onClick={() => toggle(titleId)}><i className={(saved ? 'fa-solid' : 'fa-regular') + ' fa-star'} aria-hidden='true' /></button>
                 <div className='component_gametitle_infopage'>
                     <Link href={ '/xcloud/info/'+titleId } title={t("page.xCloudLibrary.viewGamePageIcon")}><i className="fa-solid fa-info" /></Link>
                 </div>

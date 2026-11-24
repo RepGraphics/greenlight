@@ -1,4 +1,6 @@
 import React from 'react'
+import TitleRow from '../components/xcloud/titleRow'
+import { useGameFavourites } from '../context/gameFavourites'
 import Head from 'next/head'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -11,9 +13,12 @@ import Card from '../components/ui/card'
 import Label from '../components/ui/label'
 import Loader from '../components/ui/loader'
 
-function Home({ account }: { account?: { gamertag?: string } }) {
+function Home({ account }: { account?: { gamertag?: string; level?: string | number } }) {
     const consoles = useQuery('consoles', () => Ipc.send('consoles', 'get'), { staleTime: 60*1000 })
     const { t } = useTranslation()
+    const { favourites: gameFavourites } = useGameFavourites()
+    const hasCloud = Number(account?.level) > 1
+    const recentGames = useQuery('xCloudRecentTitles', () => Ipc.send('xCloud', 'getRecentTitles'), { enabled: hasCloud, staleTime: 60000 })
     const [favourites, setFavourites] = React.useState<string[]>([])
     const [lastConsole, setLastConsole] = React.useState<string | null>(null)
     const [search, setSearch] = React.useState('')
@@ -43,6 +48,7 @@ function Home({ account }: { account?: { gamertag?: string } }) {
             </Head>
 
             <section className='gl-console-page'>
+                <div className='gl-dashboard-welcome'><p className='gl-eyebrow'>Xbox</p><h1>{t('dashboard.welcome', { name: account?.gamertag || '' })}</h1><div className='gl-dashboard-links'>{hasCloud && <Link href='/xcloud/library' className='btn btn-primary'><i className='fa-solid fa-cloud' aria-hidden='true' /> {t('header.xCloudLibrary')}</Link>}<Link href='/profile' className='btn'>{t('dashboard.profile')}</Link><Link href='/settings/streaming' className='btn'>{t('dashboard.qualityPresets')}</Link></div></div>
                 <div className='gl-console-hero'>
                     <h1>{t('page.myConsoles.pageTitle')}</h1>
                     <Button label={consoles.isFetching ? t('dashboard.refreshing') : t('dashboard.refresh')} disabled={consoles.isFetching} onClick={() => { void consoles.refetch() }} />
@@ -109,6 +115,7 @@ function Home({ account }: { account?: { gamertag?: string } }) {
                     }) : <div className='gl-console-feedback'>{all.length ? t('dashboard.noMatchingConsoles') : t('page.myConsoles.noConsoles')}</div>
                 }
                 </div>
+                {hasCloud && <><div className='gl-dashboard-cloud'><h2>{t('header.xCloudLibrary')}</h2><Link href='/xcloud/library' className='btn'>{t('page.xCloud.viewLibraryBtn')}</Link></div>{gameFavourites.length > 0 && <TitleRow titles={gameFavourites}>{t('dashboard.gameFavourites')}</TitleRow>}<TitleRow loading={recentGames.isLoading} titles={recentGames.data}>{t('page.xCloud.recentGames')}</TitleRow></>}
             </section>
 
         </React.Fragment>
