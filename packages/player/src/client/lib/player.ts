@@ -15,14 +15,15 @@ export default class xCloudPlayer {
 
     _peerConnection = new RTCPeerConnection({})
     _channels = {
+        input: new InputChannel(this),
         chat: new ChatChannel(this),
         control: new ControlChannel(this),
-        input: new InputChannel(this),
         message: new MessageChannel(this),
     }
 
     private _elementId: string
     private _isDestoyed: boolean = false
+    serverDisconnected = false
     private _iceHelper = new Ice(this)
     private _sdpHelper = new Sdp(this)
     private _statsHelper = new Stats(this)
@@ -41,7 +42,7 @@ export default class xCloudPlayer {
         this._peerConnection.addTransceiver('audio', { direction: 'sendrecv' })
         const videoTransceiver = this._peerConnection.addTransceiver('video', { direction: 'recvonly' })
         const codecs = this._sdpHelper.getDefaultCodecPreferences(profiles)
-        if (codecs.length) videoTransceiver.setCodecPreferences(codecs)
+        if (profiles.length && codecs.length) videoTransceiver.setCodecPreferences(codecs)
 
         this._peerConnection.ontrack = (event) => {
 

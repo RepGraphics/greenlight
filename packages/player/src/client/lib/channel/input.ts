@@ -51,7 +51,7 @@ export default class InputChannel extends Channel {
         if (this.stopped || this.started || !this.isOpen()) return
         this.started = true
         const Packet = new InputPacket(0)
-        Packet.setMetadata(navigator.maxTouchPoints > 1 ? navigator.maxTouchPoints : 1)
+        Packet.setMetadata(Math.max(2,navigator.maxTouchPoints || 0))
         this.send(Packet.toBuffer())
 
         console.log('[InputChannel] Sent metadata:', Packet, Packet.toBuffer())
@@ -127,10 +127,12 @@ export default class InputChannel extends Channel {
             this.queueGamepadFrames(gamepadFrames)
         }
 
+        this._inputQueue.checkQueueAndSend(true)
         if (!this.stopped) this.loopTimer = setTimeout(this.gamepadStateLoop.bind(this), 16)
     }
 
     queueMetadataFrame(data:MetadataFrame){
+        if (!this.started || this.stopped || !this.isOpen()) return
         return this._inputQueue.queueMetadataFrame(data)
     }
 

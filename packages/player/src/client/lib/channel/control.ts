@@ -56,6 +56,10 @@ export default class ControlChannel extends Channel {
 
         this.send(authRequest)
 
+        // Match upstream V3 initialization without leaving a phantom controller attached.
+        if (!this._gamepadHandlers[0]) { this.sendGamepadState(0,true); this.sendGamepadState(0,false) }
+        clearInterval(this._keyframeInterval)
+        this._keyframeInterval=setInterval(()=>this.requestKeyframeRequest(true),5000)
         for (const index of [0,1,2,3]) if (this._gamepadHandlers[index]) this.sendGamepadState(index, true)
 
         // if(this.getPlayer()._config.keyframe_interval > 0) {

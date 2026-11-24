@@ -480,7 +480,8 @@
       "failure_transport": "The WebRTC transport disconnected or failed.",
       "failure_heartbeat": "The Xbox session stopped responding to keepalive requests.",
       "failure_stats": "WebRTC statistics stopped updating for 15 seconds. The native media pipeline may be stalled.",
-      "autoRecoveryPreference": "Remember automatic recovery across V3 Remote Play sessions. Recovery is limited to two attempts and may interrupt gameplay."
+      "autoRecoveryPreference": "Remember automatic recovery across V3 Remote Play sessions. Recovery is limited to two attempts and may interrupt gameplay.",
+      "failure_server": "Xbox requested that the streaming session disconnect."
     }
   }
 }

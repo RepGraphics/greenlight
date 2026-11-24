@@ -23,7 +23,7 @@ export default class MessageChannel extends Channel {
             'type':'Handshake',
             'version':'messageV1',
             'id':'be0bfc6d-1e83-4c8a-90ed-fa8601c5a179',
-            'cv':'0',
+            'cv':'',
         })
         this.send(handshake)
     }
@@ -58,7 +58,7 @@ export default class MessageChannel extends Channel {
 
     sendConfig(){
         const systemUis = []
-        const systemVersion = [0, 2, 0]
+        const systemVersion = [0, 1, 0]
         const uiConfig = JSON.stringify(this.generateMessage('/streaming/systemUi/configuration', {
             'version': systemVersion,
             'systemUis': systemUis, // Xbox Windows app has [33], xCloud has [10,19,31,27,32,-41]

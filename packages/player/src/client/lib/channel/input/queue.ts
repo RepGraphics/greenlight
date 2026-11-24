@@ -71,6 +71,8 @@ export default class InputQueue {
     }
 
     queueMetadataFrame(data:MetadataFrame) {
+        if(!Number.isFinite(data.serverDataKey)) return
+        if(this._metadataQueue.length>=29)this._metadataQueue.shift()
         this._metadataQueue.push(data)
         this.checkQueueAndSend()
     }

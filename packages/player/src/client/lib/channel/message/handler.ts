@@ -16,7 +16,8 @@ export default class MessageHandler {
         switch(data.target){
             case '/streaming/sessionLifetimeManagement/serverInitiatedDisconnect':
                 this.completeTransaction(data.id, '')
-                this._channel.getPlayer().destroy()
+                // Preserve the reason so the owning session can perform orderly recovery.
+                this._channel.getPlayer().serverDisconnected = true
                 break
             
             case '/streaming/properties/titleinfo':
