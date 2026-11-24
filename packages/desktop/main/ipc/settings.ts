@@ -1,5 +1,5 @@
 import IpcBase from './base'
-import { defaultSettings } from '../../renderer/context/userContext.defaults'
+import defaultSettings from '../../shared/settings-defaults.json'
 
 export default class IpcSettings extends IpcBase {
 

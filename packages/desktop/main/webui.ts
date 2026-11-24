@@ -5,7 +5,7 @@ import expressProxy from 'express-http-proxy'
 import path from 'path'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import Ipc from './ipc'
-import { defaultSettings } from '../renderer/context/userContext.defaults'
+import defaultSettings from '../shared/settings-defaults.json'
 
 export default class WebUI {
     _application:Application
