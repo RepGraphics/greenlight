@@ -214,8 +214,7 @@ function StreamComponent({
                         }
                     })
 
-                    // document.querySelector('div#component_streamcomponent_debug_text').innerHTML = statsOutput;
-                })
+                }).catch(() => {}).finally(() => { statsPending = false })
             }
         }, 250)
 
