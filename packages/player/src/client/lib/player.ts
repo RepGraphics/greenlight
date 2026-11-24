@@ -54,12 +54,13 @@ export default class xCloudPlayer {
                 if (useWebGpu && navigator.gpu && typeof MediaStreamTrackProcessor !== 'undefined') {
                     const gpu = new WebGpuComponent(this)
                     this._videoComponent = gpu
-                    gpu.create(stream, fallback)
+                    gpu.create(stream, () => { if (this._videoComponent === gpu) fallback() })
                 } else fallback()
 
             } else if(event.track.kind === 'audio'){
+                this._audioComponent?.destroy()
                 this._audioComponent = new AudioComponent(this)
-                this._audioComponent.create(event.streams[0])
+                this._audioComponent.create(event.streams[0] || new MediaStream([event.track]))
 
             } else {
                 console.log('[xPlayer] Detected an unknown stream type: ', event.track.kind)
@@ -144,7 +145,7 @@ export default class xCloudPlayer {
             }
             
             for(const channel in this._channels) {
-                this._channels[channel].destroy()
+                try { this._channels[channel].destroy() } catch { /* continue teardown */ }
             }
 
             if(this._videoComponent){ this._videoComponent.destroy() }

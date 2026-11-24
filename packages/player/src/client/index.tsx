@@ -36,6 +36,7 @@ export interface StreamPlayerProps {
     mouseSensitivity?: number;
     buttonMapping?: Record<string, string>;
     onMetrics?: (metrics: StreamMetrics) => void;
+    keyframeRequest?: number;
     onMicrophoneStatus?: (active: boolean, error?: boolean) => void;
 }
 export interface StreamPlayerHandle {
@@ -60,7 +61,7 @@ export interface communicationHandler {
 export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
     ({
         onStatusChanged,
-        communicationHandler, useWebGpu = true, autoGamepad = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false, codecProfiles = [], touchControls = false, keyboardMapping, microphone = false, onMicrophoneStatus, nativeMouseKeyboard = false, deadzone = 0.08, invertY = false, swapSticks = false, mouseSensitivity = 1, buttonMapping, onMetrics
+        communicationHandler, useWebGpu = true, autoGamepad = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false, codecProfiles = [], touchControls = false, keyboardMapping, microphone = false, onMicrophoneStatus, nativeMouseKeyboard = false, deadzone = 0.08, invertY = false, swapSticks = false, mouseSensitivity = 1, buttonMapping, onMetrics, keyframeRequest = 0
     }, ref): ReactElement => {
         const handler = useRef(communicationHandler);
         handler.current = communicationHandler;
@@ -77,6 +78,13 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
         // let player = new xCloudPlayer('playerContainer');
         const [player, setPlayer] = useState<xCloudPlayer | undefined>(undefined);
 
+        const lastKeyframeRequest = useRef(0);
+        useEffect(() => {
+            if (player && playerState === 'Connected' && keyframeRequest > lastKeyframeRequest.current) {
+                lastKeyframeRequest.current = keyframeRequest;
+                player._channels.control.requestKeyframeRequest(true);
+            }
+        }, [player, playerState, keyframeRequest]);
         const micCallback = useRef(onMicrophoneStatus);
         micCallback.current = onMicrophoneStatus;
         useEffect(() => {

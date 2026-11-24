@@ -13,6 +13,7 @@ interface GamepadHandlers {
 export default class ControlChannel extends Channel {
     private authorizationRequested = false
     private authorized = false
+    private lastKeyframe = -Infinity
     _keyframeInterval
     _gamepadHandlers:GamepadHandlers = {
         0: undefined,
@@ -88,13 +89,15 @@ export default class ControlChannel extends Channel {
     }
 
     requestKeyframeRequest(ifrRequested = false) {
-        // console.log('xCloudPlayer Channel/Control.ts - ['+this._channelName+'] User requested Video KeyFrame')
+        if (!this.isOpen() || !this.authorized || performance.now() - this.lastKeyframe < 3000) return false
+        this.lastKeyframe = performance.now()
         const keyframeRequest = JSON.stringify({
             message: 'videoKeyframeRequested',
             ifrRequested: ifrRequested,
         })
 
         this.send(keyframeRequest)
+        return true
     }
 
     getGamepadHandlers(){

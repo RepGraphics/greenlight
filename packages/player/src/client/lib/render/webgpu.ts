@@ -10,6 +10,14 @@ export default class WebGpuComponent {
     private _element:HTMLCanvasElement | undefined
     private _overlay:Overlay
     private _isActive: boolean = true
+    private _failure: () => void = () => {}
+    private _failureReported = false
+
+    private fail() {
+        if (!this._isActive || this._failureReported) return
+        this._failureReported = true
+        this._failure()
+    }
 
     private _gpuReader:ReadableStreamDefaultReader<VideoFrame> | undefined
     private _gpuVideoTexture:GPUTexture | null = null
@@ -35,6 +43,7 @@ export default class WebGpuComponent {
     }
 
     create(stream:MediaStream, onFailure: () => void = () => {}) {
+        this._failure = onFailure
         const videoElement = document.createElement('canvas')
         console.log('Creating WebGPU canvas element for stream:', stream);
 
@@ -55,7 +64,7 @@ export default class WebGpuComponent {
         navigator.gpu.requestAdapter().then((adapter:any) => {
             if (!this._isActive) return
             if (!adapter) {
-                onFailure();
+                this.fail();
                 return;
             }
             console.log('WebGPU adapter:', adapter);
@@ -63,9 +72,12 @@ export default class WebGpuComponent {
                 if (!this._isActive) { device.destroy(); return }
                 const context = videoElement.getContext("webgpu");
                 if (!context) {
-                    device.destroy(); onFailure();
+                    device.destroy(); this.fail();
                     return;
                 }
+                this._gpuDevice = device
+                this._gpuContext = context
+                device.addEventListener('uncapturederror', () => this.fail())
                 const format = navigator.gpu.getPreferredCanvasFormat();
                 context.configure({
                     device,
@@ -76,7 +88,7 @@ export default class WebGpuComponent {
                 });
 
                 this._gpuDevice = device
-                void device.lost.then(() => { if (this._isActive) onFailure() })
+                void device.lost.then(() => { if (this._isActive) this.fail() })
                 this._gpuContext = context
 
                 // Additional WebGPU setup and rendering logic would go here
@@ -206,9 +218,10 @@ export default class WebGpuComponent {
                 });
 
                 // Start rendering loop
-                that.processVideoData();
+                this.resizeCanvas()
+                void that.processVideoData();
             });
-        }).catch(() => { if (this._isActive) onFailure() });
+        }).catch(() => { if (this._isActive) this.fail() });
 
         // console.log('WebGPU adapter:', adapter, navigator.gpu);
         // const device = adapter.requestDevice();
@@ -256,22 +269,22 @@ export default class WebGpuComponent {
 
         this._isProcessingFrame = true;
 
+        let pendingFrame: VideoFrame | undefined
         try {
             // Non-blocking read - check if frame is available without waiting
+            if (!this._gpuReader) { this.fail(); return }
             const { value: frame, done } = await this._gpuReader.read();
+            pendingFrame = frame
             if (done || !this._isActive || !frame) {
-                this._isProcessingFrame = false;
+                if (done && this._isActive) this.fail()
                 return;
             }
 
             // Frame dropping: if multiple frames queued, skip older ones to maintain order and latency
             // This prevents frames from being processed out of order
             if (this._frameQueueSize > 0) {
-                frame.close();
                 this._droppedFrames++;
-                this._isProcessingFrame = false;
-                // Continue processing next frame immediately without delay
-                this.videoLoop();
+                // Finally schedules the next read.
                 return;
             }
 
@@ -368,16 +381,18 @@ export default class WebGpuComponent {
                 frameRenderedTimeMs: renderEndTime,
             })
 
-            frame.close();
-            this._frameQueueSize--;
+
 
         } catch (error) {
             console.error('Error processing video frame:', error);
+            this.fail()
         } finally {
+            pendingFrame?.close()
+            this._frameQueueSize = 0
             this._isProcessingFrame = false;
             
             // Continue processing next frame immediately without vsync delay for low-latency streaming
-            if (this._isActive) {
+            if (this._isActive && !this._failureReported) {
                 this.videoLoop();
             }
         }
@@ -400,8 +415,8 @@ export default class WebGpuComponent {
         const devicePixelRatio = window.devicePixelRatio || 1
 
         // Calculate the actual canvas size in device pixels
-        const width = Math.floor(displayWidth * devicePixelRatio)
-        const height = Math.floor(displayHeight * devicePixelRatio)
+        const width = Math.max(1, Math.min(this._gpuDevice.limits.maxTextureDimension2D, Math.floor(displayWidth * devicePixelRatio)))
+        const height = Math.max(1, Math.min(this._gpuDevice.limits.maxTextureDimension2D, Math.floor(displayHeight * devicePixelRatio)))
 
         // Check if canvas needs resizing
         if (this._element.width !== width || this._element.height !== height) {
@@ -454,13 +469,13 @@ export default class WebGpuComponent {
     }
 
     destroy(){
-        const streamHolder = document.getElementById(this._player.getElementId())
+        if (!this._isActive) return
         this._isActive = false
-        const element = streamHolder?.querySelector('canvas')
 
         // Clean up GPU reader
         if(this._gpuReader){
-            void this._gpuReader.cancel().catch(() => {});
+            const reader = this._gpuReader
+            void reader.cancel().catch(() => {}).finally(() => { try { reader.releaseLock() } catch {} });
             this._gpuReader = undefined;
         }
 
@@ -479,10 +494,6 @@ export default class WebGpuComponent {
         this._gpuDevice = null
         if(this._overlay !== undefined){
             this._overlay.destroy()
-        }
-
-        if(element){
-            element.remove()
         }
 
         if(this._element){

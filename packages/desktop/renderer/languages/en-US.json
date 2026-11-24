@@ -448,7 +448,8 @@
       "restartQuality": "Restart with lower bitrate?",
       "restartQualityWarning": "This starts a new streaming session with a requested {{bitrate}} Mbps cap. Cloud Gaming may require joining the queue again and unsaved progress could be lost. Global settings will not change.",
       "networkGraphs": "Network graphs",
-      "networkGraphWindow": "Recent 60 seconds of streaming measurements. Each graph uses its own scale."
+      "networkGraphWindow": "Recent 60 seconds of streaming measurements. Each graph uses its own scale.",
+      "refreshVideo": "Refresh video"
     }
   }
 }
