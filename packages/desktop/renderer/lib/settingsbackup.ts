@@ -5,7 +5,7 @@ import { readConsoleProfiles } from './consoleprofiles'
 import { defaultButtonMapping } from '../../../player/src/client/lib/input/mapping'
 
 type Settings = typeof defaultSettings
-const boolKeys = ['v3_native_mkb','v3_invert_y','v3_swap_sticks','xcloud_show_non_entitled','controller_vibration','input_touch','input_mousekeyboard','input_newgamepad','app_lowresolution','stream_performance_hud','video_enabled','audio_enabled'] as const
+const boolKeys = ['v3_session_history','v3_native_mkb','v3_invert_y','v3_swap_sticks','xcloud_show_non_entitled','controller_vibration','input_touch','input_mousekeyboard','input_newgamepad','app_lowresolution','stream_performance_hud','video_enabled','audio_enabled'] as const
 const object = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string,unknown> : {}
 export function portableSettings(value: unknown): Partial<Settings> {
     const raw = object(value)

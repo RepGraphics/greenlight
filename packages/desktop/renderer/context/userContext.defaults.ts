@@ -6,6 +6,7 @@ export const defaultSettings = {
     streaming_engine: 'legacy',
     v3_renderer: 'video',
     v3_native_mkb: false,
+    v3_session_history: false,
     v3_deadzone: 0.08,
     v3_invert_y: false,
     v3_swap_sticks: false,

@@ -393,7 +393,24 @@
       "cancelBackup": "Cancel",
       "backupInvalid": "Invalid or unsupported settings backup (maximum 1 MB).",
       "backupRestored": "Settings restored. Restart the app for all changes to take effect.",
-      "backupFailed": "Could not save restored settings."
+      "backupFailed": "Could not save restored settings.",
+      "sessionHistory": "Session history",
+      "historyDescription": "Optional local history for V3 streaming attempts. Keeps up to 100 records with duration, outcome and recent connection statistics. No console, game, account or network identifiers are stored.",
+      "recordHistory": "Record future V3 sessions",
+      "historyFilter": "Streaming mode",
+      "historyAll": "All sessions",
+      "historyTotals": "{{count}} sessions · {{minutes}} minutes connected",
+      "clearHistory": "Clear history",
+      "clearHistoryConfirm": "Delete all locally saved streaming history?",
+      "historyClearFailed": "Could not clear local history.",
+      "historyEmpty": "No recorded sessions.",
+      "historyDate": "Date",
+      "historyMode": "Mode",
+      "historyDuration": "Duration",
+      "historyOutcome": "Outcome",
+      "history_ended": "Ended",
+      "history_failed": "Failed",
+      "history_interrupted": "Interrupted"
     }
   }
 }

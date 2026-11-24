@@ -58,3 +58,13 @@ test('quality summary requires sufficient samples and uses p95 latency', () => {
     assert.equal(summarizeDiagnostics(make(200)).quality,'poor')
     assert.equal(summarizeDiagnostics(make(20)).packetsLostDuringWindow,9)
 })
+
+import { makeSessionRecord } from '../../renderer/lib/sessionhistory'
+
+test('session history records connected duration without target identifiers',()=>{
+ const record=makeSessionRecord(1000,3000,63000,'home','ended',[])
+ assert.equal(record.durationSeconds,60)
+ assert.equal(record.quality,'insufficient')
+ assert.equal(Object.keys(record).length,8)
+ assert.equal(makeSessionRecord(1000,0,5000,'cloud','failed',[]).durationSeconds,0)
+})
