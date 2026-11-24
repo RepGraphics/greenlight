@@ -30,7 +30,7 @@ An independently maintained fork of [Greenlight](https://github.com/unknownskl/g
 | Standard video playback | Yes | Yes |
 | WebGPU rendering | — | Experimental |
 | Controller profiles, remapping and calibration | — | Yes |
-| Console-paired controller mode | — | Yes |
+| Console-paired controller mode | Yes | Yes |
 | Touch gamepad and native mouse/keyboard | — | Experimental |
 | Video filters and sharpening | — | Yes |
 | Screenshots, picture-in-picture and local clips | — | Standard video only |
@@ -70,7 +70,7 @@ The original [Flathub package](https://flathub.org/apps/details/io.github.unknow
 
 Select V3 under **Settings → Streaming → Streaming engine**. Begin with standard video rendering, automatic bitrate and automatic H.264 profile selection. Return to Classic if you encounter stability or compatibility issues.
 
-If your controller is paired directly to the Xbox, enable **Controller connected to Xbox** under **Settings → Input** before opening the stream. This prevents V3 from registering a virtual controller or forwarding local input. The setting is saved between sessions.
+If your controller is paired directly to the Xbox, enable **Controller connected to Xbox** under **Settings → Input** before opening the stream. This prevents either player from registering a virtual controller or forwarding local input during Remote Play. The setting is saved between sessions.
 
 Press **F8** (default) to pin the streaming toolbar. Configure additional V3 shortcuts under Settings → Input. Use it to access network graphs, video adjustments, screenshots, clips and recovery controls.
 
@@ -101,7 +101,7 @@ Enable Instant replay in the streaming toolbar to keep recent standalone WebM se
 ## Troubleshooting
 
 - **Black screen or frozen stream:** compare Classic and V3 with the same console and quality settings. V3 has media and statistics stall detection and an optional persistent auto-reconnect setting. A recurring failure should still be reported.
-- **Console controller stops responding:** enable console-connected controller mode before starting V3 and reconnect the stream.
+- **Console controller stops responding:** enable console-connected controller mode before starting Classic or V3 and reconnect the stream.
 - **WebGPU or capture problems:** use standard video rendering. Screenshot, picture-in-picture and recording support depends on the platform.
 - **Handheld controls:** enable the handheld layout in settings and configure the device's controller mapping as needed.
 

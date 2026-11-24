@@ -1,4 +1,5 @@
 import React from 'react'
+import { configureClassicConsoleController } from '../../lib/classicconsolecontroller'
 import { readConsoleProfiles } from '../../lib/consoleprofiles'
 import { readGameProfiles } from '../../lib/gameprofiles'
 import ExperimentalStream from '../../components/ui/experimentalstream'
@@ -20,6 +21,7 @@ function LegacyStream() {
     const consoleProfile = !target.startsWith('xcloud_') ? readConsoleProfiles(globalSettings.console_profiles).find(item => item.consoleId === target) : undefined
     const settings = {...globalSettings, xhome_resolution:consoleProfile?.resolution ?? globalSettings.xhome_resolution, xcloud_resolution:profile?.resolution ?? globalSettings.xcloud_resolution, xcloud_bitrate:profile?.bitrate ?? globalSettings.xcloud_bitrate, xhome_bitrate:consoleProfile?.bitrate ?? globalSettings.xhome_bitrate}
     const { t } = useTranslation()
+    const [consoleController] = React.useState(()=>!target.startsWith('xcloud_') && Boolean(globalSettings.v3_console_controller))
 
     const streamStateInterval = React.useRef<ReturnType<typeof setInterval> | undefined>(undefined)
     const keepaliveInterval = React.useRef<ReturnType<typeof setInterval> | undefined>(undefined)
@@ -56,6 +58,7 @@ function LegacyStream() {
             surface.className = 'size_' + settings.video_size
             holder.replaceChildren(surface)
             xPlayer.bind()
+            if(consoleController && streamType==='home') configureClassicConsoleController(xPlayer)
 
             // Set bitrates & video codec profiles
             if(((streamType === 'cloud') ? settings.xcloud_bitrate : settings.xhome_bitrate) > 0){
@@ -206,9 +209,9 @@ function LegacyStream() {
                             // Start xPlayer interface
                             setxPlayer(new xCloudPlayer('streamComponent', {
                                 ui_systemui: [],
-                                input_touch: settings.input_touch || false,
-                                input_mousekeyboard: settings.input_mousekeyboard || false,
-                                input_legacykeyboard: (settings.input_newgamepad) ? false : true,
+                                input_touch: !consoleController && Boolean(settings.input_touch),
+                                input_mousekeyboard: !consoleController && Boolean(settings.input_mousekeyboard),
+                                input_legacykeyboard: !consoleController && !settings.input_newgamepad,
                                 input_mousekeyboard_config: settings.input_mousekeyboard_config !== undefined ? {
                                     _keymapping: settings.input_mousekeyboard_config,
                                 } : undefined as any,
@@ -292,7 +295,7 @@ function LegacyStream() {
 
             { (xPlayer !== undefined) ? <StreamComponent onDisconnect={ () => {
                 onDisconnect()
-            }} onMenu={ () => {
+            }} onMenu={ consoleController ? undefined : () => {
                 gamepadSend('nexus')
             } } xPlayer={ xPlayer }></StreamComponent> : (queueTime > 0) ?<StreamPreload onDisconnect={ () => {
                 onDisconnect()

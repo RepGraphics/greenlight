@@ -35,6 +35,8 @@ Changes on `main-v2` are development changes, not a new numbered release. See [c
 
 ### Changed / fixed
 
+- Classic Remote Play now honours console-paired controller mode, preventing virtual controller registration while preserving frame acknowledgements.
+
 - Electron build entry point and packaging checks.
 - Token storage and IPC/WebUI security hardening.
 - Data-channel initialization, media monitoring, bounded session requests and renderer cleanup.

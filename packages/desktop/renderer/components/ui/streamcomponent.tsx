@@ -433,8 +433,8 @@ function StreamComponent({
                             marginLeft: 'auto',
                             marginRight: 'auto',
                         }}>
-                            <Button label={<span><i className="fa-brands fa-xbox"></i> {t("streamWindow.menuBtn")}</span>} title={t("streamWindow.menuTitle")} onClick={(e) => {
-                                e.target.blur(); onMenu()
+                            <Button disabled={!onMenu} label={<span><i className="fa-brands fa-xbox"></i> {t("streamWindow.menuBtn")}</span>} title={t("streamWindow.menuTitle")} onClick={(e) => {
+                                e.target.blur(); onMenu?.()
                             }}></Button> &nbsp;
                             <Button label={(micStatus === false) ? <span><i className="fa-solid fa-microphone-slash"></i> {t("streamWindow.micMuted")}</span> : <span><i className="fa-solid fa-microphone"></i> {t("streamWindow.micActive")}</span>} title={(micStatus === false) ? t("streamWindow.enableMic") : t("streamWindow.disableMic")} className={(micStatus === false) ? 'btn-cancel' : 'btn-primary'} onClick={(e) => {
                                 e.target.blur(); toggleMic()
