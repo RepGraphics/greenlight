@@ -410,7 +410,18 @@
       "historyOutcome": "Outcome",
       "history_ended": "Ended",
       "history_failed": "Failed",
-      "history_interrupted": "Interrupted"
+      "history_interrupted": "Interrupted",
+      "controllerTest": "Live controller test",
+      "controllerTestDescription": "Inspect physical controller input locally. Press a controller button if the device is not detected.",
+      "startControllerTest": "Start testing",
+      "stopControllerTest": "Stop testing",
+      "leftStick": "Left stick",
+      "rightStick": "Right stick",
+      "calibrationInstructions": "Release both sticks and keep the window focused for three seconds. This estimates a V3 deadzone from resting stick drift.",
+      "calibrateDeadzone": "Measure resting drift",
+      "calibrationFailed": "Calibration interrupted or excessive movement detected. Release the sticks and try again.",
+      "calibrationResult": "Suggested V3 deadzone: {{value}}%",
+      "nonstandardController": "This device does not expose the standard gamepad layout. Raw button and axis readings remain available."
     }
   }
 }

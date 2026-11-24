@@ -1,4 +1,5 @@
 import React from 'react'
+import ControllerTest from '../../components/settings/controllertest'
 import { controllerPresets, readProfiles, snapshotProfile } from '../../lib/controllerprofiles'
 import type { ControllerProfile } from '../../lib/controllerprofiles'
 import { defaultButtonMapping, validateButtonMapping } from '../../../../player/src/client/lib/input/mapping'
@@ -233,6 +234,7 @@ function SettingsInput() {
                     </div>
                 </Card>
 
+                <ControllerTest />
                 <Card hidden={settings.streaming_engine !== 'experimental'}>
                     <h1>{t('dashboard.advancedInput')}</h1>
                     <p><label htmlFor='v3-deadzone'>{t('dashboard.deadzone')}</label><input id='v3-deadzone' type='range' min='0' max='0.5' step='0.01' value={settings.v3_deadzone} onChange={e => setSettings({...settings, v3_deadzone:Number(e.target.value)})} /> {Math.round(settings.v3_deadzone*100)}%</p>

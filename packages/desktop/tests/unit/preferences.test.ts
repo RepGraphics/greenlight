@@ -68,3 +68,6 @@ test('session history records connected duration without target identifiers',()=
  assert.equal(Object.keys(record).length,8)
  assert.equal(makeSessionRecord(1000,0,5000,'cloud','failed',[]).durationSeconds,0)
 })
+
+import { recommendDeadzone } from '../../renderer/lib/controllercalibration'
+test('calibration recommends a bounded deadzone and rejects movement',()=>{assert.equal(recommendDeadzone(Array.from({length:60},()=>[0,0,0,0])),0.03);assert.equal(recommendDeadzone(Array.from({length:60},()=>[0.1,0,0,0])),0.12);assert.equal(recommendDeadzone(Array.from({length:60},()=>[0.7,0,0,0])),null);assert.equal(recommendDeadzone([[0,0,0,0]]),null)})
