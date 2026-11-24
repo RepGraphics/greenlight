@@ -43,8 +43,19 @@ export default class xCloudPlayer {
 
             if(event.track.kind === 'video'){
                 // this._videoComponent = new VideoComponent(this)
-                this._videoComponent = useWebGpu && navigator.gpu ? new WebGpuComponent(this) : new VideoComponent(this)
-                this._videoComponent.create(event.streams[0])
+                this._videoComponent?.destroy()
+                const stream = event.streams[0] || new MediaStream([event.track])
+                const fallback = () => {
+                    if (this._isDestoyed) return
+                    this._videoComponent?.destroy()
+                    this._videoComponent = new VideoComponent(this)
+                    this._videoComponent.create(stream)
+                }
+                if (useWebGpu && navigator.gpu && typeof MediaStreamTrackProcessor !== 'undefined') {
+                    const gpu = new WebGpuComponent(this)
+                    this._videoComponent = gpu
+                    gpu.create(stream, fallback)
+                } else fallback()
 
             } else if(event.track.kind === 'audio'){
                 this._audioComponent = new AudioComponent(this)

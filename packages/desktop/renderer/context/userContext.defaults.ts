@@ -1,5 +1,7 @@
 export const defaultSettings = {
     streaming_engine: 'legacy',
+    v3_renderer: 'video',
+    v3_native_mkb: false,
     xhome_bitrate: 0,
     xcloud_bitrate: 0,
     xcloud_show_non_entitled: true,

@@ -336,7 +336,12 @@
       "muteAudio": "Mute audio",
       "volume": "Volume",
       "touchControls": "Touch controls",
-      "microphoneFailed": "Microphone could not be enabled. Check permissions or use the classic player."
+      "microphoneFailed": "Microphone could not be enabled. Check permissions or use the classic player.",
+      "v3Renderer": "V3 video renderer",
+      "standardVideo": "Standard video (recommended)",
+      "rendererDescription": "WebGPU is experimental. The standard renderer is used when GPU initialization fails.",
+      "nativeMkb": "Native mouse and keyboard",
+      "nativeMkbHint": "Click the video to capture mouse and keyboard. Press Esc to release. Requires game support."
     }
   }
 }

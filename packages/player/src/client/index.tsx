@@ -27,6 +27,7 @@ export interface StreamPlayerProps {
     touchControls?: boolean;
     keyboardMapping?: Record<string, string>;
     microphone?: boolean;
+    nativeMouseKeyboard?: boolean;
     onMicrophoneStatus?: (active: boolean, error?: boolean) => void;
 }
 export interface StreamPlayerHandle {
@@ -51,7 +52,7 @@ export interface communicationHandler {
 export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
     ({
         onStatusChanged,
-        communicationHandler, useWebGpu = true, autoGamepad = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false, codecProfiles = [], touchControls = false, keyboardMapping, microphone = false, onMicrophoneStatus
+        communicationHandler, useWebGpu = true, autoGamepad = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false, codecProfiles = [], touchControls = false, keyboardMapping, microphone = false, onMicrophoneStatus, nativeMouseKeyboard = false
     }, ref): ReactElement => {
         const handler = useRef(communicationHandler);
         handler.current = communicationHandler;
@@ -76,6 +77,19 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             player._channels.chat.setMicrophone(microphone, handler.current.sendChatSDP).then(active => { if (!disposed) micCallback.current?.(active) }).catch(() => { if (!disposed) micCallback.current?.(false, true) });
             return () => { disposed = true };
         }, [player, playerState, microphone]);
+        useEffect(() => {
+            if (!player || !nativeMouseKeyboard || playerState !== 'Connected') return;
+            let input: MouseKeyboard | undefined;
+            let surface: HTMLElement | undefined;
+            const sync = () => {
+                const element = player.getVideoElement();
+                if (!element || element === surface) return;
+                input?.detach();
+                input = new MouseKeyboard(0); input.attach(player); surface = element;
+            };
+            sync(); const timer = setInterval(sync, 500);
+            return () => { clearInterval(timer); input?.detach() };
+        }, [player, nativeMouseKeyboard, playerState]);
         const [metrics, setMetrics] = useState({ width: 0, height: 0, fps: 0, bitrate: 0, jitter: 0, loss: 0 });
         useEffect(() => {
             if (!player) return;

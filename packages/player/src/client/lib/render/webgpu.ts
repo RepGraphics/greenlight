@@ -34,7 +34,7 @@ export default class WebGpuComponent {
         this._overlay = new Overlay(this, this._player)
     }
 
-    create(stream:MediaStream) {
+    create(stream:MediaStream, onFailure: () => void = () => {}) {
         const videoElement = document.createElement('canvas')
         console.log('Creating WebGPU canvas element for stream:', stream);
 
@@ -53,15 +53,17 @@ export default class WebGpuComponent {
         const that:WebGpuComponent = this
 
         navigator.gpu.requestAdapter().then((adapter:any) => {
+            if (!this._isActive) return
             if (!adapter) {
-                console.error('Failed to get GPU adapter');
+                onFailure();
                 return;
             }
             console.log('WebGPU adapter:', adapter);
-            adapter.requestDevice().then((device:any) => {
+            return adapter.requestDevice().then((device:any) => {
+                if (!this._isActive) { device.destroy(); return }
                 const context = videoElement.getContext("webgpu");
                 if (!context) {
-                    console.error('Failed to get WebGPU context');
+                    device.destroy(); onFailure();
                     return;
                 }
                 const format = navigator.gpu.getPreferredCanvasFormat();
@@ -74,6 +76,7 @@ export default class WebGpuComponent {
                 });
 
                 this._gpuDevice = device
+                void device.lost.then(() => { if (this._isActive) onFailure() })
                 this._gpuContext = context
 
                 // Additional WebGPU setup and rendering logic would go here
@@ -205,7 +208,7 @@ export default class WebGpuComponent {
                 // Start rendering loop
                 that.processVideoData();
             });
-        });
+        }).catch(() => { if (this._isActive) onFailure() });
 
         // console.log('WebGPU adapter:', adapter, navigator.gpu);
         // const device = adapter.requestDevice();
@@ -457,7 +460,7 @@ export default class WebGpuComponent {
 
         // Clean up GPU reader
         if(this._gpuReader){
-            this._gpuReader.cancel();
+            void this._gpuReader.cancel().catch(() => {});
             this._gpuReader = undefined;
         }
 
@@ -471,6 +474,9 @@ export default class WebGpuComponent {
             this._gpuVideoTexture = null;
         }
 
+        this._gpuContext?.unconfigure()
+        this._gpuDevice?.destroy()
+        this._gpuDevice = null
         if(this._overlay !== undefined){
             this._overlay.destroy()
         }
