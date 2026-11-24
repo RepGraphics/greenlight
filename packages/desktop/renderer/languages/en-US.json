@@ -449,7 +449,9 @@
       "restartQualityWarning": "This starts a new streaming session with a requested {{bitrate}} Mbps cap. Cloud Gaming may require joining the queue again and unsaved progress could be lost. Global settings will not change.",
       "networkGraphs": "Network graphs",
       "networkGraphWindow": "Recent 60 seconds of streaming measurements. Each graph uses its own scale.",
-      "refreshVideo": "Refresh video"
+      "refreshVideo": "Refresh video",
+      "consoleController": "Controller connected to Xbox (V3 Remote Play)",
+      "consoleControllerDescription": "Use the controller paired directly with your console. Greenlight will not register a remote gamepad or forward local keyboard, mouse or touch input in this mode. Applies to V3 Remote Play only."
     }
   }
 }

@@ -56,7 +56,6 @@ export default class ControlChannel extends Channel {
 
         this.send(authRequest)
 
-        if (!this._gamepadHandlers[0]) { this.sendGamepadState(0, true); this.sendGamepadState(0, false) }
         for (const index of [0,1,2,3]) if (this._gamepadHandlers[index]) this.sendGamepadState(index, true)
 
         // if(this.getPlayer()._config.keyframe_interval > 0) {

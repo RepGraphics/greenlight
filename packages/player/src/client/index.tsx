@@ -20,6 +20,7 @@ export interface StreamPlayerProps {
     communicationHandler: communicationHandler;
     useWebGpu?: boolean;
     autoGamepad?: boolean;
+    consoleController?: boolean;
     vibration?: boolean;
     videoBitrate?: number;
     showStats?: boolean;
@@ -61,7 +62,7 @@ export interface communicationHandler {
 export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
     ({
         onStatusChanged,
-        communicationHandler, useWebGpu = true, autoGamepad = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false, codecProfiles = [], touchControls = false, keyboardMapping, microphone = false, onMicrophoneStatus, nativeMouseKeyboard = false, deadzone = 0.08, invertY = false, swapSticks = false, mouseSensitivity = 1, buttonMapping, onMetrics, keyframeRequest = 0
+        communicationHandler, useWebGpu = true, autoGamepad = false, consoleController = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false, codecProfiles = [], touchControls = false, keyboardMapping, microphone = false, onMicrophoneStatus, nativeMouseKeyboard = false, deadzone = 0.08, invertY = false, swapSticks = false, mouseSensitivity = 1, buttonMapping, onMetrics, keyframeRequest = 0
     }, ref): ReactElement => {
         const handler = useRef(communicationHandler);
         handler.current = communicationHandler;
@@ -85,6 +86,24 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 player._channels.control.requestKeyframeRequest(true);
             }
         }, [player, playerState, keyframeRequest]);
+        // Register a remote controller only when the client actually needs one.
+        useEffect(() => {
+            if (!player || playerState !== 'Connected' || !autoGamepad || consoleController) return;
+            let attached: Gamepad | undefined;
+            const sync = () => {
+                const hasPhysical = Array.from(navigator.getGamepads?.() || []).some(pad => pad?.connected);
+                const needed = hasPhysical || touchControls || Boolean(keyboardMapping);
+                if (needed && !attached) {
+                    const mapping = keyboardMapping ? Object.fromEntries(Object.entries(keyboardMapping).map(([key,button])=>[button,key])) : undefined;
+                    attached = new Gamepad(0,{enable_keyboard:Boolean(mapping),...(mapping?{keyboard_mapping:mapping}:{}),enable_vibration:vibration,gamepad_deadzone:deadzone,gamepad_invert_y:invertY,gamepad_swap_sticks:swapSticks,gamepad_mapping:buttonMapping});
+                    attached.attach(player); controller.current = attached;
+                } else if (!needed && attached) {
+                    attached.detach(); attached=undefined; controller.current=undefined;
+                }
+            };
+            sync(); const timer=setInterval(sync,500);
+            return () => { clearInterval(timer); if(attached){releaseTouch();attached.detach()} controller.current=undefined };
+        }, [player,playerState,autoGamepad,consoleController,touchControls,keyboardMapping,vibration,deadzone,invertY,swapSticks,buttonMapping]);
         const micCallback = useRef(onMicrophoneStatus);
         micCallback.current = onMicrophoneStatus;
         useEffect(() => {
@@ -94,7 +113,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             return () => { disposed = true };
         }, [player, playerState, microphone]);
         useEffect(() => {
-            if (!player || !nativeMouseKeyboard || playerState !== 'Connected') return;
+            if (!player || consoleController || !nativeMouseKeyboard || playerState !== 'Connected') return;
             let input: MouseKeyboard | undefined;
             let surface: HTMLElement | undefined;
             const sync = () => {
@@ -105,7 +124,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             };
             sync(); const timer = setInterval(sync, 500);
             return () => { clearInterval(timer); input?.detach() };
-        }, [player, nativeMouseKeyboard, playerState, mouseSensitivity]);
+        }, [player, consoleController, nativeMouseKeyboard, playerState, mouseSensitivity]);
         const metricsCallback = useRef(onMetrics);
         metricsCallback.current = onMetrics;
         const [metrics, setMetrics] = useState<StreamMetrics>({ width: 0, height: 0, fps: 0, bitrate: 0, jitter: 0, loss: 0, rtt: 0 });
@@ -206,13 +225,6 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                     else if (peer.connectionState === 'failed' || peer.connectionState === 'closed') status('Error');
                 };
                 peer.addEventListener('connectionstatechange', onConnection);
-                if (autoGamepad) {
-                    const mapping = keyboardMapping ? Object.fromEntries(Object.entries(keyboardMapping).map(([key, button]) => [button, key])) : undefined;
-                    const gamepad = new Gamepad(0, { enable_keyboard: Boolean(mapping), ...(mapping ? { keyboard_mapping: mapping } : {}), enable_vibration: vibration, gamepad_deadzone: deadzone, gamepad_invert_y: invertY, gamepad_swap_sticks: swapSticks, gamepad_mapping: buttonMapping });
-                    const attach = () => { if (!disposed) { gamepad.attach(instance!); controller.current = gamepad; inputs.current.push(gamepad); } };
-                    const ready = () => { if (peer.connectionState === 'connected') { peer.removeEventListener('connectionstatechange', ready); attach(); } };
-                    peer.addEventListener('connectionstatechange', ready); ready();
-                }
                 connectionDeadline = setTimeout(() => { if (peer.connectionState !== 'connected') status('Error') }, 30000);
                 status('Negotiated'); onConnection();
                 keepalive = setTimeout(heartbeat, 30000);
@@ -253,7 +265,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
         return (
             <div ref={playerInstance}>
                 <div id="playerContainer"></div>
-                {touchControls && playerState === 'Connected' && <div className="gl-touch-overlay"><div className="gl-touch-shoulders">{touchButton('LeftTrigger','LT')}{touchButton('LeftShoulder','LB')}{touchButton('View','▣')}{touchButton('Nexus','Xbox')}{touchButton('Menu','☰')}{touchButton('RightShoulder','RB')}{touchButton('RightTrigger','RT')}</div><div className="gl-touch-dpad">{touchButton('DPadUp','↑')}{touchButton('DPadLeft','←')}{touchButton('DPadRight','→')}{touchButton('DPadDown','↓')}</div><VirtualStick side="Left" onMove={(x,y) => controller.current?.setVirtualStick('Left', x,y)} onRelease={() => controller.current?.releaseVirtualStick('Left')} /><VirtualStick side="Right" onMove={(x,y) => controller.current?.setVirtualStick('Right', x,y)} onRelease={() => controller.current?.releaseVirtualStick('Right')} /><div className="gl-touch-abxy">{touchButton('Y','Y')}{touchButton('X','X')}{touchButton('B','B')}{touchButton('A','A')}</div></div>}
+                {!consoleController && touchControls && playerState === 'Connected' && <div className="gl-touch-overlay"><div className="gl-touch-shoulders">{touchButton('LeftTrigger','LT')}{touchButton('LeftShoulder','LB')}{touchButton('View','▣')}{touchButton('Nexus','Xbox')}{touchButton('Menu','☰')}{touchButton('RightShoulder','RB')}{touchButton('RightTrigger','RT')}</div><div className="gl-touch-dpad">{touchButton('DPadUp','↑')}{touchButton('DPadLeft','←')}{touchButton('DPadRight','→')}{touchButton('DPadDown','↓')}</div><VirtualStick side="Left" onMove={(x,y) => controller.current?.setVirtualStick('Left', x,y)} onRelease={() => controller.current?.releaseVirtualStick('Left')} /><VirtualStick side="Right" onMove={(x,y) => controller.current?.setVirtualStick('Right', x,y)} onRelease={() => controller.current?.releaseVirtualStick('Right')} /><div className="gl-touch-abxy">{touchButton('Y','Y')}{touchButton('X','X')}{touchButton('B','B')}{touchButton('A','A')}</div></div>}
                 {showStats && <div className="gl-performance-hud"><span>{metrics.width ? metrics.width + '×' + metrics.height : '—'}</span><span>{Math.round(metrics.fps)} FPS</span><span>{metrics.bitrate.toFixed(1)} Mbps</span><span>{metrics.jitter.toFixed(1)} ms jitter</span><span>{metrics.loss} packets lost</span></div>}
             </div>
         );

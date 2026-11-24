@@ -234,6 +234,7 @@ function SettingsInput() {
                     </div>
                 </Card>
 
+                <Card><h1>{t('dashboard.consoleController')}</h1><p>{t('dashboard.consoleControllerDescription')}</p><label><input type='checkbox' checked={settings.v3_console_controller} onChange={event=>setSettings({...settings,v3_console_controller:event.target.checked})}/> {t('dashboard.consoleController')}</label></Card>
                 <ControllerTest />
                 <Card hidden={settings.streaming_engine !== 'experimental'}>
                     <h1>{t('dashboard.advancedInput')}</h1>

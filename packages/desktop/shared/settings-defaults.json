@@ -53,5 +53,6 @@
     "audio_enabled": true,
     "webui_autostart": false,
     "webui_port": 9003,
-    "language": "en-US"
+    "language": "en-US",
+    "v3_console_controller": false
 }
