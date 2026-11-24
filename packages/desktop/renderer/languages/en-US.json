@@ -469,7 +469,11 @@
       "clipReady": "Recorded clip ready",
       "saveClip": "Save WebM",
       "discardClip": "Discard clip",
-      "saveClipBeforeExit": "Save or discard your recorded clip before ending the stream."
+      "saveClipBeforeExit": "Save or discard your recorded clip before ending the stream.",
+      "requestedResolution": "Requested resolution",
+      "resolutionHint": "Advertise a 720p or 1080p client display when starting a new session. Xbox determines the actual encoded resolution; this preference is not a guarantee.",
+      "homeResolution": "Remote Play display resolution",
+      "cloudResolution": "Cloud Gaming display resolution"
     }
   }
 }

@@ -171,6 +171,7 @@ function LegacyStream() {
 
             Ipc.send('streaming', 'startStream', {
                 type: streamType,
+                resolution: streamType === 'cloud' ? settings.xcloud_resolution : settings.xhome_resolution,
                 target: serverId,
             }).then((result:string) => {
                 console.log('StartStream session:', result)

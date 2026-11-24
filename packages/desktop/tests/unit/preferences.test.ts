@@ -85,3 +85,6 @@ test('screenshot filenames use portable UTC timestamps',()=>{assert.equal(screen
 
 import { recordingFilename, recordingLimitBytes, recordingLimitMs } from '../../renderer/lib/streamrecording'
 test('recording uses bounded clip targets and portable filenames',()=>{assert.equal(recordingFilename(new Date('2026-11-24T14:00:01.123Z')),'greenlight-clip-2026-11-24T14-00-01-123Z.webm');assert.equal(recordingLimitBytes,134217728);assert.equal(recordingLimitMs,300000)})
+
+import { requestedDisplay } from '../../main/helpers/streamresolution'
+test('requested display sizes accept only supported presets',()=>{assert.deepEqual(requestedDisplay(720),{widthInPixels:1280,heightInPixels:720});assert.deepEqual(requestedDisplay(1080),{widthInPixels:1920,heightInPixels:1080});assert.deepEqual(requestedDisplay(2160),requestedDisplay(1080));assert.deepEqual(requestedDisplay('720'),requestedDisplay(1080))})

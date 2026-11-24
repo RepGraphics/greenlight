@@ -38,11 +38,11 @@ export default class StreamManager {
         return this._sessions[sessionId]
     }
 
-    startStream(type:string|'home'|'cloud', target){
+    startStream(type:string|'home'|'cloud', target, resolution: 720 | 1080 = 1080){
         return new Promise((resolve, reject) => {
             const api = this.getApi(type)
             if (!api || !target || (type !== 'home' && type !== 'cloud')) return reject(new Error('Invalid streaming target'))
-            api.startStream(target).then((playResult:playResult) => {
+            api.startStream(target, resolution).then((playResult:playResult) => {
             // this._application._xCloudApi.startStream(type, target).then((playResult) => {
                 console.log('Streammanager - startStream:', playResult)
 

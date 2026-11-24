@@ -1,4 +1,5 @@
 import https from 'https'
+import { requestedDisplay } from './streamresolution'
 import Application from '../application'
 import { Address6 } from 'ip-address'
 
@@ -165,7 +166,7 @@ export default class xCloudApi {
         return this.get('/v5/sessions/'+this._type+'/'+sessionId, 'DELETE')
     }
 
-    startStream(target:string){
+    startStream(target:string, resolution: 720 | 1080 = 1080){
         const deviceInfo = JSON.stringify({
             'appInfo': {
                 'env': {
@@ -189,10 +190,7 @@ export default class xCloudApi {
                     'platform': 'desktop',
                 },
                 'displayInfo': {
-                    'dimensions': {
-                        'widthInPixels': 1920,
-                        'heightInPixels': 1080,
-                    },
+                    'dimensions': requestedDisplay(resolution),
                     'pixelDensity': {
                         'dpiX': 1,
                         'dpiY': 1,

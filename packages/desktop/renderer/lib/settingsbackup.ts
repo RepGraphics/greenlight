@@ -17,6 +17,7 @@ export function portableSettings(value: unknown): Partial<Settings> {
         if (typeof v === 'number' && Number.isFinite(v)) result[key] = Math.max(min,Math.min(max,v))
     }
     number('xhome_bitrate',0,40960); number('xcloud_bitrate',0,40960); number('v3_deadzone',0,0.5); number('v3_mouse_sensitivity',0.25,4)
+    for (const key of ['xhome_resolution','xcloud_resolution'] as const) if (raw[key] === 720 || raw[key] === 1080) result[key] = raw[key]
     if (raw.streaming_engine === 'legacy' || raw.streaming_engine === 'experimental') result.streaming_engine = raw.streaming_engine
     if (raw.v3_video_filters && typeof raw.v3_video_filters === 'object') result.v3_video_filters = validateVideoFilters(raw.v3_video_filters)
     if (raw.v3_renderer === 'video' || raw.v3_renderer === 'webgpu') result.v3_renderer = raw.v3_renderer

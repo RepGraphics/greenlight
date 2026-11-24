@@ -119,13 +119,14 @@ export default function ExperimentalStream({ target, onExit }: { target: string;
     const [muted, setMuted] = React.useState(!settings.audio_enabled)
     const cloud = target.startsWith('xcloud_')
     const id = cloud ? target.slice(7) : target
+    const resolution:720|1080 = (cloud?settings.xcloud_resolution:settings.xhome_resolution)===720?720:1080
     const [consoleController,setConsoleController] = React.useState(!cloud && settings.v3_console_controller)
     React.useEffect(() => {
         let disposed = false
         let active = ''
         samples.current = []; sampleCount.current = 0; started.current = Date.now(); connectedAt.current = 0; outcome.current = 'interrupted'; lastState.current = 'Initializing'; setSummary(null); setGraphSamples([])
         setSession(''); setState('Initializing'); setMic(false); setMicBusy(false); setMicActive(false); setMicError(false)
-        Ipc.send('streaming', 'startStream', { type: cloud ? 'cloud' : 'home', target: id }).then((result: string) => {
+        Ipc.send('streaming', 'startStream', { type: cloud ? 'cloud' : 'home', target: id, resolution }).then((result: string) => {
             if (disposed) { void Ipc.send('streaming', 'stopStream', { sessionId: result }).catch(() => {}); return }
             active = result; setSession(result)
         }).catch(() => { if (!disposed) updateStatus('Error') })
@@ -134,7 +135,7 @@ export default function ExperimentalStream({ target, onExit }: { target: string;
     const adapter = React.useMemo(() => ({
         getSessionId: () => session,
         getSessionPath: () => session,
-        getStreamConfig: () => ({ id, type: cloud ? 'cloud' as const : 'home' as const, language: settings.preferred_game_language, host: '', resolution: 1080 as const }),
+        getStreamConfig: () => ({ id, type: cloud ? 'cloud' as const : 'home' as const, language: settings.preferred_game_language, host: '', resolution }),
         getStreamStatus: async () => {
             const value = await Ipc.send('streaming', 'getPlayerState', { sessionId: session }) as { playerState?: string }
             return { state: value?.playerState === 'started' ? 'Provisioned' : !value || value.playerState === 'failed' ? 'Failed' : 'Provisioning' }
@@ -144,7 +145,7 @@ export default function ExperimentalStream({ target, onExit }: { target: string;
         sendICECandidates: async (candidates: string[]) => ({ exchangeResponse: JSON.stringify(await Ipc.send('streaming', 'sendIce', { sessionId: session, ice: candidates.map(candidate => JSON.parse(candidate)) })) }),
         sendChatSDP: async (offer: RTCSessionDescriptionInit) => { const answer = await Ipc.send('streaming', 'sendChatSdp', { sessionId: session, sdp: offer.sdp }); return answer.sdp },
         sendKeepalive: () => Ipc.send('streaming', 'sendKeepalive', { sessionId: session }),
-    }), [session, id, cloud, settings.preferred_game_language])
+    }), [session, id, cloud, resolution, settings.preferred_game_language])
     return <section className={'gl-experimental-stream gl-display-'+(['stretch','zoom'].includes(displayMode)?displayMode:'default')+(settings.video_enabled?'':' gl-video-disabled')} style={{'--gl-video-filter':videoFilterCss(filters)} as React.CSSProperties}>
         {filters.sharpening > 0 && <svg width='0' height='0' aria-hidden='true' style={{position:'absolute',pointerEvents:'none'}}><defs><filter id='gl-stream-sharpen' colorInterpolationFilters='sRGB'><feConvolveMatrix order={3} kernelMatrix={sharpeningKernel(filters.sharpening)} divisor={1} edgeMode='duplicate' preserveAlpha={true}/></filter></defs></svg>}
         {session && state !== 'Error' && <SharedPlayer communicationHandler={adapter} onStatusChanged={updateStatus} useWebGpu={settings.v3_renderer === 'webgpu'} autoGamepad consoleController={consoleController} vibration={settings.controller_vibration} videoBitrate={activeCap} showStats={hud} volume={volume} muted={muted} codecProfiles={settings.video_profiles || []} touchControls={touch} microphone={mic} onMicrophoneStatus={(active, error) => { setMicBusy(false); setMicActive(active); if (error) { setMicError(true); setMic(false) } }} nativeMouseKeyboard={settings.v3_native_mkb} deadzone={settings.v3_deadzone} invertY={settings.v3_invert_y} swapSticks={settings.v3_swap_sticks} mouseSensitivity={settings.v3_mouse_sensitivity} buttonMapping={settings.v3_button_mapping} onMetrics={recordMetrics} keyframeRequest={keyframeRequest} keyboardMapping={settings.input_mousekeyboard && !settings.v3_native_mkb ? settings.input_mousekeyboard_config : undefined} />}
@@ -155,7 +156,7 @@ export default function ExperimentalStream({ target, onExit }: { target: string;
         {showGraphs && <NetworkGraphs samples={graphSamples} onClose={()=>setShowGraphs(false)}/>}
         {showFilters && <div className='gl-live-video-panel'><h2>{t('dashboard.videoFilters')}</h2><VideoFilterControls value={filters} onChange={setFilters}/><label>{t('settings.videoAudio.aspectSizeLabel')} <select value={displayMode} onChange={event=>setDisplayMode(event.target.value)}><option value='default'>{t('settings.videoAudio.aspectSizeValueDefault')}</option><option value='stretch'>{t('settings.videoAudio.aspectSizeValueStretch')}</option><option value='zoom'>{t('settings.videoAudio.aspectSizeValueZoom')}</option></select></label><div className='gl-console-toolbar'><button type='button' className='btn' onClick={()=>setSettings({...globalSettings,v3_video_filters:filters,video_size:displayMode})}>{t('dashboard.saveVideoDefaults')}</button><button type='button' className='btn' onClick={()=>setShowFilters(false)}>{t('dashboard.dismiss')}</button></div></div>}
         {settings.v3_native_mkb && state === 'Connected' && <div className="gl-performance-hud" style={{top:'auto',bottom:85}}>{t('dashboard.nativeMkbHint')}</div>}
-        {showSummary && <div className="gl-performance-hud gl-quality-advice" style={{top:'auto',bottom:135}}><span>{t('dashboard.connectionQuality')}: {t('dashboard.quality_'+(summary?.quality || 'insufficient'))}</span><span>RTT p95: {summary?.rtt95 ?? '—'} ms</span><span>Jitter p95: {summary?.jitter95 ?? '—'} ms</span><span>{t('dashboard.averageBitrate')}: {summary?.averageBitrate ?? '—'} Mbps</span><span>{t('dashboard.qualityHint_'+(summary?.quality || 'insufficient'))}</span><span>{t('dashboard.currentBitrateCap')}: {activeCap?Math.round(activeCap/1000)+' Mbps':t('settings.streaming.unlimitedLabel')}</span>{recommendedCap!==null&&state==='Connected'&&<button type='button' className='btn' style={{pointerEvents:'auto'}} onClick={()=>setRestartCap(recommendedCap)}>{t('dashboard.lowerBitrateSuggestion',{bitrate:Math.round(recommendedCap/1000)})}</button>}</div>}
+        {showSummary && <div className="gl-performance-hud gl-quality-advice" style={{top:'auto',bottom:135}}><span>{t('dashboard.connectionQuality')}: {t('dashboard.quality_'+(summary?.quality || 'insufficient'))}</span><span>RTT p95: {summary?.rtt95 ?? '—'} ms</span><span>Jitter p95: {summary?.jitter95 ?? '—'} ms</span><span>{t('dashboard.averageBitrate')}: {summary?.averageBitrate ?? '—'} Mbps</span><span>{t('dashboard.qualityHint_'+(summary?.quality || 'insufficient'))}</span><span>{t('dashboard.requestedResolution')}: {resolution}p</span><span>{t('dashboard.currentBitrateCap')}: {activeCap?Math.round(activeCap/1000)+' Mbps':t('settings.streaming.unlimitedLabel')}</span>{recommendedCap!==null&&state==='Connected'&&<button type='button' className='btn' style={{pointerEvents:'auto'}} onClick={()=>setRestartCap(recommendedCap)}>{t('dashboard.lowerBitrateSuggestion',{bitrate:Math.round(recommendedCap/1000)})}</button>}</div>}
         {recordingActive&&<div className='gl-recording-indicator' role='status'><span/>REC {Math.floor(recordingElapsed/60)}:{String(recordingElapsed%60).padStart(2,'0')}</div>}
         {recordedClip&&<div className='gl-recording-result'><strong>{t('dashboard.clipReady')}</strong> · {(recordedClip.size/1048576).toFixed(1)} MiB <button type='button' className='btn' onClick={()=>{downloadRecording(recordedClip);setRecordedClip(null)}}>{t('dashboard.saveClip')}</button><button type='button' className='btn' onClick={()=>setRecordedClip(null)}>{t('dashboard.discardClip')}</button></div>}
         {captureMessage && <div className='gl-mic-error' role='status'>{t('dashboard.'+captureMessage)} <button type='button' className='btn' onClick={()=>setCaptureMessage('')}>{t('dashboard.dismiss')}</button></div>}

@@ -55,5 +55,7 @@
     "webui_autostart": false,
     "webui_port": 9003,
     "language": "en-US",
-    "v3_console_controller": false
+    "v3_console_controller": false,
+    "xhome_resolution": 1080,
+    "xcloud_resolution": 1080
 }
