@@ -57,7 +57,7 @@ export default class ControlChannel extends Channel {
         this.send(authRequest)
 
         // Match upstream V3 initialization without leaving a phantom controller attached.
-        if (!this._gamepadHandlers[0]) { this.sendGamepadState(0,true); this.sendGamepadState(0,false) }
+        if (!this.getPlayer().consoleController && !this._gamepadHandlers[0]) { this.sendGamepadState(0,true); this.sendGamepadState(0,false) }
         clearInterval(this._keyframeInterval)
         this._keyframeInterval=setInterval(()=>this.requestKeyframeRequest(true),5000)
         for (const index of [0,1,2,3]) if (this._gamepadHandlers[index]) this.sendGamepadState(index, true)
@@ -71,6 +71,8 @@ export default class ControlChannel extends Channel {
 
     sendGamepadState(gamepadIndex, wasAdded = true, handler:undefined|Gamepad|MouseKeyboard|Touch = undefined) {
        
+        if(wasAdded && this.getPlayer().consoleController) return
+        if(!wasAdded && this.getPlayer().consoleController && !this._gamepadHandlers[gamepadIndex]) return
         if(wasAdded === true){
             if(handler !== undefined){
                 if(this._gamepadHandlers[gamepadIndex] !== undefined && this._gamepadHandlers[gamepadIndex] !== handler){

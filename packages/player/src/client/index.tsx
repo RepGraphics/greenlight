@@ -90,6 +90,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 player._channels.control.requestKeyframeRequest(true);
             }
         }, [player, playerState, keyframeRequest]);
+        useEffect(()=>{if(player)player.consoleController=consoleController},[player,consoleController]);
         // Register a remote controller only when the client actually needs one.
         useEffect(() => {
             if (!player || playerState !== 'Connected' || !autoGamepad || consoleController) return;
@@ -206,7 +207,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 if (!disposed && !terminal) keepalive = setTimeout(heartbeat, failures ? 5000 : 20000);
             };
             const connect = async () => {
-                instance = new xCloudPlayer('playerContainer', useWebGpu, videoBitrate, codecProfiles);
+                instance = new xCloudPlayer('playerContainer', useWebGpu, videoBitrate, codecProfiles, consoleController);
                 instance.init();
                 setPlayer(instance);
                 status('Connecting');

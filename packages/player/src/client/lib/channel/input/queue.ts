@@ -143,6 +143,10 @@ export default class InputQueue {
     }
 
     sendQueue() {
+        if(this._player.consoleController){
+            this._gamepadQueue=[];this._pointerQueue=[];this._mouseQueue=[];this._keyboardQueue=[]
+            if(!this._metadataQueue.length)return
+        }
         // console.log('Sending queues:', this._metadataQueue.length, this._gamepadQueue.length, this._pointerQueue.length, this._mouseQueue.length, this._keyboardQueue.length)
 
         const packet = new InputPacket(this.getSequenceNum())
