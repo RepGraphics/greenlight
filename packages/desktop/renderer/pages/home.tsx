@@ -21,17 +21,17 @@ function Home() {
                 <title>Greenlight - {t('page.myConsoles.pageTitle')}</title>
             </Head>
 
-            <div style={ {
-                display: 'flex',
-                flexDirection: 'row',
-                flexWrap: 'wrap',
-                alignItems: 'stretch',
-                paddingTop: '20px',
-            }}>
+            <section className='gl-console-page'>
+                <div className='gl-console-hero'>
+                    <h1>{t('page.myConsoles.pageTitle')}</h1>
+                    <Button label={consoles.isFetching ? 'Refreshing…' : 'Refresh'} disabled={consoles.isFetching} onClick={() => { void consoles.refetch() }} />
+                </div>
+                <div className='gl-console-grid' aria-busy={consoles.isFetching}>
                 { (consoles.isLoading === true) ? <Loader></Loader> :
-                    (consoles.isFetched === true && consoles.data.length > 0) ? consoles.data.map((item, i) => {
+                    consoles.isError && !Array.isArray(consoles.data) ? <div className='gl-console-feedback' role='alert'>Unable to load consoles. Use Refresh to try again.</div> :
+                    (Array.isArray(consoles.data) && consoles.data.length > 0) ? consoles.data.map((item) => {
                         return (
-                            <Card className='padbottom' key={i}>
+                            <Card className='padbottom' key={item.id}>
                                 <h1>{item.name}</h1>
 
                                 <div style={{
@@ -57,8 +57,8 @@ function Home() {
                                         item.powerState === 'ConnectedStandby' ? <Label>{t('page.myConsoles.standby')}</Label> :
                                             <Label>{item.powerState}</Label>) :
                                     (<div>
-                                        {!item.remoteManagementEnabled ? '' : <p><Label className='orange'>{t('page.myConsoles.warningLabel')}</Label> {t('page.myConsoles.managementWarning')}</p>}
-                                        {!item.consoleStreamingEnabled ? '' : <p><Label className='orange'>{t('page.myConsoles.warningLabel')}</Label> {t('page.myConsoles.streamingWarning')}</p>}
+                                        {item.remoteManagementEnabled ? '' : <p><Label className='orange'>{t('page.myConsoles.warningLabel')}</Label> {t('page.myConsoles.managementWarning')}</p>}
+                                        {item.consoleStreamingEnabled ? '' : <p><Label className='orange'>{t('page.myConsoles.warningLabel')}</Label> {t('page.myConsoles.streamingWarning')}</p>}
                                     </div>)}
 
                                 {/* <p>Name: {item.name}</p>
@@ -69,16 +69,17 @@ function Home() {
                                 <p>Remote: {item.remoteManagementEnabled ? 'Enabled' : 'Disabled'}</p>
                                 <p>Streaming: {item.consoleStreamingEnabled ? 'Enabled' : 'Disabled'}</p><br /> */}
 
-                                <div style={ { display: 'flex', gap: '20px', minWidth: 280 }}>
-                                    <Link href={ `stream/${item.id}` }>
-                                        <Button label={t('page.myConsoles.startStreamBtn')} className='btn-primary' />
+                                <div className='gl-console-actions'>
+                                    <Link href={ `/stream/${encodeURIComponent(item.id)}` }>
+                                        <span className='btn btn-primary'>{t('page.myConsoles.startStreamBtn')}</span>
                                     </Link>
                                 </div>
                             </Card>
                         )
-                    }) : <Card className='padbottom' key='noconsoles'>{t('page.myConsoles.noConsoles')}</Card>
+                    }) : <div className='gl-console-feedback'>{t('page.myConsoles.noConsoles')}</div>
                 }
-            </div>
+                </div>
+            </section>
 
         </React.Fragment>
     )

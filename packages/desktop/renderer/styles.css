@@ -159,3 +159,51 @@ input.text:focus {
         transform: rotate(360deg);
     }
 }
+
+/* Desktop visual system: shared surfaces, typography and keyboard focus. */
+:root {
+    color-scheme: dark;
+    --gl-surface: #171e26;
+    --gl-raised: #222c36;
+    --gl-border: #35434e;
+    --gl-text: #f4f7fa;
+    --gl-muted: #aebcc9;
+    --gl-accent: #65dda0;
+}
+body { background: #10161d; color: var(--gl-text); text-shadow: none; }
+#component_header { background: rgba(16, 22, 29, .96); border-bottom: 1px solid var(--gl-border); box-shadow: none; }
+#component_header ul li a { border-radius: 8px; }
+#component_header ul li a.active { background: #263a34; border-bottom-color: var(--gl-accent); color: var(--gl-accent); }
+#component_header ul li a:hover { background: var(--gl-raised); }
+div#app_sidebar { background: rgba(16, 22, 29, .94); border-left: 1px solid var(--gl-border); box-sizing: border-box; bottom: 40px; }
+div#app_body_container { padding-bottom: 56px; }
+#component_footer { background: #10161d; border-top: 1px solid var(--gl-border); }
+#component_footer p.status { color: var(--gl-muted); }
+div.component_card { background: var(--gl-surface); border: 1px solid var(--gl-border); border-radius: 14px; box-sizing: border-box; backdrop-filter: none; }
+div.component_card h1 { font-weight: 600; }
+div.component_card h2.grey { opacity: 1; color: var(--gl-muted); overflow-wrap: anywhere; }
+.btn { border-radius: 9px; background-color: var(--gl-raised); border: 1px solid var(--gl-border); text-transform: none; font-weight: 600; align-items: center; justify-content: center; }
+.btn:not(:disabled):hover { filter: brightness(1.15); }
+.btn-primary { color: #092319; background-color: var(--gl-accent); border-color: var(--gl-accent); }
+.btn-primary:not(:disabled):hover { background-color: #83e8b5; }
+.btn-cancel { background-color: #8c2935; border-color: #bc5260; }
+.btn:disabled { cursor: not-allowed; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, div.component_card input.card_input_text_transparent:focus-visible { outline: 2px solid var(--gl-accent); outline-offset: 3px; }
+input, textarea { user-select: text; -webkit-user-select: text; }
+input.text { background: var(--gl-surface); border: 1px solid var(--gl-border); border-radius: 8px; }
+input.text:focus { border: 1px solid var(--gl-accent); }
+div#component_settings_sidebar_menu { background: var(--gl-surface); border-right: 1px solid var(--gl-border); }
+div#component_settings_sidebar_menu ul li.active a { background: #263a34; color: var(--gl-accent); }
+div#component_settings_sidebar_menu ul li:hover a { background: var(--gl-raised); }
+.gl-console-page { padding: clamp(16px, 3vw, 36px); }
+.gl-console-hero { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
+.gl-console-hero h1 { font-size: clamp(24px, 3vw, 36px); letter-spacing: -.03em; font-weight: 700; }
+.gl-console-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 16px; align-items: stretch; }
+.gl-console-grid .component_card { margin: 0; padding: 20px; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.gl-console-grid .component_card h1 { overflow-wrap: anywhere; }
+.gl-console-actions { margin-top: auto; display: flex; }
+.gl-console-actions a, .gl-console-actions .btn { width: 100%; box-sizing: border-box; text-align: center; }
+.gl-console-feedback { padding: 24px; border: 1px dashed var(--gl-border); border-radius: 14px; color: var(--gl-muted); }
+@media (prefers-reduced-motion: reduce) {
+    #component_header, #component_header a, #component_footer, .btn { transition: none; }
+}

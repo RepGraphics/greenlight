@@ -22,7 +22,7 @@ import {
 // This default export is required in a new `pages/_app.js` file.
 export default function MyApp({ Component, pageProps }) {
     const router = useRouter()
-    const queryClient = new QueryClient()
+    const [queryClient] = React.useState(() => new QueryClient())
 
     const [loggedIn, setLoginState] = React.useState(false)
     const [prevUserState, setPrevUserState] = React.useState({
@@ -139,7 +139,7 @@ export default function MyApp({ Component, pageProps }) {
             </Head>
 
             <div style={ {
-                background: 'linear-gradient(0deg, rgba(26,27,30,1) 0%, rgba(26,27,30,1) 25%, rgba(0,212,255,0) 100%), url(\'/images/backgrounds/background1.jpeg\') fixed',
+                background: 'radial-gradient(ellipse at top left, #203b35 0%, #151e27 45%, #10161d 85%)',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
                 backgroundSize: 'cover',
