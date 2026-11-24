@@ -491,7 +491,18 @@
       "shortcut_screenshot": "Take screenshot",
       "shortcut_recording": "Start or stop recording",
       "shortcut_graphs": "Network graphs",
-      "resetShortcuts": "Reset shortcuts"
+      "resetShortcuts": "Reset shortcuts",
+      "captureLibrary": "Capture library",
+      "captureLibraryDescription": "Screenshots and clips saved explicitly to this device. Maximum 512 MiB or 200 items. Download important captures before clearing app data or uninstalling.",
+      "captureLibrarySaved": "Saved to capture library",
+      "captureLibraryFailed": "Unable to access or save to the capture library. Check storage space or download the capture instead.",
+      "screenshotToLibrary": "Save screenshot to library",
+      "saveToLibrary": "Save to library",
+      "captureDeleteConfirm": "Permanently delete this local capture?",
+      "captureLibraryEmpty": "No saved captures in this view.",
+      "capturePreview": "Preview",
+      "captureDownload": "Download",
+      "captureDelete": "Delete"
     }
   }
 }

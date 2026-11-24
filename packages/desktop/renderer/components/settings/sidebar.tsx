@@ -24,6 +24,7 @@ function SettingsSidebar({
                         <li className={ router.pathname.includes('settings/video') ? 'active' : ''}><Link href="/settings/video">{t('settings.sidebar.videoAudio')}</Link></li>
                         <li className={ router.pathname.includes('settings/webui') ? 'active' : ''}><Link href="/settings/webui">{t('settings.sidebar.webUI')}</Link></li>
                         <li className={router.pathname.includes('settings/history') ? 'active' : ''}><Link href='/settings/history'>{t('dashboard.sessionHistory')}</Link></li>
+                        <li className={router.pathname.includes('settings/captures')?'active':''}><Link href='/settings/captures'>{t('dashboard.captureLibrary')}</Link></li>
                         <li className={ router.pathname.includes('settings/debug') ? 'active' : ''}><Link href="/settings/debug">{t('settings.sidebar.debug')}</Link></li>
                     </ul>
                 </div>

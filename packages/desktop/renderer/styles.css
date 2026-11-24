@@ -378,3 +378,5 @@ div.component_gametitle .gl-art-placeholder { width: 140px; height: 140px; displ
 .gl-recording-indicator,.gl-recording-result{position:fixed;z-index:1180;background:#202020ed;color:white;padding:9px 12px;border-radius:6px;border:1px solid #777;right:16px;top:16px}.gl-recording-indicator span{display:inline-block;width:9px;height:9px;border-radius:50%;background:#e33;margin-right:6px}.gl-recording-result{top:55px;max-width:calc(100vw - 32px)}
 
 .gl-recording-result{z-index:1400}
+
+.gl-capture-preview{display:block;max-width:100%;max-height:65vh;object-fit:contain;margin:12px auto}.gl-capture-list{display:grid;gap:12px}.gl-capture-item{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px;border:1px solid #ffffff22;border-radius:8px}.gl-capture-item p{margin:4px 0}

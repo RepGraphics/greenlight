@@ -6,6 +6,8 @@ Changes on `main-v2` are development changes, not a new numbered release. See [c
 
 ### Added
 
+- Persistent local V3 capture library with preview, download, deletion and bounded storage.
+
 - Configurable V3 streaming shortcuts for controls, fullscreen, mute, HUD, screenshots, recording and graphs.
 
 - Per-console and per-cloud-game requested resolution overrides for both streaming engines.
