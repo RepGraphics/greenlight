@@ -56,7 +56,7 @@ export default class Sdp {
         return sdp
     }
 
-    getDefaultCodecPreferences() {
+    getDefaultCodecPreferences(profiles: string[] = []) {
         const capabilities = RTCRtpReceiver.getCapabilities('video')?.codecs
         if(capabilities === undefined) {return []}
 
@@ -92,7 +92,8 @@ export default class Sdp {
 
         const codecOrder = [...t1, ...t2, ...t3, ...t4]
 
-        return codecOrder
+        const preferred = codecOrder.filter(codec => codec.mimeType.toLowerCase() === 'video/h264' && profiles.some(profile => ['4d', '42e', '420'].includes(profile) && codec.sdpFmtpLine?.includes('profile-level-id=' + profile)))
+        return [...preferred, ...codecOrder.filter(codec => !preferred.includes(codec))]
     }
 
     _setBitrate(sdp: string, media: string, bitrate: number) {

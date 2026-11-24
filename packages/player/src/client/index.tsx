@@ -23,6 +23,9 @@ export interface StreamPlayerProps {
     showStats?: boolean;
     volume?: number;
     muted?: boolean;
+    codecProfiles?: string[];
+    touchControls?: boolean;
+    keyboardMapping?: Record<string, string>;
 }
 export interface StreamPlayerHandle {
     ping: (echo: string) => void;
@@ -45,12 +48,16 @@ export interface communicationHandler {
 export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
     ({
         onStatusChanged,
-        communicationHandler, useWebGpu = true, autoGamepad = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false
+        communicationHandler, useWebGpu = true, autoGamepad = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false, codecProfiles = [], touchControls = false, keyboardMapping
     }, ref): ReactElement => {
         const handler = useRef(communicationHandler);
         handler.current = communicationHandler;
         const statusCallback = useRef(onStatusChanged);
         statusCallback.current = onStatusChanged;
+        const controller = useRef<Gamepad | undefined>(undefined);
+        const pressed = useRef(new Map<number, string>());
+        const releaseTouch = () => { pressed.current.forEach(button => controller.current?.sendButtonState(button, 0)); pressed.current.clear() };
+        useEffect(() => { if (!touchControls) releaseTouch(); window.addEventListener('blur', releaseTouch); return () => { window.removeEventListener('blur', releaseTouch); releaseTouch() } }, [touchControls]);
         const inputs = useRef<Array<{ detach: () => void }>>([]);
         const [playerState, setPlayerState] = useState<string>('Initializing');
 
@@ -123,7 +130,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 if (!disposed) keepalive = setTimeout(heartbeat, 30000);
             };
             const connect = async () => {
-                instance = new xCloudPlayer('playerContainer', useWebGpu, videoBitrate);
+                instance = new xCloudPlayer('playerContainer', useWebGpu, videoBitrate, codecProfiles);
                 instance.init();
                 setPlayer(instance);
                 status('Connecting');
@@ -151,8 +158,9 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 };
                 peer.addEventListener('connectionstatechange', onConnection);
                 if (autoGamepad) {
-                    const gamepad = new Gamepad(0, { enable_keyboard: false, enable_vibration: vibration });
-                    const attach = () => { if (!disposed) { gamepad.attach(instance!); inputs.current.push(gamepad); } };
+                    const mapping = keyboardMapping ? Object.fromEntries(Object.entries(keyboardMapping).map(([key, button]) => [button, key])) : undefined;
+                    const gamepad = new Gamepad(0, { enable_keyboard: Boolean(mapping), ...(mapping ? { keyboard_mapping: mapping } : {}), enable_vibration: vibration });
+                    const attach = () => { if (!disposed) { gamepad.attach(instance!); controller.current = gamepad; inputs.current.push(gamepad); } };
                     const ready = () => { if (peer.connectionState === 'connected') { peer.removeEventListener('connectionstatechange', ready); attach(); } };
                     peer.addEventListener('connectionstatechange', ready); ready();
                 }
@@ -180,15 +188,18 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 disposed = true;
                 clearTimeout(timer);
                 clearTimeout(keepalive);
+                releaseTouch(); controller.current = undefined;
                 inputs.current.forEach(input => input.detach());
                 inputs.current = [];
                 instance?.destroy();
             };
         }, [communicationHandler.getSessionPath()]);
 
+        const touchButton = (button: string, label: string) => <button key={button} type="button" aria-label={button} onPointerDown={event => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); pressed.current.set(event.pointerId, button); controller.current?.sendButtonState(button, 1) }} onLostPointerCapture={event => { const released = pressed.current.get(event.pointerId); if (released) { pressed.current.delete(event.pointerId); if (!Array.from(pressed.current.values()).includes(released)) controller.current?.sendButtonState(released, 0) } }}>{label}</button>;
         return (
             <div ref={playerInstance}>
                 <div id="playerContainer"></div>
+                {touchControls && playerState === 'Connected' && <div className="gl-touch-overlay"><div className="gl-touch-shoulders">{touchButton('LeftTrigger','LT')}{touchButton('LeftShoulder','LB')}{touchButton('View','▣')}{touchButton('Nexus','Xbox')}{touchButton('Menu','☰')}{touchButton('RightShoulder','RB')}{touchButton('RightTrigger','RT')}</div><div className="gl-touch-dpad">{touchButton('DPadUp','↑')}{touchButton('DPadLeft','←')}{touchButton('DPadRight','→')}{touchButton('DPadDown','↓')}</div><div className="gl-touch-abxy">{touchButton('Y','Y')}{touchButton('X','X')}{touchButton('B','B')}{touchButton('A','A')}</div></div>}
                 {showStats && <div className="gl-performance-hud"><span>{metrics.width ? metrics.width + '×' + metrics.height : '—'}</span><span>{Math.round(metrics.fps)} FPS</span><span>{metrics.bitrate.toFixed(1)} Mbps</span><span>{metrics.jitter.toFixed(1)} ms jitter</span><span>{metrics.loss} packets lost</span></div>}
             </div>
         );

@@ -30,13 +30,14 @@ export default class xCloudPlayer {
     private _videoComponent: VideoComponent | WebGpuComponent | undefined
     private _audioComponent: AudioComponent | undefined
 
-    constructor(elementId: string, useWebGpu = true, private videoBitrate = 0) {
+    constructor(elementId: string, useWebGpu = true, private videoBitrate = 0, profiles: string[] = []) {
         console.log('xCloudPlayer constructing...');
 
         this._elementId = elementId;
         this._peerConnection.addTransceiver('audio', { direction: 'sendrecv' })
         const videoTransceiver = this._peerConnection.addTransceiver('video', { direction: 'recvonly' })
-        videoTransceiver.setCodecPreferences(this._sdpHelper.getDefaultCodecPreferences())
+        const codecs = this._sdpHelper.getDefaultCodecPreferences(profiles)
+        if (codecs.length) videoTransceiver.setCodecPreferences(codecs)
 
         this._peerConnection.ontrack = (event) => {
 

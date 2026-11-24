@@ -24,6 +24,7 @@ export default class Gamepad {
     private _player: xCloudPlayer | undefined
     private _index: number
     private _physicalGamepadId = -1
+    private neutralPending = false
     private _rumbleInterval
     private _isFocused = true
     private _gamepadOverride = {
@@ -120,7 +121,7 @@ export default class Gamepad {
             window.addEventListener('focus', this._listener.windowFocus)
         }
 
-        this.detectActiveGamepad()
+        if (this._options.enable_gamepad) this.detectActiveGamepad()
     }
 
     detach(){
@@ -130,6 +131,8 @@ export default class Gamepad {
         }
         this._player._channels.control.sendGamepadState(this._index, false)
         this._physicalGamepadId = -1
+        this._gamepadOverride.buttons = {}
+        this._player = undefined
 
         if(this._rumbleInterval !== undefined){
             clearInterval(this._rumbleInterval)
@@ -200,6 +203,7 @@ export default class Gamepad {
     onWindowBlur(){
         this._isFocused = false
         this._gamepadOverride.buttons = {}
+        this.neutralPending = true
     }
 
     getDefaultFamepadFrame(){
@@ -278,6 +282,7 @@ export default class Gamepad {
     onGamepadDisconnected(event:GamepadEvent){
         if(event.gamepad.index === this._physicalGamepadId){
             this._physicalGamepadId = -1
+            this.neutralPending = true
         }
     }
 
@@ -286,6 +291,8 @@ export default class Gamepad {
     }
 
     getGamepadState(){
+        if (this.neutralPending) { this.neutralPending = false; return { ...this.getDefaultFamepadFrame(), GamepadIndex: this._index } }
+        if (!this._isFocused) return undefined
         const gamepad = this.getGamepad(this._physicalGamepadId)
         if((this._physicalGamepadId < 0 || gamepad === undefined || this._isFocused === false) && (this.hasOverrideButtons() === false)){
             return undefined
@@ -297,12 +304,12 @@ export default class Gamepad {
         // Set buttons
         if(gamepad !== undefined){
             for(const button in this._options.gamepad_mapping){
-                frame[button] = gamepad.buttons[this._options.gamepad_mapping[button]].value
+                frame[button] = gamepad.buttons[this._options.gamepad_mapping[button]]?.value ?? 0
             }
 
             // Set axis
             for(const axis in this._options.gamepad_axes_mapping){
-                frame[axis] = this.normaliseAxis(gamepad.axes[this._options.gamepad_axes_mapping[axis]])
+                frame[axis] = this.normaliseAxis(gamepad.axes[this._options.gamepad_axes_mapping[axis]] ?? 0)
             }
         }
 
@@ -353,7 +360,7 @@ export default class Gamepad {
     }
 
     getGamepad(index = -1){
-        const gamepad = navigator.getGamepads()[index]
+        const gamepad = navigator.getGamepads?.()[index]
         if(gamepad !== null) {
             return gamepad
         } else {
@@ -423,7 +430,7 @@ export default class Gamepad {
                 }, report.delayMs + report.durationMs)
             }
         } else {
-            console.log('[Gamepad] Unknown vibration type:', (gamepad.vibrationActuator as any).type)
+            console.log('[Gamepad] Unknown vibration type:', (gamepad.vibrationActuator as any)?.type)
         }
     }
 
