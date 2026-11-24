@@ -220,7 +220,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 const peer = instance._peerConnection;
                 const onConnection = () => {
                     if (disposed) return;
-                    if (peer.connectionState === 'connected') { clearTimeout(connectionDeadline); clearTimeout(disconnectDeadline); status('Connected') }
+                    if (peer.connectionState === 'connected') { clearTimeout(connectionDeadline); clearTimeout(disconnectDeadline); status('Connected'); instance?._channels.control.requestKeyframeRequest(true) }
                     else if (peer.connectionState === 'disconnected') { clearTimeout(disconnectDeadline); status('Reconnecting'); disconnectDeadline = setTimeout(() => { if (peer.connectionState !== 'connected') status('Error') }, 15000) }
                     else if (peer.connectionState === 'failed' || peer.connectionState === 'closed') status('Error');
                 };

@@ -7,6 +7,11 @@ export default class VideoComponent {
     private _element:HTMLVideoElement | undefined
     private _overlay:Overlay
     private frameCallback?: number
+    private lastFrameAt = 0
+    private resume = () => { if (this._element?.paused) void this._element.play().catch(()=>{}) }
+
+    getLastFrameAt(){ return this.lastFrameAt }
+    recover(){ this.resume(); this._player._channels.control.requestKeyframeRequest(true) }
 
     constructor(player:any){
         this._player = player
@@ -28,7 +33,11 @@ export default class VideoComponent {
         const element = document.getElementById(this._player.getElementId())
         if(element === null) {return}
 
+        this.lastFrameAt = performance.now()
         this._element = videoElement
+        videoElement.addEventListener('pause', this.resume)
+        videoElement.addEventListener('canplay', this.resume)
+        void videoElement.play().catch(()=>{})
         element.appendChild(this._element)
         const isStatic = getComputedStyle(element).position === 'static' ? true : false
         if(isStatic === true){
@@ -40,6 +49,7 @@ export default class VideoComponent {
 
     processVideoMetadata(timestamp, data:VideoFrameCallbackMetadata) {
         if(this._element === undefined) {return}
+        this.lastFrameAt = performance.now()
 
         this.frameCallback = this._element.requestVideoFrameCallback(this.processVideoMetadata.bind(this))
 
@@ -64,7 +74,7 @@ export default class VideoComponent {
         const element = this._element
         if (element && this.frameCallback !== undefined) element.cancelVideoFrameCallback(this.frameCallback)
         this._element = undefined
-        if (element) { element.pause(); element.srcObject = null }
+        if (element) { element.removeEventListener('pause',this.resume); element.removeEventListener('canplay',this.resume); element.pause(); element.srcObject = null }
 
         if(this._overlay !== undefined){
             this._overlay.destroy()

@@ -29,6 +29,10 @@ export default class xCloudPlayer {
 
     private _videoComponent: VideoComponent | WebGpuComponent | undefined
     private _audioComponent: AudioComponent | undefined
+    private videoWatchdog: ReturnType<typeof setInterval> | undefined
+    private lastVideoRecovery = 0
+    private videoReceivedAt = 0
+    private videoStream: MediaStream | undefined
 
     constructor(elementId: string, useWebGpu = true, private videoBitrate = 0, profiles: string[] = []) {
         console.log('xCloudPlayer constructing...');
@@ -45,6 +49,9 @@ export default class xCloudPlayer {
                 // this._videoComponent = new VideoComponent(this)
                 this._videoComponent?.destroy()
                 const stream = event.streams[0] || new MediaStream([event.track])
+                this.videoStream = stream
+                this.videoReceivedAt = performance.now()
+                this.lastVideoRecovery = 0
                 const fallback = () => {
                     if (this._isDestoyed) return
                     this._videoComponent?.destroy()
@@ -67,6 +74,17 @@ export default class xCloudPlayer {
             }
         }
 
+        this.videoWatchdog = setInterval(()=>{
+            if(this._isDestoyed || this._peerConnection.connectionState!=='connected' || document.hidden) return
+            const video=this._videoComponent
+            if(video instanceof VideoComponent && performance.now()-video.getLastFrameAt()>5000 && performance.now()-this.lastVideoRecovery>5000){
+                this.lastVideoRecovery=performance.now();video.recover()
+            } else if(video instanceof WebGpuComponent && this.videoStream && performance.now()-this.videoReceivedAt>10000 && video.getFrameStats().renderingFps===0){
+                video.destroy();this._videoComponent=new VideoComponent(this);this._videoComponent.create(this.videoStream);this._channels.control.requestKeyframeRequest(true)
+            } else if(!video && performance.now()-this.lastVideoRecovery>5000){
+                this.lastVideoRecovery=performance.now();this._channels.control.requestKeyframeRequest(true)
+            }
+        },2000)
         console.log('xCloudPlayer constructed.');
     }
 
@@ -136,6 +154,7 @@ export default class xCloudPlayer {
     destroy() {
         if(this._isDestoyed === false){
             this._isDestoyed = true
+            clearInterval(this.videoWatchdog)
             this._statsHelper.destroy()
             this._peerConnection.ontrack = null
             this._peerConnection.close()

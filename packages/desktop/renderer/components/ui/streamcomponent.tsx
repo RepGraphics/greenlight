@@ -48,6 +48,24 @@ function StreamComponent({
         return () => { disposed = true; clearInterval(interval) }
     }, [hud, xPlayer])
 
+    const refreshVideo = React.useCallback(()=>{
+        const video=document.querySelector<HTMLVideoElement>('#streamComponentHolder video')
+        if(video && settings.video_enabled) void video.play().catch(()=>{})
+    },[settings.video_enabled])
+    React.useEffect(()=>{
+        if(!settings.video_enabled)return
+        let lastTime=-1,stalled=0
+        const timer=setInterval(()=>{
+            if(document.hidden){stalled=0;return}
+            const video=document.querySelector<HTMLVideoElement>('#streamComponentHolder video')
+            if(!video||!video.srcObject){stalled=0;lastTime=-1;return}
+            if(video.currentTime===lastTime||video.paused)stalled++;else stalled=0
+            lastTime=video.currentTime
+            if(stalled>=3){refreshVideo();stalled=0}
+        },2000)
+        return()=>clearInterval(timer)
+    },[xPlayer,refreshVideo,settings.video_enabled])
+
     function performance_now_seconds() {
         return performance.now() / 1000.0
     }
@@ -439,7 +457,7 @@ function StreamComponent({
                             width: '25%',
                             textAlign: 'right',
                         }}>
-                            <button type='button' className='btn' aria-label={t('dashboard.performanceHud')} aria-pressed={hud} onClick={() => setHud(value => !value)}><i className='fa-solid fa-chart-line' aria-hidden='true' /></button>
+                            <button type='button' className='btn' title={t('dashboard.refreshVideo')} onClick={refreshVideo}><i className='fa-solid fa-rotate' aria-hidden='true'/></button><button type='button' className='btn' aria-label={t('dashboard.performanceHud')} aria-pressed={hud} onClick={() => setHud(value => !value)}><i className='fa-solid fa-chart-line' aria-hidden='true' /></button>
                             <button type='button' className='btn' aria-pressed={controlsPinned} title={t('dashboard.pinControls')} onClick={togglePin}><i className='fa-solid fa-thumbtack' aria-hidden='true' /></button>
                             <button type='button' className='btn' aria-label={t('dashboard.fullscreen')} aria-pressed={fullscreen} onClick={() => { void toggleFullscreen() }}><i className={'fa-solid ' + (fullscreen ? 'fa-compress' : 'fa-expand')} aria-hidden='true' /></button>
                             <Button label={<i className="fa-solid fa-bug"></i>} title={t("streamWindow.debugTitle")} onClick={(e) => {
