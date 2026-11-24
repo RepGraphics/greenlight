@@ -1,4 +1,5 @@
 import xCloudPlayer from './player'
+import { MediaStallMonitor } from './mediastall'
 
 export default class Stats {
     private _player: xCloudPlayer
@@ -6,6 +7,9 @@ export default class Stats {
     private timer: ReturnType<typeof setInterval>
     private disposed = false
     private busy = false
+    private mediaMonitor = new MediaStallMonitor()
+    mediaStalled = false
+    lastStatsAt = 0
     private previous?: { id: string; bytes: number; time: number }
     _bitrate = 0
     _jitter = 0
@@ -39,6 +43,9 @@ export default class Stats {
         this.busy = true
         this._peerConnection.getStats().then((stats) => {
             if (this.disposed) return
+            this.lastStatsAt=performance.now()
+            const inbound=Array.from(stats.values()).filter(r=>r.type==='inbound-rtp'&&(r.kind==='video'||r.kind==='audio')).map(r=>({id:r.id,bytes:r.bytesReceived}))
+            this.mediaStalled=this.mediaMonitor.sample(this.lastStatsAt,inbound,this._peerConnection.connectionState==='connected'&&!document.hidden)
             const transport = Array.from(stats.values()).find(report=>report.type==='transport'&&report.selectedCandidatePairId)
             const selectedPair = transport ? stats.get(transport.selectedCandidatePairId) : undefined
             stats.forEach((report) => {

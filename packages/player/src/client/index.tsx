@@ -38,6 +38,7 @@ export interface StreamPlayerProps {
     buttonMapping?: Record<string, string>;
     onMetrics?: (metrics: StreamMetrics) => void;
     keyframeRequest?: number;
+    onFailureReason?: (reason: string) => void;
     onMicrophoneStatus?: (active: boolean, error?: boolean) => void;
 }
 export interface StreamPlayerHandle {
@@ -62,10 +63,12 @@ export interface communicationHandler {
 export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
     ({
         onStatusChanged,
-        communicationHandler, useWebGpu = true, autoGamepad = false, consoleController = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false, codecProfiles = [], touchControls = false, keyboardMapping, microphone = false, onMicrophoneStatus, nativeMouseKeyboard = false, deadzone = 0.08, invertY = false, swapSticks = false, mouseSensitivity = 1, buttonMapping, onMetrics, keyframeRequest = 0
+        communicationHandler, useWebGpu = true, autoGamepad = false, consoleController = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false, codecProfiles = [], touchControls = false, keyboardMapping, microphone = false, onMicrophoneStatus, nativeMouseKeyboard = false, deadzone = 0.08, invertY = false, swapSticks = false, mouseSensitivity = 1, buttonMapping, onMetrics, keyframeRequest = 0, onFailureReason
     }, ref): ReactElement => {
         const handler = useRef(communicationHandler);
         handler.current = communicationHandler;
+        const failureCallback=useRef(onFailureReason);
+        failureCallback.current=onFailureReason;
         const statusCallback = useRef(onStatusChanged);
         statusCallback.current = onStatusChanged;
         const controller = useRef<Gamepad | undefined>(undefined);
@@ -186,15 +189,18 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             let disconnectDeadline: ReturnType<typeof setTimeout>;
             let instance: xCloudPlayer | undefined;
             let authSent = false;
+            let mediaWatchdog:ReturnType<typeof setInterval>;
+            let terminal=false;
             let failures = 0;
             const provisioningStarted = Date.now();
             const current = handler.current;
-            const status = (value: string) => { if (!disposed) setPlayerState(value) };
+            const status = (value: string) => { if (!disposed && !terminal) { if(value==='Error')terminal=true; setPlayerState(value) } };
+            const fail=(reason:string)=>{if(!disposed&&!terminal){failureCallback.current?.(reason);status('Error')}};
             const heartbeat = async () => {
-                if (disposed) return;
+                if (disposed || terminal) return;
                 try { await current.sendKeepalive(); failures = 0 }
-                catch { if (++failures >= 3) { status('Error'); return } }
-                if (!disposed) keepalive = setTimeout(heartbeat, 30000);
+                catch { if (++failures >= 3) { fail('heartbeat'); return } }
+                if (!disposed && !terminal) keepalive = setTimeout(heartbeat, failures ? 5000 : 20000);
             };
             const connect = async () => {
                 instance = new xCloudPlayer('playerContainer', useWebGpu, videoBitrate, codecProfiles);
@@ -221,13 +227,14 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 const onConnection = () => {
                     if (disposed) return;
                     if (peer.connectionState === 'connected') { clearTimeout(connectionDeadline); clearTimeout(disconnectDeadline); status('Connected'); instance?._channels.control.requestKeyframeRequest(true) }
-                    else if (peer.connectionState === 'disconnected') { clearTimeout(disconnectDeadline); status('Reconnecting'); disconnectDeadline = setTimeout(() => { if (peer.connectionState !== 'connected') status('Error') }, 15000) }
-                    else if (peer.connectionState === 'failed' || peer.connectionState === 'closed') status('Error');
+                    else if (peer.connectionState === 'disconnected') { clearTimeout(disconnectDeadline); status('Reconnecting'); disconnectDeadline = setTimeout(() => { if (peer.connectionState !== 'connected') fail('transport') }, 15000) }
+                    else if (peer.connectionState === 'failed' || peer.connectionState === 'closed') fail('transport');
                 };
                 peer.addEventListener('connectionstatechange', onConnection);
                 connectionDeadline = setTimeout(() => { if (peer.connectionState !== 'connected') status('Error') }, 30000);
                 status('Negotiated'); onConnection();
-                keepalive = setTimeout(heartbeat, 30000);
+                void heartbeat();
+                mediaWatchdog=setInterval(()=>{if(disposed||terminal||document.hidden||peer.connectionState!=='connected')return;if(instance?.getStats().mediaStalled)fail('media')},1000);
             };
             const poll = async () => {
                 if (disposed) return;
@@ -252,6 +259,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 disposed = true;
                 clearTimeout(timer);
                 clearTimeout(keepalive);
+                clearInterval(mediaWatchdog);
                 clearTimeout(connectionDeadline);
                 clearTimeout(disconnectDeadline);
                 releaseTouch(); controller.current = undefined;

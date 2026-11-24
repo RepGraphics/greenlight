@@ -91,3 +91,6 @@ test('requested display sizes accept only supported presets',()=>{assert.deepEqu
 
 import { recoveryDelay } from '../../renderer/lib/sessionrecovery'
 test('automatic recovery is opt-in, limited to established Remote Play and bounded',()=>{assert.equal(recoveryDelay(true,false,true,0),3000);assert.equal(recoveryDelay(true,false,true,1),8000);assert.equal(recoveryDelay(true,false,true,2),null);assert.equal(recoveryDelay(true,true,true,0),null);assert.equal(recoveryDelay(false,false,true,0),null);assert.equal(recoveryDelay(true,false,false,0),null)})
+
+import { MediaStallMonitor } from '../../../player/src/client/lib/mediastall'
+test('media stalls require established inbound traffic and sustained inactivity',()=>{const monitor=new MediaStallMonitor();assert.equal(monitor.sample(0,[{id:'v',bytes:10}],true),false);for(let t=1000;t<15000;t+=1000)assert.equal(monitor.sample(t,[{id:'v',bytes:10}],true),false);assert.equal(monitor.sample(15000,[{id:'v',bytes:10}],true),true);assert.equal(monitor.sample(16000,[{id:'v',bytes:11}],true),false);assert.equal(monitor.sample(17000,[],false),false)})
