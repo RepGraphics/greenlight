@@ -122,3 +122,6 @@ test('controller slot assignment is unique, bounded and stable on hotplug',()=>{
 
 import { recoveryBitrate } from '../../renderer/lib/bitrateadvisor'
 test('adaptive recovery only lowers caps on sustained fresh congestion evidence',()=>{const samples=Array.from({length:20},(_,i)=>({elapsedSeconds:i,width:1920,height:1080,fps:60,bitrate:20,jitter:40,loss:0,rtt:200,statsFresh:true}));assert.equal(recoveryBitrate(samples,20480,'transport',true),10240);assert.equal(recoveryBitrate(samples,20480,'stats',true),null);assert.equal(recoveryBitrate(samples,20480,'transport',false),null);assert.equal(recoveryBitrate(samples.map(s=>({...s,rtt:5,jitter:1})),20480,'media',true),null);assert.equal(recoveryBitrate(samples.map(s=>({...s,statsFresh:false})),20480,'media',true),null)})
+
+import { replayDuration } from '../../renderer/lib/instantreplay'
+test('replay duration is bounded and replay shortcuts are opt-in',()=>{assert.equal(replayDuration(15),15);assert.equal(replayDuration(60),60);assert.equal(replayDuration(120),30);assert.equal(replayDuration('60'),30);assert.equal(validateShortcuts({}).replay,'');assert.equal(assignShortcut({},'replay','F8').controls,'');assert.equal(portableSettings({v3_replay_seconds:60}).v3_replay_seconds,60)})

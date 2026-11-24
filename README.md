@@ -96,7 +96,7 @@ Enable Multiple client controllers under Settings → Input before starting V3. 
 
 ### Instant replay (V3 experimental)
 
-Enable Instant replay in the streaming toolbar to keep recent standalone WebM segments in memory. Save recent segment to download or add it to the capture library. Segments rotate every 30 seconds, with a 32 MiB cap per segment; a saved segment may be shorter and is not guaranteed to contain exactly the preceding 30 seconds. Replay is opt-in per session, standard-video only, mutually exclusive with manual recording, and stops on disconnect. Unsaved replay buffers are discarded. It can increase encoding load.
+Enable Instant replay in the streaming toolbar to keep recent standalone WebM segments in memory. Save recent segment to download or add it to the capture library. Segments rotate every 15, 30 or 60 seconds (configurable in Settings → Streaming), with a 32 MiB cap per segment; a saved segment may be shorter and is not guaranteed to contain exactly the selected preceding duration. Replay is opt-in per session, standard-video only, mutually exclusive with manual recording, and stops on disconnect. Unsaved replay buffers are discarded. It can increase encoding load.
 
 ## Troubleshooting
 

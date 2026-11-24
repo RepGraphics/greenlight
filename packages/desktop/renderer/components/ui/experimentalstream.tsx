@@ -1,7 +1,7 @@
 import React from 'react'
 import { shortcutAction, validateShortcuts } from '../../lib/streamshortcuts'
 import { recoveryDelay } from '../../lib/sessionrecovery'
-import { startInstantReplay } from '../../lib/instantreplay'
+import { startInstantReplay, replayDuration } from '../../lib/instantreplay'
 import { startStreamRecording, recordingMimeType, downloadRecording } from '../../lib/streamrecording'
 import { storeCapture } from '../../lib/capturelibrary'
 import { currentVideo, canCapture, captureScreenshotBlob, saveStreamScreenshot, toggleStreamPictureInPicture } from '../../lib/streamcapture'
@@ -110,6 +110,7 @@ export default function ExperimentalStream({ target, onExit }: { target: string;
     const [recordedClip,setRecordedClip]=React.useState<Blob|null>(null)
     const replay=React.useRef<ReturnType<typeof startInstantReplay>|null>(null)
     const [replayEnabled,setReplayEnabled]=React.useState(false)
+    const replaySeconds=replayDuration(settings.v3_replay_seconds)
     const [replayReady,setReplayReady]=React.useState(false)
     const [replaySaving,setReplaySaving]=React.useState(false)
     const mounted=React.useRef(true)
@@ -143,9 +144,9 @@ export default function ExperimentalStream({ target, onExit }: { target: string;
         if(!replayEnabled||state!=='Connected'||!recordingAvailable||recordingActive){setReplayReady(false);return}
         const video=currentVideo();if(!canCapture(video)){setReplayEnabled(false);return}
         let active=true
-        try{replay.current=startInstantReplay(video,ready=>{if(active)setReplayReady(ready)},()=>{if(active){setReplayEnabled(false);setCaptureMessage('replayFailed')}})}catch{setReplayEnabled(false);setCaptureMessage('replayFailed')}
+        try{replay.current=startInstantReplay(video,ready=>{if(active)setReplayReady(ready)},()=>{if(active){setReplayEnabled(false);setCaptureMessage('replayFailed')}},replaySeconds)}catch{setReplayEnabled(false);setCaptureMessage('replayFailed')}
         return()=>{active=false;replay.current?.dispose();replay.current=null;setReplayReady(false)}
-    },[replayEnabled,state,session,recordingAvailable,recordingActive])
+    },[replayEnabled,state,session,recordingAvailable,recordingActive,replaySeconds])
     React.useEffect(()=>{if(state!=='Connected')setReplayEnabled(false)},[state])
     const saveReplay=async()=>{if(!replay.current||replaySaving||recordedClip)return;setReplaySaving(true);try{const blob=await replay.current.save();if(!mounted.current)return;if(blob){setRecordedClip(blob);setCaptureMessage('replaySaved')}else setCaptureMessage('replayFailed')}catch{if(mounted.current)setCaptureMessage('replayFailed')}finally{if(mounted.current)setReplaySaving(false)}}
     const togglePip=async()=>{if(state!=='Connected'||!settings.video_enabled)return;try{await toggleStreamPictureInPicture(currentVideo())}catch{setCaptureMessage('pipFailed')}}
@@ -202,6 +203,7 @@ export default function ExperimentalStream({ target, onExit }: { target: string;
         else if(action==='graphs'){setGraphSamples([...samples.current]);setShowGraphs(value=>!value)}
         else if(action==='screenshot'&&captureAvailable)void captureFrame()
         else if(action==='recording'&&(recordingActive||recordingAvailable&&!recordedClip))toggleRecording()
+        else if(action==='replay'&&replayEnabled&&!replaySaving&&!recordedClip)void saveReplay()
     }
     React.useEffect(()=>{const key=(event:KeyboardEvent)=>shortcutHandler.current(event);window.addEventListener('keydown',key,true);return()=>window.removeEventListener('keydown',key,true)},[])
     const adapter = React.useMemo(() => ({
@@ -229,7 +231,7 @@ export default function ExperimentalStream({ target, onExit }: { target: string;
         {showFilters && <div className='gl-live-video-panel'><h2>{t('dashboard.videoFilters')}</h2><VideoFilterControls value={filters} onChange={setFilters}/><label>{t('settings.videoAudio.aspectSizeLabel')} <select value={displayMode} onChange={event=>setDisplayMode(event.target.value)}><option value='default'>{t('settings.videoAudio.aspectSizeValueDefault')}</option><option value='stretch'>{t('settings.videoAudio.aspectSizeValueStretch')}</option><option value='zoom'>{t('settings.videoAudio.aspectSizeValueZoom')}</option></select></label><div className='gl-console-toolbar'><button type='button' className='btn' onClick={()=>setSettings({...globalSettings,v3_video_filters:filters,video_size:displayMode})}>{t('dashboard.saveVideoDefaults')}</button><button type='button' className='btn' onClick={()=>setShowFilters(false)}>{t('dashboard.dismiss')}</button></div></div>}
         {settings.v3_native_mkb && state === 'Connected' && <div className="gl-performance-hud" style={{top:'auto',bottom:85}}>{t('dashboard.nativeMkbHint')}</div>}
         {showSummary && <div className="gl-performance-hud gl-quality-advice" style={{top:'auto',bottom:135}}><span>{t('dashboard.connectionQuality')}: {t('dashboard.quality_'+(summary?.quality || 'insufficient'))}</span><span>RTT p95: {summary?.rtt95 ?? '—'} ms</span><span>Jitter p95: {summary?.jitter95 ?? '—'} ms</span><span>{t('dashboard.averageBitrate')}: {summary?.averageBitrate ?? '—'} Mbps</span><span>{t('dashboard.qualityHint_'+(summary?.quality || 'insufficient'))}</span><span>{t('dashboard.requestedResolution')}: {resolution}p</span><span>{t('dashboard.currentBitrateCap')}: {activeCap?Math.round(activeCap/1000)+' Mbps':t('settings.streaming.unlimitedLabel')}</span>{bitrateOverride!==null&&<span>{t('dashboard.sessionQualityOverride')}</span>}{recommendedCap!==null&&state==='Connected'&&<button type='button' className='btn' style={{pointerEvents:'auto'}} onClick={()=>setRestartCap(recommendedCap)}>{t('dashboard.lowerBitrateSuggestion',{bitrate:Math.round(recommendedCap/1000)})}</button>}</div>}
-        {replayEnabled&&<div className='gl-replay-indicator' role='status'>{t(replayReady?'dashboard.replayReady':'dashboard.replayBuffering')}</div>}
+        {replayEnabled&&<div className='gl-replay-indicator' role='status'>{t(replayReady?'dashboard.replayReady':'dashboard.replayBuffering',{seconds:replaySeconds})}</div>}
         {recordingActive&&<div className='gl-recording-indicator' role='status'><span/>REC {Math.floor(recordingElapsed/60)}:{String(recordingElapsed%60).padStart(2,'0')}</div>}
         {recordedClip&&<div className='gl-recording-result'><strong>{t('dashboard.clipReady')}</strong> · {(recordedClip.size/1048576).toFixed(1)} MiB <button type='button' className='btn' disabled={libraryBusy} onClick={()=>{downloadRecording(recordedClip);setRecordedClip(null)}}>{t('dashboard.saveClip')}</button><button type='button' className='btn' disabled={libraryBusy} onClick={()=>void saveCaptureToLibrary('clip')}>{t('dashboard.saveToLibrary')}</button><button type='button' className='btn' disabled={libraryBusy} onClick={()=>setRecordedClip(null)}>{t('dashboard.discardClip')}</button></div>}
         {captureMessage && <div className='gl-mic-error' role='status'>{t('dashboard.'+captureMessage)} <button type='button' className='btn' onClick={()=>setCaptureMessage('')}>{t('dashboard.dismiss')}</button></div>}

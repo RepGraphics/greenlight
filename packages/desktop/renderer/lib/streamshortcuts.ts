@@ -1,4 +1,4 @@
-export const shortcutDefaults = { controls:'F8', fullscreen:'', mute:'', hud:'', screenshot:'', recording:'', graphs:'' }
+export const shortcutDefaults = { controls:'F8', fullscreen:'', mute:'', hud:'', screenshot:'', recording:'', graphs:'', replay:'' }
 export type StreamAction = keyof typeof shortcutDefaults
 export const shortcutKeys = ['', 'F6','F7','F8','F9','F10']
 export function validateShortcuts(value:unknown):typeof shortcutDefaults {
