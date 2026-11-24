@@ -39,6 +39,8 @@ export default class Stats {
         this.busy = true
         this._peerConnection.getStats().then((stats) => {
             if (this.disposed) return
+            const transport = Array.from(stats.values()).find(report=>report.type==='transport'&&report.selectedCandidatePairId)
+            const selectedPair = transport ? stats.get(transport.selectedCandidatePairId) : undefined
             stats.forEach((report) => {
                 //  @TODO: Implement chat stats using type outbound-rtp
 
@@ -54,7 +56,7 @@ export default class Stats {
                         this._packetsLost = report.packetsLost || 0
                     }
 
-                } else if(report.type === 'candidate-pair' && report.packetsReceived !== undefined && report.packetsReceived > 0){
+                } else if(report.type === 'candidate-pair' && (selectedPair ? report.id===selectedPair.id : report.nominated && report.state==='succeeded')){
                     this.readCandidatePair(report)
                     
                 } else if(report.type === 'remote-candidate'){
@@ -82,7 +84,7 @@ export default class Stats {
 
             if(report.frameWidth){ this._videoWidth = report.frameWidth }
             if(report.frameHeight){ this._videoHeight = report.frameHeight }
-            if(report.framesPerSecond){ this._videoFps = report.framesPerSecond }
+            if(typeof report.framesPerSecond==='number'){ this._videoFps = report.framesPerSecond }
             // report.jitter
 
         } else if(report.kind === 'audio' && report.codecId && report.packetsReceived !== undefined && report.packetsReceived > 0){
@@ -94,7 +96,7 @@ export default class Stats {
 
     readCandidatePair(report){
         this._activeRemoteCandidate = report.remoteCandidateId
-        this._rtt = report.currentRoundTripTime
+        this._rtt = Number.isFinite(report.currentRoundTripTime)?report.currentRoundTripTime:0
     }
 
     readRemoteCandidate(report){
