@@ -79,3 +79,6 @@ import { recommendLowerBitrate } from '../../renderer/lib/bitrateadvisor'
 test('bitrate advice requires sustained poor quality and reduces the existing cap',()=>{const samples=Array.from({length:20},(_,i)=>sanitizeSample({width:1920,height:1080,fps:60,bitrate:16,jitter:35,loss:i,rtt:200},i));assert.equal(recommendLowerBitrate(samples,20480),10240);assert.equal(recommendLowerBitrate(samples,4096),2048);assert.equal(recommendLowerBitrate(samples.slice(0,5),20480),null);assert.equal(recommendLowerBitrate(samples.map(s=>({...s,rtt:30,jitter:5})),20480),null)})
 
 test('sharpening is opt-in, bounded and preserves constant image brightness',()=>{assert.equal(validateVideoFilters({}).sharpening,0);assert.equal(validateVideoFilters({sharpening:999}).sharpening,100);assert.equal(validateVideoFilters({sharpening:-1}).sharpening,0);assert.equal(sharpeningKernel(0),'0 0 0 0 1 0 0 0 0');assert.ok(Math.abs(sharpeningKernel(75).split(' ').map(Number).reduce((a,b)=>a+b,0)-1)<1e-9);assert.ok(videoFilterCss({sharpening:25}).endsWith('url(#gl-stream-sharpen)'))})
+
+import { screenshotFilename } from '../../renderer/lib/streamcapture'
+test('screenshot filenames use portable UTC timestamps',()=>{assert.equal(screenshotFilename(new Date('2026-11-24T14:00:01.123Z')),'greenlight-2026-11-24T14-00-01-123Z.png')})

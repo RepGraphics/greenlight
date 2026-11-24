@@ -56,7 +56,7 @@ jobs:
           node -e "for (const f of [require('./package.json').main, 'app/preload.js']) { if (!require('node:fs').existsSync(f)) throw new Error('Missing compiled entry: ' + f) }"
       - name: Package installer without publishing
         working-directory: packages/desktop
-        run: yarn exec electron-builder --publish never
+        run: yarn run package:local
       - name: Upload installers
         uses: actions/upload-artifact@v7
         with:

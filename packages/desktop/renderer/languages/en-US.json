@@ -454,7 +454,14 @@
       "consoleControllerDescription": "Use the controller paired directly with your console. Greenlight will not register a remote gamepad or forward local keyboard, mouse or touch input in this mode. Applies to V3 Remote Play only.",
       "videoFilter_sharpening": "Sharpening",
       "videoPreset_clarity": "Clarity",
-      "sharpeningHint": "Optional local edge enhancement. Higher values can exaggerate compression artifacts and increase rendering load; set to 0% to disable."
+      "sharpeningHint": "Optional local edge enhancement. Higher values can exaggerate compression artifacts and increase rendering load; set to 0% to disable.",
+      "screenshot": "Save screenshot",
+      "enterPip": "Picture-in-picture",
+      "exitPip": "Exit picture-in-picture",
+      "captureStandardVideoHint": "Requires standard video rendering and a decoded frame. Screenshots and floating video exclude visual filters and overlays.",
+      "screenshotReady": "Screenshot prepared for download.",
+      "screenshotFailed": "Unable to capture a video frame.",
+      "pipFailed": "Picture-in-picture is unavailable for this stream."
     }
   }
 }

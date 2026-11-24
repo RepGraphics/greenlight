@@ -19,7 +19,8 @@
     "test-serve": "npx http-server app/ -p 3000",
     "postinstall": "electron-builder install-app-deps",
     "publish": "electron-builder -p onTag",
-    "flatpak-build": "nextron build --no-pack && electron-builder --dir"
+    "flatpak-build": "nextron build --no-pack && electron-builder --dir",
+    "package:local": "electron-builder --publish never"
   },
   "dependencies": {
     "@types/i18next": "^13.0.0",
