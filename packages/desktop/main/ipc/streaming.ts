@@ -37,6 +37,9 @@ export default class IpcStreaming extends IpcBase {
     }
 
     startStream(args:startStreamArgs){
+        if (!args || (args.type !== 'home' && args.type !== 'cloud') || typeof args.target !== 'string' || !args.target.trim()) {
+            return Promise.reject(new Error('Invalid streaming request'))
+        }
 
         if(args.type === 'home'){
             this._application._ipc._channels.consoles._consolesLastUpdate = 0

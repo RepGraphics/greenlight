@@ -72,9 +72,9 @@ function StreamComponent({
 
     React.useEffect(() => {
 
-        Ipc.onAction('streaming', 'onQueue', (event, waitingTimes) => {
+        const queueListener = Ipc.onAction('streaming', 'onQueue', (event, waitingTimes) => {
             console.log('Waiting times:', waitingTimes)
-            drawWaitingTimes(waitingTimes.estimatedTotalWaitTimeInSeconds)
+            drawWaitingTimes(waitingTimes?.estimatedTotalWaitTimeInSeconds)
         })
 
         // ipcRenderer.on('xcloud', (event, args) => {
@@ -171,9 +171,13 @@ function StreamComponent({
             ],
         }, droppedData, document.getElementById('component_streamcomponent_debug_webrtc_dropped'))
 
+        let disposed = false
+        let statsPending = false
         webRtcStatsInterval = setInterval(() => {
-            if (xPlayer._webrtcClient !== undefined) {
+            if (!disposed && !statsPending && document.getElementById('component_streamcomponent_debug')?.classList.contains('hidden') === false && xPlayer._webrtcClient !== undefined) {
+                statsPending = true
                 xPlayer._webrtcClient.getStats().then((stats) => {
+                    if (disposed) return
                     let statsOutput = ''
 
                     stats.forEach((report) => {
@@ -200,9 +204,9 @@ function StreamComponent({
 
                             if (frameCountDomUpdate >= 15) {
                                 Object.keys(report).forEach((statName) => {
-                                    statsOutput += `<strong>${statName}:</strong> ${report[statName]}<br>\n`
+                                    statsOutput += statName + ': ' + report[statName] + '\n'
                                 })
-                                document.querySelector('div#component_streamcomponent_debug_text').innerHTML = statsOutput
+                                document.querySelector('div#component_streamcomponent_debug_text').textContent = statsOutput
                                 frameCountDomUpdate = 0
                             } else {
                                 frameCountDomUpdate++
@@ -213,7 +217,7 @@ function StreamComponent({
                     // document.querySelector('div#component_streamcomponent_debug_text').innerHTML = statsOutput;
                 })
             }
-        }, 33)
+        }, 250)
 
         // Gamebar menu mouse events
         const mouseEvent = () => {
@@ -252,6 +256,10 @@ function StreamComponent({
 
         // cleanup this component
         return () => {
+            disposed = true
+            if (queueListener) Ipc.removeListener('streaming', queueListener)
+            jitterUplot.destroy()
+            droppedUplot.destroy()
             window.removeEventListener('mousemove', mouseEvent)
             window.removeEventListener('mousedown', mouseEvent)
             window.removeEventListener('keypress', keyboardPressEvent)
@@ -306,30 +314,14 @@ function StreamComponent({
     }
 
     function drawWaitingTimes(seconds) {
-        if (seconds !== false) {
-            setWaitingSeconds(seconds)
-
-            const formattedWaitingTime = formatWaitingTime(seconds)
-            const html = '<div>' + t("streamWindow.estimatedWaitingTimeMessage") + ' ' + '<span id="component_streamcomponent_waitingtimes_seconds">' + formattedWaitingTime + '</span></div>'
-
-            document.getElementById('component_streamcomponent_waitingtimes').innerHTML = html
-
-            const secondsInterval = setInterval(() => {
-                seconds--
-                setWaitingSeconds(seconds)
-
-                if (document.getElementById('component_streamcomponent_waitingtimes') !== null) {
-                    document.getElementById('component_streamcomponent_waitingtimes_seconds').innerText = formatWaitingTime(seconds)
-                } else {
-                    clearInterval(secondsInterval)
-                }
-
-                if (seconds === 0) {
-                    clearInterval(secondsInterval)
-                }
-            }, 1000)
-        }
+        if (typeof seconds === 'number' && Number.isFinite(seconds)) setWaitingSeconds(Math.max(0, seconds))
     }
+
+    React.useEffect(() => {
+        if (waitingSeconds <= 0) return
+        const timeout = setTimeout(() => setWaitingSeconds(seconds => Math.max(0, seconds - 1)), 1000)
+        return () => clearTimeout(timeout)
+    }, [waitingSeconds])
 
     function formatWaitingTime(rawSeconds: number): string {
         let formattedText = ''
@@ -368,7 +360,7 @@ function StreamComponent({
                         <p>{t("streamWindow.gettingStreamReadyMessage")}</p>
                         <p id="component_streamcomponent_connectionstatus"></p>
 
-                        <p id="component_streamcomponent_waitingtimes"></p>
+                        <p id="component_streamcomponent_waitingtimes">{waitingSeconds > 0 ? t("streamWindow.estimatedWaitingTimeMessage") + " " + formatWaitingTime(waitingSeconds) : ""}</p>
                     </Card>
                 </div>
 

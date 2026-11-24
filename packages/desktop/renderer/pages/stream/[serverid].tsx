@@ -14,8 +14,8 @@ function Stream() {
     const { settings } = useSettings()
     const { t } = useTranslation()
 
-    let streamStateInterval
-    let keepaliveInterval
+    const streamStateInterval = React.useRef<ReturnType<typeof setInterval> | undefined>(undefined)
+    const keepaliveInterval = React.useRef<ReturnType<typeof setInterval> | undefined>(undefined)
 
     const [xPlayer, setxPlayer] = React.useState(undefined)
     const [sessionId, setSessionId] = React.useState('')
@@ -23,6 +23,8 @@ function Stream() {
 
     React.useEffect(() => {
         if (!router.isReady || typeof router.query.serverid !== 'string') return
+        let cancelled = false
+        let polling = false
         // Detect stream type and title / server id
         let streamType = 'home'
         let serverId = router.query.serverid
@@ -98,6 +100,7 @@ function Stream() {
             })
 
             xPlayer.getEventBus().on('connectionstate', (event) => {
+                if (cancelled) return
                 console.log('connectionstate changed:', event)
 
                 const connStatus = document.getElementById('component_streamcomponent_connectionstatus')
@@ -117,8 +120,8 @@ function Stream() {
                         }
 
                         // Start keepalive loop
-                        if (keepaliveInterval) clearInterval(keepaliveInterval)
-                        keepaliveInterval = setInterval(() => {
+                        if (keepaliveInterval.current) clearInterval(keepaliveInterval.current)
+                        keepaliveInterval.current = setInterval(() => {
                             Ipc.send('streaming', 'sendKeepalive', {
                                 sessionId: sessionId,
                             }).then((result) => {
@@ -150,6 +153,7 @@ function Stream() {
                 target: serverId,
             }).then((result:string) => {
                 console.log('StartStream session:', result)
+                if (cancelled) { void Ipc.send('streaming', 'stopStream', { sessionId: result }).catch(() => {}); return }
                 setSessionId(result)
 
             }).catch((error) => {
@@ -157,10 +161,14 @@ function Stream() {
             })
         } else {
 
-            streamStateInterval = setInterval(() => {
+            streamStateInterval.current = setInterval(() => {
+                if (polling || cancelled) return
+                polling = true
                 Ipc.send('streaming', 'getPlayerState', {
                     sessionId: sessionId,
                 }).then((session:any) => {
+                    if (cancelled) return
+                    if (!session) { clearInterval(streamStateInterval.current); alert(t('errors.failedToGetPlayerState')); void router.replace('/home'); return }
                     console.log('Player state:', session)
 
                     switch(session.playerState){
@@ -170,7 +178,7 @@ function Stream() {
 
                         case 'started':
                             // Console is ready
-                            clearInterval(streamStateInterval)
+                            clearInterval(streamStateInterval.current)
 
                             // Start xPlayer interface
                             setxPlayer(new xCloudPlayer('streamComponent', {
@@ -186,7 +194,7 @@ function Stream() {
 
                         case 'failed':
                             // Error
-                            clearInterval(streamStateInterval)
+                            clearInterval(streamStateInterval.current)
 
                             if(session.errorDetails?.code === 'WNSError' && session.errorDetails?.message?.includes('WaitingForServerToRegister')){
                                 // Detected the "WaitingForServerToRegister" error. This means the console is not connected to the xbox servers
@@ -196,7 +204,7 @@ function Stream() {
                             }
                             console.log('Full stream error:', session.errorDetails)
                             onDisconnect()
-                            xPlayer?.close()
+                            void router.replace('/home')
                             break
 
                         case 'queued':
@@ -212,23 +220,24 @@ function Stream() {
                     }
 
                 }).catch((error) => {
-                    alert(t('errors.failedToGetPlayerState') + '\n' + JSON.stringify(error))
-                })
+                    if (!cancelled) { clearInterval(streamStateInterval.current); alert(t('errors.failedToGetPlayerState')); onDisconnect(); void router.replace('/home') }
+                }).finally(() => { polling = false })
             }, 1000)
         }
 
         // Modal window
         return () => {
+            cancelled = true
             if(xPlayer !== undefined){
                 xPlayer.close()
             }
 
-            if(keepaliveInterval){
-                clearInterval(keepaliveInterval)
+            if(keepaliveInterval.current){
+                clearInterval(keepaliveInterval.current)
             }
 
-            if(streamStateInterval){
-                clearInterval(streamStateInterval)
+            if(streamStateInterval.current){
+                clearInterval(streamStateInterval.current)
             }
         }
     }, [router.isReady, router.query.serverid, sessionId, xPlayer])
@@ -239,14 +248,15 @@ function Stream() {
     }
 
     function onDisconnect(){
+        if (!sessionId) return
         Ipc.send('streaming', 'stopStream', {
             sessionId: sessionId,
         }).then((result) => {
             console.log('Stream stopped:', result)
-        })
+        }).catch(() => console.warn('Unable to stop remote session'))
 
-        if(streamStateInterval){
-            clearInterval(streamStateInterval)
+        if(streamStateInterval.current){
+            clearInterval(streamStateInterval.current)
         }
     }
 

@@ -1,38 +1,32 @@
 import { contextBridge, ipcRenderer, shell } from 'electron'
 import pkg from '../package.json'
 
+let nextRequestId = 0
+
 export const Preload = {
 
     send(channel:string, action:string, data = {}){
         return new Promise((resolve, reject) => {
-            const requestId = Math.round(Math.random()*1000)
-
-            ipcRenderer.send(channel, {
-                id: requestId,
-                action: action,
-                data: data,
-            })
-
-            // Wait for event back..
-            const callbackFunction = (event, args) => {
-                if(args.action === action && args.id === requestId){
-                    ipcRenderer.removeListener(channel, callbackFunction)
-                    
-                    if(args.error === undefined)
-                        resolve(args.data)
-                    else {
-                        // if(args.error.status){
-                        //     alert('HTTP Status: ' + args.error.status + '\nPath:' + args.error.url + '\n' + args.error.body)
-                        // } else {
-                        //     alert(args.error)
-                        // }
-                        reject(args.error)
-                    }
-                }
+            const requestId = ++nextRequestId
+            const callbackFunction = (_event, args) => {
+                if (args.action !== action || args.id !== requestId) return
+                clearTimeout(timeout)
+                ipcRenderer.removeListener(channel, callbackFunction)
+                if (args.error === undefined) resolve(args.data)
+                else reject(args.error)
             }
-
+            const timeout = setTimeout(() => {
+                ipcRenderer.removeListener(channel, callbackFunction)
+                reject(new Error('Application request timed out'))
+            }, 60000)
             ipcRenderer.on(channel, callbackFunction)
-
+            try {
+                ipcRenderer.send(channel, { id: requestId, action, data })
+            } catch (error) {
+                clearTimeout(timeout)
+                ipcRenderer.removeListener(channel, callbackFunction)
+                reject(error)
+            }
         })
     },
 

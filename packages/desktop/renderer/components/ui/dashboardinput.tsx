@@ -68,6 +68,7 @@ export default function DashboardInput({ enabled }: { enabled: boolean }) {
         let previousA = true
         let previousB = true
         let previousX = true
+        let previousPad = -1
         const keys: Record<string, Direction> = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }
         const onKey = (event: KeyboardEvent) => {
             if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
@@ -81,9 +82,10 @@ export default function DashboardInput({ enabled }: { enabled: boolean }) {
         }
         const tick = (now: number) => {
             frame = requestAnimationFrame(tick)
-            if (!document.hasFocus() || document.hidden) return
+            if (!document.hasFocus() || document.hidden) { previousA = previousB = previousX = true; lastDirection = undefined; previousPad = -1; return }
             const pad = Array.from(navigator.getGamepads?.() || []).find(p => p?.mapping === 'standard')
-            if (!pad) { previousA = previousB = previousX = true; lastDirection = undefined; return }
+            if (!pad) { previousA = previousB = previousX = true; lastDirection = undefined; previousPad = -1; return }
+            if (pad.index !== previousPad) { previousPad = pad.index; previousA = previousB = previousX = true; lastDirection = undefined }
             const down = (n: number) => Boolean(pad.buttons[n]?.pressed)
             const x = pad.axes[0] || 0
             const y = pad.axes[1] || 0
