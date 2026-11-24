@@ -59,7 +59,7 @@ function adjust(el: HTMLElement, direction: number) {
     return false
 }
 
-export default function DashboardInput({ enabled }: { enabled: boolean }) {
+export default function DashboardInput({ enabled, onBack }: { enabled: boolean; onBack?: () => void }) {
     React.useEffect(() => {
         if (!enabled) return
         let frame = 0
@@ -105,7 +105,11 @@ export default function DashboardInput({ enabled }: { enabled: boolean }) {
                     else if (target instanceof HTMLSelectElement) adjust(target, 1)
                 } else move('down')
             }
-            if (down(1) && !previousB && document.activeElement instanceof HTMLElement) document.activeElement.blur()
+            if (down(1) && !previousB) {
+                const target = document.activeElement as HTMLElement
+                if (target?.matches('input, select, textarea')) target.blur()
+                else onBack?.()
+            }
             if (down(2) && !previousX) {
                 const target = document.activeElement as HTMLElement
                 adjust(target, -1)
@@ -124,6 +128,6 @@ export default function DashboardInput({ enabled }: { enabled: boolean }) {
             window.removeEventListener('pointerdown', mouse)
             mouse()
         }
-    }, [enabled])
+    }, [enabled, onBack])
     return null
 }

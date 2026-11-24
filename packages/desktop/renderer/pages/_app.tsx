@@ -24,6 +24,9 @@ import {
 // This default export is required in a new `pages/_app.js` file.
 export default function MyApp({ Component, pageProps }) {
     const router = useRouter()
+    const onDashboardBack = React.useCallback(() => {
+        if (router.pathname !== '/home' && !router.pathname.startsWith('/stream/')) void router.push('/home')
+    }, [router.pathname])
     const [queryClient] = React.useState(() => new QueryClient())
 
     const [loggedIn, setLoginState] = React.useState(false)
@@ -135,7 +138,7 @@ export default function MyApp({ Component, pageProps }) {
                     <UserProvider>
                         <LanguageProvider>
                             {appBody}
-                            <DashboardInput enabled={!router.pathname.startsWith('/stream/')} />
+                            <DashboardInput enabled={!router.pathname.startsWith('/stream/')} onBack={onDashboardBack} />
                             <Notifications />
                         </LanguageProvider>
                     </UserProvider>

@@ -280,7 +280,17 @@
       "quickAccess": "Quick access",
       "requestFailed": "An application request failed. Please try again.",
       "httpError": "Request failed (HTTP {{status}}). Please try again.",
-      "dismiss": "Dismiss notification"
+      "dismiss": "Dismiss notification",
+      "lastConsole": "Last selected console",
+      "resumeDescription": "Reconnect to your Xbox",
+      "connectAgain": "Connect again",
+      "searchConsoles": "Search consoles",
+      "favourites": "Favourites",
+      "consoleCount_one": "{{count}} console",
+      "consoleCount_other": "{{count}} consoles",
+      "addFavourite": "Add to favourites",
+      "removeFavourite": "Remove from favourites",
+      "noMatchingConsoles": "No consoles match your filters."
     }
   }
 }

@@ -11,9 +11,30 @@ import Card from '../components/ui/card'
 import Label from '../components/ui/label'
 import Loader from '../components/ui/loader'
 
-function Home() {
+function Home({ account }: { account?: { gamertag?: string } }) {
     const consoles = useQuery('consoles', () => Ipc.send('consoles', 'get'), { staleTime: 60*1000 })
     const { t } = useTranslation()
+    const [favourites, setFavourites] = React.useState<string[]>([])
+    const [lastConsole, setLastConsole] = React.useState<string | null>(null)
+    const [search, setSearch] = React.useState('')
+    const [onlyFavourites, setOnlyFavourites] = React.useState(false)
+    const storageKey = 'greenlight.dashboard.' + (account?.gamertag || 'local')
+    React.useEffect(() => {
+        try {
+            const saved = JSON.parse(localStorage.getItem(storageKey) || '{}')
+            setFavourites(Array.isArray(saved.favourites) ? saved.favourites.filter((id: unknown) => typeof id === 'string') : [])
+            setLastConsole(typeof saved.lastConsole === 'string' ? saved.lastConsole : null)
+        } catch { setFavourites([]); setLastConsole(null) }
+    }, [storageKey])
+    function save(next: string[], recent: string | null) {
+        setFavourites(next)
+        setLastConsole(recent)
+        try { localStorage.setItem(storageKey, JSON.stringify({ favourites: next, lastConsole: recent })) } catch { /* Storage may be unavailable. */ }
+    }
+    const all = Array.isArray(consoles.data) ? consoles.data : []
+    const visible = all.filter(item => (!onlyFavourites || favourites.includes(item.id)) && String(item.name || '').toLowerCase().includes(search.trim().toLowerCase())).sort((a,b) => Number(favourites.includes(b.id)) - Number(favourites.includes(a.id)))
+    const recent = all.find(item => item.id === lastConsole)
+    const ready = (item) => item.remoteManagementEnabled === true && item.consoleStreamingEnabled === true
 
     return (
         <React.Fragment>
@@ -26,13 +47,22 @@ function Home() {
                     <h1>{t('page.myConsoles.pageTitle')}</h1>
                     <Button label={consoles.isFetching ? t('dashboard.refreshing') : t('dashboard.refresh')} disabled={consoles.isFetching} onClick={() => { void consoles.refetch() }} />
                 </div>
+                {recent && ready(recent) && <div className='gl-resume-card'>
+                    <div><span className='gl-eyebrow'>{t('dashboard.lastConsole')}</span><h2>{recent.name}</h2><p>{t('dashboard.resumeDescription')}</p></div>
+                    <Link className='btn btn-primary' href={`/stream/${encodeURIComponent(recent.id)}`}><i className='fa-solid fa-play' aria-hidden='true' /> {t('dashboard.connectAgain')}</Link>
+                </div>}
+                <div className='gl-console-toolbar'>
+                    <input className='text' type='search' value={search} onChange={e => setSearch(e.target.value)} placeholder={t('dashboard.searchConsoles')} aria-label={t('dashboard.searchConsoles')} />
+                    <button type='button' className={'btn ' + (onlyFavourites ? 'btn-primary' : '')} aria-pressed={onlyFavourites} onClick={() => setOnlyFavourites(!onlyFavourites)}><i className='fa-solid fa-star' aria-hidden='true' /> {t('dashboard.favourites')}</button>
+                    <span className='gl-console-count'>{t('dashboard.consoleCount', { count: visible.length })}</span>
+                </div>
                 <div className='gl-console-grid' aria-busy={consoles.isFetching}>
                 { (consoles.isLoading === true) ? <Loader></Loader> :
                     consoles.isError && !Array.isArray(consoles.data) ? <div className='gl-console-feedback' role='alert'>{t('dashboard.consoleError')}</div> :
-                    (Array.isArray(consoles.data) && consoles.data.length > 0) ? consoles.data.map((item) => {
+                    visible.length > 0 ? visible.map((item) => {
                         return (
                             <Card className='padbottom' key={item.id}>
-                                <h1>{item.name}</h1>
+                                <div className='gl-console-card-heading'><h1>{item.name}</h1><button type='button' className='gl-favourite' aria-pressed={favourites.includes(item.id)} title={t(favourites.includes(item.id) ? 'dashboard.removeFavourite' : 'dashboard.addFavourite')} aria-label={t(favourites.includes(item.id) ? 'dashboard.removeFavourite' : 'dashboard.addFavourite')} onClick={() => save(favourites.includes(item.id) ? favourites.filter(id => id !== item.id) : [...favourites, item.id], lastConsole)}><i className={(favourites.includes(item.id) ? 'fa-solid' : 'fa-regular') + ' fa-star'} aria-hidden='true' /></button></div>
 
                                 <div style={{
                                     width: 200,
@@ -70,13 +100,13 @@ function Home() {
                                 <p>Streaming: {item.consoleStreamingEnabled ? 'Enabled' : 'Disabled'}</p><br /> */}
 
                                 <div className='gl-console-actions'>
-                                    <Link href={ `/stream/${encodeURIComponent(item.id)}` }>
+                                    <Link href={ `/stream/${encodeURIComponent(item.id)}` } onClick={() => save(favourites, item.id)}>
                                         <span className='btn btn-primary'>{t('page.myConsoles.startStreamBtn')}</span>
                                     </Link>
                                 </div>
                             </Card>
                         )
-                    }) : <div className='gl-console-feedback'>{t('page.myConsoles.noConsoles')}</div>
+                    }) : <div className='gl-console-feedback'>{all.length ? t('dashboard.noMatchingConsoles') : t('page.myConsoles.noConsoles')}</div>
                 }
                 </div>
             </section>

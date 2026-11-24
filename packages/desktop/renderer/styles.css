@@ -296,3 +296,16 @@ div.component_gametitle div.component_gametitle_infopage a { background: #222; w
 div.component_gametitle .gl-art-placeholder { width: 140px; height: 140px; display: grid; place-items: center; color: var(--gl-muted); background: #333; }
 .gl-library-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; padding: 18px; }
 .gl-library-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+
+/* Console dashboard shortcuts and favourites */
+.gl-resume-card { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:18px; padding:24px; margin:0 0 22px; border:1px solid #45673c; background:linear-gradient(115deg,#254c25,#222 80%); border-radius:8px; }
+.gl-resume-card h2 { font-size:26px; margin:7px 0; overflow-wrap:anywhere; }
+.gl-resume-card p { color:var(--gl-muted); }
+.gl-console-toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:0 0 20px; }
+.gl-console-toolbar input { flex:1; min-width:120px; max-width:100%; }
+.gl-console-count { color:var(--gl-muted); font-size:13px; }
+.gl-console-card-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.gl-console-card-heading h1 { overflow-wrap:anywhere; }
+.gl-favourite { background:transparent; border:0; color:var(--gl-muted); font-size:20px; cursor:pointer; padding:9px; border-radius:5px; }
+.gl-favourite[aria-pressed=true] { color:#9bf00b; }
+.gl-favourite:hover { background:#383838; }
