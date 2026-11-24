@@ -92,7 +92,6 @@ function SettingsInput() {
     const { t } = useTranslation()
 
     React.useEffect(() => {
-        console.log('Last controller check:', controllerPing)
         const controllerInterval = setInterval(() => {
             setControllerPing(Date.now())
         }, 1000)
@@ -100,7 +99,7 @@ function SettingsInput() {
         return () => {
             clearInterval(controllerInterval)
         }
-    })
+    }, [])
 
     function setControllerVibration(){
         setSettings({
@@ -131,7 +130,7 @@ function SettingsInput() {
     }
 
     function setKeyConfig(button:string, event) {
-        let ckeys = controllerKeys
+        let ckeys = { ...controllerKeys }
         if(ckeys === undefined) {
             ckeys = {} as any
         }
@@ -221,7 +220,16 @@ function SettingsInput() {
                     </div>
                 </Card>
 
-                <Card hidden={ settings.input_newgamepad }>
+                <Card hidden={settings.streaming_engine !== 'experimental'}>
+                    <h1>{t('dashboard.advancedInput')}</h1>
+                    <p><label htmlFor='v3-deadzone'>{t('dashboard.deadzone')}</label><input id='v3-deadzone' type='range' min='0' max='0.5' step='0.01' value={settings.v3_deadzone} onChange={e => setSettings({...settings, v3_deadzone:Number(e.target.value)})} /> {Math.round(settings.v3_deadzone*100)}%</p>
+                    <p><label htmlFor='v3-invert-y'>{t('dashboard.invertY')}</label><input id='v3-invert-y' type='checkbox' checked={settings.v3_invert_y} onChange={e => setSettings({...settings, v3_invert_y:e.target.checked})} /></p>
+                    <p><label htmlFor='v3-swap-sticks'>{t('dashboard.swapSticks')}</label><input id='v3-swap-sticks' type='checkbox' checked={settings.v3_swap_sticks} onChange={e => setSettings({...settings, v3_swap_sticks:e.target.checked})} /></p>
+                    <p><label htmlFor='v3-sensitivity'>{t('dashboard.mouseSensitivity')}</label><input id='v3-sensitivity' type='range' min='0.25' max='4' step='0.25' value={settings.v3_mouse_sensitivity} onChange={e => setSettings({...settings,v3_mouse_sensitivity:Number(e.target.value)})} /> {settings.v3_mouse_sensitivity}×</p>
+                    <button type='button' className='btn' onClick={() => setSettings({...settings,v3_deadzone:0.08,v3_invert_y:false,v3_swap_sticks:false,v3_mouse_sensitivity:1})}>{t('dashboard.resetInput')}</button>
+                    <p>{t('dashboard.inputNextStream')}</p>
+                </Card>
+                <Card hidden={ settings.input_newgamepad && settings.streaming_engine !== 'experimental' }>
                     <h1>{t('settings.input.keyboardMappingsTitle')}</h1>
                     <p>
                         {

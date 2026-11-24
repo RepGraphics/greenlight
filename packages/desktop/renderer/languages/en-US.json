@@ -341,7 +341,15 @@
       "standardVideo": "Standard video (recommended)",
       "rendererDescription": "WebGPU is experimental. The standard renderer is used when GPU initialization fails.",
       "nativeMkb": "Native mouse and keyboard",
-      "nativeMkbHint": "Click the video to capture mouse and keyboard. Press Esc to release. Requires game support."
+      "nativeMkbHint": "Click the video to capture mouse and keyboard. Press Esc to release. Requires game support.",
+      "advancedInput": "V3 advanced input",
+      "deadzone": "Controller deadzone",
+      "invertY": "Invert vertical stick axes",
+      "swapSticks": "Swap left and right sticks",
+      "mouseSensitivity": "Native mouse sensitivity",
+      "resetInput": "Reset input settings",
+      "inputNextStream": "Changes apply to the next V3 streaming session.",
+      "retryStream": "Retry connection"
     }
   }
 }

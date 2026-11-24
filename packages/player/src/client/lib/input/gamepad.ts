@@ -15,6 +15,8 @@ export interface GamepadOptions {
         [key:string]: string;
     };
     gamepad_deadzone?: number;
+    gamepad_invert_y?: boolean;
+    gamepad_swap_sticks?: boolean;
     gamepad_force_capture?: boolean;
 }
 
@@ -81,6 +83,8 @@ export default class Gamepad {
             'RightThumbYAxis': '3',
         },
         gamepad_deadzone: 0.08,
+        gamepad_invert_y: false,
+        gamepad_swap_sticks: false,
         gamepad_force_capture: false,
     }
 
@@ -323,7 +327,9 @@ export default class Gamepad {
 
             // Set axis
             for(const axis in this._options.gamepad_axes_mapping){
-                frame[axis] = this.normaliseAxis(gamepad.axes[this._options.gamepad_axes_mapping[axis]] ?? 0)
+                const source = this._options.gamepad_swap_sticks ? axis.replace(/^(Left|Right)/, side => side === 'Left' ? 'Right' : 'Left') : axis
+                const value = this.normaliseAxis(gamepad.axes[this._options.gamepad_axes_mapping[source]] ?? 0)
+                frame[axis] = this._options.gamepad_invert_y && axis.endsWith('YAxis') ? -value : value
             }
         }
 
@@ -451,13 +457,16 @@ export default class Gamepad {
     }
 
     normaliseAxis(value:number) {
-        if(Math.abs(value) < this._options.gamepad_deadzone) {
+        const configured = this._options.gamepad_deadzone
+        const deadzone = Number.isFinite(configured) ? Math.max(0, Math.min(0.5, configured)) : 0.08
+        if (!Number.isFinite(value)) return 0
+        if(Math.abs(value) < deadzone) {
             return 0
         }
 
-        value = value - Math.sign(value) * this._options.gamepad_deadzone
-        value /= (1.0 - this._options.gamepad_deadzone)
+        value = value - Math.sign(value) * deadzone
+        value /= (1.0 - deadzone)
         
-        return value
+        return Math.max(-1, Math.min(1, value))
     }
 }

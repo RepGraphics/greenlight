@@ -7,7 +7,7 @@ export default class MouseKeyboard {
     private buttons = 0
     private locked = () => Boolean(this.element && document.pointerLockElement === this.element)
 
-    constructor(private index: number) {}
+    constructor(private index: number, private sensitivity = 1) {}
 
     private release = () => {
         this.keys.forEach(key => this.player?._channels.input.queueKeyboardFrame({ ...key, pressed: false }))
@@ -35,7 +35,9 @@ export default class MouseKeyboard {
     private onPointer = (event: PointerEvent) => {
         if (!this.locked() || event.pointerType !== 'mouse') return
         this.buttons = event.buttons
-        this.player?._channels.input.queueMouseFrame({ X: Math.round(event.movementX), Y: Math.round(event.movementY), WheelX:0, WheelY:0, Buttons:this.buttons, Relative:0 })
+        const sensitivity = Number.isFinite(this.sensitivity) ? Math.max(0.25, Math.min(4, this.sensitivity)) : 1
+        const move = (value: number) => Math.max(-32767, Math.min(32767, Math.round(value * sensitivity)))
+        this.player?._channels.input.queueMouseFrame({ X: move(event.movementX), Y: move(event.movementY), WheelX:0, WheelY:0, Buttons:this.buttons, Relative:0 })
         event.preventDefault()
     }
     private onWheel = (event: WheelEvent) => {

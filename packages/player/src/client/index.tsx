@@ -28,6 +28,10 @@ export interface StreamPlayerProps {
     keyboardMapping?: Record<string, string>;
     microphone?: boolean;
     nativeMouseKeyboard?: boolean;
+    deadzone?: number;
+    invertY?: boolean;
+    swapSticks?: boolean;
+    mouseSensitivity?: number;
     onMicrophoneStatus?: (active: boolean, error?: boolean) => void;
 }
 export interface StreamPlayerHandle {
@@ -52,7 +56,7 @@ export interface communicationHandler {
 export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
     ({
         onStatusChanged,
-        communicationHandler, useWebGpu = true, autoGamepad = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false, codecProfiles = [], touchControls = false, keyboardMapping, microphone = false, onMicrophoneStatus, nativeMouseKeyboard = false
+        communicationHandler, useWebGpu = true, autoGamepad = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false, codecProfiles = [], touchControls = false, keyboardMapping, microphone = false, onMicrophoneStatus, nativeMouseKeyboard = false, deadzone = 0.08, invertY = false, swapSticks = false, mouseSensitivity = 1
     }, ref): ReactElement => {
         const handler = useRef(communicationHandler);
         handler.current = communicationHandler;
@@ -85,11 +89,11 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 const element = player.getVideoElement();
                 if (!element || element === surface) return;
                 input?.detach();
-                input = new MouseKeyboard(0); input.attach(player); surface = element;
+                input = new MouseKeyboard(0, mouseSensitivity); input.attach(player); surface = element;
             };
             sync(); const timer = setInterval(sync, 500);
             return () => { clearInterval(timer); input?.detach() };
-        }, [player, nativeMouseKeyboard, playerState]);
+        }, [player, nativeMouseKeyboard, playerState, mouseSensitivity]);
         const [metrics, setMetrics] = useState({ width: 0, height: 0, fps: 0, bitrate: 0, jitter: 0, loss: 0 });
         useEffect(() => {
             if (!player) return;
@@ -143,6 +147,8 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             let disposed = false;
             let timer: ReturnType<typeof setTimeout>;
             let keepalive: ReturnType<typeof setTimeout>;
+            let connectionDeadline: ReturnType<typeof setTimeout>;
+            let disconnectDeadline: ReturnType<typeof setTimeout>;
             let instance: xCloudPlayer | undefined;
             let authSent = false;
             let failures = 0;
@@ -178,17 +184,19 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 const peer = instance._peerConnection;
                 const onConnection = () => {
                     if (disposed) return;
-                    if (peer.connectionState === 'connected') status('Connected');
-                    if (peer.connectionState === 'failed' || peer.connectionState === 'closed') status('Error');
+                    if (peer.connectionState === 'connected') { clearTimeout(connectionDeadline); clearTimeout(disconnectDeadline); status('Connected') }
+                    else if (peer.connectionState === 'disconnected') { clearTimeout(disconnectDeadline); status('Reconnecting'); disconnectDeadline = setTimeout(() => { if (peer.connectionState !== 'connected') status('Error') }, 15000) }
+                    else if (peer.connectionState === 'failed' || peer.connectionState === 'closed') status('Error');
                 };
                 peer.addEventListener('connectionstatechange', onConnection);
                 if (autoGamepad) {
                     const mapping = keyboardMapping ? Object.fromEntries(Object.entries(keyboardMapping).map(([key, button]) => [button, key])) : undefined;
-                    const gamepad = new Gamepad(0, { enable_keyboard: Boolean(mapping), ...(mapping ? { keyboard_mapping: mapping } : {}), enable_vibration: vibration });
+                    const gamepad = new Gamepad(0, { enable_keyboard: Boolean(mapping), ...(mapping ? { keyboard_mapping: mapping } : {}), enable_vibration: vibration, gamepad_deadzone: deadzone, gamepad_invert_y: invertY, gamepad_swap_sticks: swapSticks });
                     const attach = () => { if (!disposed) { gamepad.attach(instance!); controller.current = gamepad; inputs.current.push(gamepad); } };
                     const ready = () => { if (peer.connectionState === 'connected') { peer.removeEventListener('connectionstatechange', ready); attach(); } };
                     peer.addEventListener('connectionstatechange', ready); ready();
                 }
+                connectionDeadline = setTimeout(() => { if (peer.connectionState !== 'connected') status('Error') }, 30000);
                 status('Negotiated'); onConnection();
                 keepalive = setTimeout(heartbeat, 30000);
             };
@@ -213,6 +221,8 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 disposed = true;
                 clearTimeout(timer);
                 clearTimeout(keepalive);
+                clearTimeout(connectionDeadline);
+                clearTimeout(disconnectDeadline);
                 releaseTouch(); controller.current = undefined;
                 inputs.current.forEach(input => input.detach());
                 inputs.current = [];
