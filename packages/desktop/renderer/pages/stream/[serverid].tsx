@@ -1,4 +1,5 @@
 import React from 'react'
+import ExperimentalStream from '../../components/ui/experimentalstream'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 import xCloudPlayer from 'xbox-xcloud-player'
@@ -9,7 +10,7 @@ import StreamPreload from '../../components/ui/streampreload'
 import Ipc from '../../lib/ipc'
 import { useTranslation } from 'react-i18next'
 
-function Stream() {
+function LegacyStream() {
     const router = useRouter()
     const { settings } = useSettings()
     const { t } = useTranslation()
@@ -295,4 +296,13 @@ function Stream() {
     )
 }
 
-export default Stream
+export default function Stream() {
+    const router = useRouter()
+    const { settings } = useSettings()
+    const target = typeof router.query.serverid === 'string' ? router.query.serverid : ''
+    const [engine, setEngine] = React.useState<string | null>(null)
+    React.useEffect(() => { if (router.isReady && target && engine === null) setEngine(settings.streaming_engine || 'legacy') }, [router.isReady, target, engine, settings.streaming_engine])
+    if (!engine) return null
+    if (engine === 'experimental') return <ExperimentalStream key={target} target={target} onExit={() => { void router.replace('/home') }} />
+    return <LegacyStream key={target} />
+}

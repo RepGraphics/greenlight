@@ -21,7 +21,19 @@ export default class Ice {
         return this._iceCandidates
     }
 
-    setRemoteCandidates(candidates:RTCIceCandidate[]){
+    async waitForCandidates() {
+        if (this._peerConnection.iceGatheringState === 'complete') return this.getCandidates()
+        await new Promise<void>(resolve => {
+            const finish = () => { clearTimeout(timer); this._peerConnection.removeEventListener('icegatheringstatechange', check); resolve() }
+            const check = () => { if (this._peerConnection.iceGatheringState === 'complete') finish() }
+            const timer = setTimeout(finish, 5000)
+            this._peerConnection.addEventListener('icegatheringstatechange', check)
+            check()
+        })
+        return this.getCandidates()
+    }
+
+    async setRemoteCandidates(candidates:RTCIceCandidate[]){
         if(candidates.length === 0){
             console.warn('Error: No candidates received!')
         }
@@ -34,23 +46,23 @@ export default class Ice {
             if(candidateAddress.length > 4 && candidateAddress[4].substr(0, 4) === '2001'){
                 const teredo = new Teredo(candidateAddress[4])
 
-                this._peerConnection.addIceCandidate({
+                await this._peerConnection.addIceCandidate({
                     candidate: 'a=candidate:10 1 UDP 1 '+teredo.getIpv4Address()+' 9002 typ host ',
                     sdpMLineIndex: candidates[candidate].sdpMLineIndex,
                     sdpMid: candidates[candidate].sdpMid,
-                })
-                this._peerConnection.addIceCandidate({
+                }).catch(() => {})
+                await this._peerConnection.addIceCandidate({
                     candidate: 'a=candidate:11 1 UDP 1 '+teredo.getIpv4Address()+' '+teredo.getIpv4Port()+' typ host ',
                     sdpMLineIndex: candidates[candidate].sdpMLineIndex,
                     sdpMid: candidates[candidate].sdpMid,
-                })
+                }).catch(() => {})
             }
 
-            this._peerConnection.addIceCandidate({
+            await this._peerConnection.addIceCandidate({
                 candidate: candidates[candidate].candidate,
                 sdpMid: candidates[candidate].sdpMid,
                 sdpMLineIndex: candidates[candidate].sdpMLineIndex,
-            })
+            }).catch(() => {})
         }
     }
 }

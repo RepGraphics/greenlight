@@ -30,7 +30,7 @@ export default class xCloudPlayer {
     private _videoComponent: VideoComponent | WebGpuComponent | undefined
     private _audioComponent: AudioComponent | undefined
 
-    constructor(elementId: string) {
+    constructor(elementId: string, useWebGpu = true) {
         console.log('xCloudPlayer constructing...');
 
         this._elementId = elementId;
@@ -42,7 +42,7 @@ export default class xCloudPlayer {
 
             if(event.track.kind === 'video'){
                 // this._videoComponent = new VideoComponent(this)
-                this._videoComponent = new WebGpuComponent(this)
+                this._videoComponent = useWebGpu && navigator.gpu ? new WebGpuComponent(this) : new VideoComponent(this)
                 this._videoComponent.create(event.streams[0])
 
             } else if(event.track.kind === 'audio'){
@@ -71,7 +71,7 @@ export default class xCloudPlayer {
             offerToReceiveVideo: true,
         })
         const finalOffer = this._sdpHelper.setLocalSDP(offer)
-        this._peerConnection.setLocalDescription(finalOffer)
+        await this._peerConnection.setLocalDescription(finalOffer)
 
         return finalOffer
     }
@@ -85,13 +85,13 @@ export default class xCloudPlayer {
     }
 
     async getICECandidates() {
-        return this._iceHelper.getCandidates()
+        return await this._iceHelper.waitForCandidates()
     }
 
     async setRemoteIceCandidates(candidates:RTCIceCandidate[]) {
         // @TODO: Sort ipv4 and ipv6, and use best route as preference (ipv6 only etc)
 
-        this._iceHelper.setRemoteCandidates(candidates)
+        await this._iceHelper.setRemoteCandidates(candidates)
     }
 
     getVideoElement() {

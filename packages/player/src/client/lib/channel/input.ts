@@ -16,6 +16,8 @@ export interface VibrationFrame {
 }
 
 export default class InputChannel extends Channel {
+    private loopTimer: ReturnType<typeof setTimeout> | undefined
+    private stopped = false
     private _serverVideoWidth = 0
     private _serverVideoHeight = 0
 
@@ -47,7 +49,8 @@ export default class InputChannel extends Channel {
 
         console.log('[InputChannel] Sent metadata:', Packet, Packet.toBuffer())
 
-        setTimeout(this.gamepadStateLoop.bind(this), 16)
+        clearTimeout(this.loopTimer)
+        if (!this.stopped) this.loopTimer = setTimeout(this.gamepadStateLoop.bind(this), 16)
     }
 
     onMessage(event: MessageEvent<any>) {
@@ -97,6 +100,7 @@ export default class InputChannel extends Channel {
     }
 
     gamepadStateLoop(){
+        if (this.stopped) return
         const gamepadHandlers = this.getPlayer()._channels.control.getGamepadHandlers()
         // console.log('[InputChannel] gamepadStateLoop() called', gamepadHandlers)
         const gamepadFrames:Array<GamepadFrame> = []
@@ -137,6 +141,7 @@ export default class InputChannel extends Channel {
     }
 
     destroy() {
-        // console.log('DebugChannel destroy() called')
+        this.stopped = true
+        clearTimeout(this.loopTimer)
     }
 }

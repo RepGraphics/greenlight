@@ -16,7 +16,10 @@ import Touch from './lib/input/touch';
 
 export interface StreamPlayerProps {
     onStatusChanged: (newStatus: string) => void;
-    communicationHandler: communicationHandler
+    communicationHandler: communicationHandler;
+    useWebGpu?: boolean;
+    autoGamepad?: boolean;
+    vibration?: boolean;
 }
 export interface StreamPlayerHandle {
     ping: (echo: string) => void;
@@ -39,7 +42,7 @@ export interface communicationHandler {
 export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
     ({
         onStatusChanged,
-        communicationHandler
+        communicationHandler, useWebGpu = true, autoGamepad = false, vibration = true
     }, ref): ReactElement => {
         const handler = useRef(communicationHandler);
         handler.current = communicationHandler;
@@ -101,7 +104,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 if (!disposed) keepalive = setTimeout(heartbeat, 30000);
             };
             const connect = async () => {
-                instance = new xCloudPlayer('playerContainer');
+                instance = new xCloudPlayer('playerContainer', useWebGpu);
                 instance.init();
                 setPlayer(instance);
                 status('Connecting');
@@ -111,7 +114,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 if (disposed) return;
                 const remote = JSON.parse(answer.exchangeResponse);
                 if (typeof remote?.sdp !== 'string') throw new Error('Invalid SDP answer');
-                instance.setRemoteSDP(remote.sdp);
+                await instance.setRemoteSDP(remote.sdp);
                 const localIce = await instance.getICECandidates();
                 if (disposed) return;
                 const candidates = localIce.map(candidate => JSON.stringify({ candidate: candidate.candidate, sdpMid: candidate.sdpMid, sdpMLineIndex: candidate.sdpMLineIndex, usernameFragment: candidate.usernameFragment }));
@@ -119,8 +122,22 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 if (disposed) return;
                 const ice = JSON.parse(response.exchangeResponse);
                 if (!Array.isArray(ice)) throw new Error('Invalid ICE response');
-                instance.setRemoteIceCandidates(ice);
-                status('Negotiated');
+                await instance.setRemoteIceCandidates(ice);
+                if (disposed) return;
+                const peer = instance._peerConnection;
+                const onConnection = () => {
+                    if (disposed) return;
+                    if (peer.connectionState === 'connected') status('Connected');
+                    if (peer.connectionState === 'failed' || peer.connectionState === 'closed') status('Error');
+                };
+                peer.addEventListener('connectionstatechange', onConnection);
+                if (autoGamepad) {
+                    const gamepad = new Gamepad(0, { enable_keyboard: false, enable_vibration: vibration });
+                    const attach = () => { if (!disposed) { gamepad.attach(instance!); inputs.current.push(gamepad); } };
+                    const ready = () => { if (peer.connectionState === 'connected') { peer.removeEventListener('connectionstatechange', ready); attach(); } };
+                    peer.addEventListener('connectionstatechange', ready); ready();
+                }
+                status('Negotiated'); onConnection();
                 keepalive = setTimeout(heartbeat, 30000);
             };
             const poll = async () => {

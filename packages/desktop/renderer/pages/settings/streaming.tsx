@@ -86,6 +86,7 @@ function SettingsStreaming() {
                     <h1>{t('settings.streaming.title')}</h1>
 
                     <p>{t('settings.streaming.description')}</p>
+                    <p><label htmlFor='stream-engine'>{t('dashboard.streamingEngine')}</label><select id='stream-engine' value={settings.streaming_engine} onChange={e => setSettings({...settings, streaming_engine:e.target.value})}><option value='legacy'>{t('dashboard.legacyPlayer')}</option><option value='experimental'>{t('dashboard.experimentalPlayer')}</option></select></p><p>{t('dashboard.experimentalWarning')}</p>
                     <h2>{t('dashboard.qualityPresets')}</h2><p>{t('dashboard.presetDescription')}</p>
                     <div className='gl-quality-presets'>{presets.map(preset => <button type='button' key={preset.key} className={'gl-quality-preset ' + (activePreset?.key === preset.key ? 'selected' : '')} aria-pressed={activePreset?.key === preset.key} onClick={() => applyPreset(preset.bitrate)}><strong>{t('dashboard.preset_' + preset.key)}</strong><span>{preset.bitrate ? Math.floor(preset.bitrate / 1024) + ' ' + t('settings.streaming.mbpsLabel') : t('settings.streaming.unlimitedLabel')}</span></button>)}</div>
                     {!activePreset && <p>{t('dashboard.customQuality')}</p>}

@@ -1,4 +1,5 @@
 export const defaultSettings = {
+    streaming_engine: 'legacy',
     xhome_bitrate: 0,
     xcloud_bitrate: 0,
     xcloud_show_non_entitled: true,

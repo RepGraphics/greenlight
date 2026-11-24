@@ -198,7 +198,8 @@ export default class Gamepad {
     }
 
     onWindowBlur(){
-        // this._isFocused = false
+        this._isFocused = false
+        this._gamepadOverride.buttons = {}
     }
 
     getDefaultFamepadFrame(){
