@@ -1,6 +1,5 @@
 import { forwardRef, useImperativeHandle, useRef, useEffect, useState } from 'react';
 import type { ReactElement } from 'react';
-import './Player.css';
 
 import type { xStreamToken, xCloudStreamConfig, startStreamResponse } from '../types/index';
 export type { xStreamToken, startStreamResponse, xCloudStreamConfig };
