@@ -68,5 +68,6 @@
         "recording": "",
         "graphs": ""
     },
-    "v3_multi_controller": false
+    "v3_multi_controller": false,
+    "v3_adaptive_recovery": false
 }

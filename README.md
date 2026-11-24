@@ -38,7 +38,7 @@ An independently maintained fork of [Greenlight](https://github.com/unknownskl/g
 | Automatic Remote Play recovery | — | Opt-in |
 | Local session history | — | Opt-in |
 
-Some features depend on Xbox service capabilities and platform support. Requested resolution is a preference, not a guaranteed encoded resolution. Automatic recovery starts a new session, rather than seamlessly resuming the old one.
+Some features depend on Xbox service capabilities and platform support. Requested resolution is a preference, not a guaranteed encoded resolution. Automatic recovery starts a new session, rather than seamlessly resuming the old one. Optional adaptive recovery lowers the next attempt's bitrate only when fresh metrics indicate sustained poor connection quality; saved preferences are unchanged.
 
 ## Downloads
 

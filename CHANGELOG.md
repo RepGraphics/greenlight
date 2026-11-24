@@ -6,6 +6,8 @@ Changes on `main-v2` are development changes, not a new numbered release. See [c
 
 ### Added
 
+- Opt-in adaptive quality during existing Remote Play recovery attempts, using fresh sustained congestion evidence without restarting healthy streams.
+
 - Opt-in multi-controller support with stable assignments for up to four client-connected controllers and slot-based vibration routing.
 
 - Experimental opt-in instant replay with rotating standalone WebM segments, capture-library integration and bounded memory.

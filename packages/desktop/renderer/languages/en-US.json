@@ -510,7 +510,10 @@
       "replayFailed": "Replay unavailable or no recent segment could be saved.",
       "replaySaved": "Replay ready. Download or save to library.",
       "multiController": "Multiple client controllers (experimental)",
-      "multiControllerDescription": "Allow up to four controllers connected to this device, each with its own remote slot. Game and service support may vary. Disabled while using the controller paired directly to Xbox. Changes apply to the next stream."
+      "multiControllerDescription": "Allow up to four controllers connected to this device, each with its own remote slot. Game and service support may vary. Disabled while using the controller paired directly to Xbox. Changes apply to the next stream.",
+      "adaptiveRecovery": "Adaptive quality during recovery (experimental)",
+      "adaptiveRecoveryHint": "When automatic Remote Play recovery is enabled, lower the bitrate for the next attempt only if recent fresh statistics show sustained poor connection quality. Does not restart healthy streams or change saved quality preferences.",
+      "sessionQualityOverride": "Temporary bitrate override for this session"
     }
   }
 }

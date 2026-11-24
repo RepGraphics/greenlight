@@ -119,3 +119,6 @@ test('instant replay only accepts recent complete bounded WebM segments',()=>{co
 
 import { reconcileSlots } from '../../../player/src/client/lib/input/slots'
 test('controller slot assignment is unique, bounded and stable on hotplug',()=>{const first=reconcileSlots([],[7,2,4,9,12]);assert.deepEqual(first.map(s=>s.physicalId),[2,4,7,9]);const second=reconcileSlots(first,[4,7,9,12]);assert.deepEqual(second.map(s=>s.physicalId),[12,4,7,9]);assert.deepEqual(reconcileSlots([],[],true),[{slot:0,physicalId:null}]);assert.deepEqual(reconcileSlots([],[2,2,-1,NaN]),[{slot:0,physicalId:2}])})
+
+import { recoveryBitrate } from '../../renderer/lib/bitrateadvisor'
+test('adaptive recovery only lowers caps on sustained fresh congestion evidence',()=>{const samples=Array.from({length:20},(_,i)=>({elapsedSeconds:i,width:1920,height:1080,fps:60,bitrate:20,jitter:40,loss:0,rtt:200,statsFresh:true}));assert.equal(recoveryBitrate(samples,20480,'transport',true),10240);assert.equal(recoveryBitrate(samples,20480,'stats',true),null);assert.equal(recoveryBitrate(samples,20480,'transport',false),null);assert.equal(recoveryBitrate(samples.map(s=>({...s,rtt:5,jitter:1})),20480,'media',true),null);assert.equal(recoveryBitrate(samples.map(s=>({...s,statsFresh:false})),20480,'media',true),null)})
