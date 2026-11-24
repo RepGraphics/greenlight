@@ -1,113 +1,136 @@
-# Greenlight
+# Greenlight Fork
 
-[![Build/Desktop](https://github.com/unknownskl/greenlight/actions/workflows/build_desktop.yml/badge.svg)](https://github.com/unknownskl/greenlight/actions/workflows/build_desktop.yml)
-[![Build/Docs](https://github.com/unknownskl/greenlight/actions/workflows/build_docs.yml/badge.svg)](https://github.com/unknownskl/greenlight/actions/workflows/build_docs.yml)
+[![Desktop installers](https://github.com/RepGraphics/greenlight/actions/workflows/fork-installers.yml/badge.svg?branch=main-v2)](https://github.com/RepGraphics/greenlight/actions/workflows/fork-installers.yml)
+[![CodeQL](https://github.com/RepGraphics/greenlight/actions/workflows/codeql-analysis.yml/badge.svg?branch=main-v2)](https://github.com/RepGraphics/greenlight/actions/workflows/codeql-analysis.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=unknownskl_greenlight&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=unknownskl_greenlight)
-[![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=unknownskl_greenlight&metric=ncloc)](https://sonarcloud.io/summary/new_code?id=unknownskl_greenlight)
-[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=unknownskl_greenlight&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=unknownskl_greenlight)
-[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=unknownskl_greenlight&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=unknownskl_greenlight)
+An independently maintained fork of [Greenlight](https://github.com/unknownskl/greenlight), an open-source desktop client for Xbox Remote Play and Xbox Cloud Gaming. This fork develops a redesigned interface, additional streaming controls and an optional experimental V3 player.
 
-Greenlight is an open-source client for xCloud and Xbox home streaming made in Javascript and Typescript. The client is an application wrapper around [xbox-xcloud-player](https://github.com/unknownskl/xbox-xcloud-player).
-The application runs on Linux, macOS, Windows and Steam Deck.
+**Windows · Linux · macOS · Linux handhelds**
 
-_DISCLAIMER: Greenlight is not affiliated with Microsoft, Xbox or Moonlight. All rights and trademarks are property of their respective owners._
+[Downloads](#downloads) · [Features](#features) · [Getting started](#getting-started) · [Troubleshooting](#troubleshooting) · [Development](#development)
+
+> The classic player remains the default and is recommended for reliability. V3 is experimental; compatibility with every console, controller and operating system is not yet established.
 
 ## Features
 
-- Stream video and audio from the Xbox One and Xbox Series
-- Support for gamepad controls
-- Supports rumble on xCloud
-- Keyboard controls
-- Build-in online friends list
+### Dashboard and library
 
-<img src="images/main.png" width="400" /> <img src="images/stream.png" width="400" />
+- Xbox-inspired navigation, console search, favourites and quick reconnect.
+- Cloud game library, favourites and recently played titles.
+- Friends, social hub and achievement browsing.
+- Handheld-friendly layout and controller-based dashboard navigation.
 
-## Install
+### Streaming
 
-### Install from Flathub:
-[Install on Flathub](https://flathub.org/apps/details/io.github.unknownskl.greenlight)
+| Feature | Classic | V3 experimental |
+| --- | --- | --- |
+| Xbox Remote Play and Cloud Gaming | Yes | Yes |
+| Bitrate presets and requested display resolution | Yes | Yes |
+| Standard video playback | Yes | Yes |
+| WebGPU rendering | — | Experimental |
+| Controller profiles, remapping and calibration | — | Yes |
+| Console-paired controller mode | — | Yes |
+| Touch gamepad and native mouse/keyboard | — | Experimental |
+| Video filters and sharpening | — | Yes |
+| Screenshots, picture-in-picture and local clips | — | Standard video only |
+| Live network graphs and diagnostic exports | — | Yes |
+| Automatic Remote Play recovery | — | Opt-in |
+| Local session history | — | Opt-in |
 
-### Download pre-compiled binaries:
-[Latest releases can be found here](https://github.com/unknownskl/greenlight/releases).
+Some features depend on Xbox service capabilities and platform support. Requested resolution is a preference, not a guaranteed encoded resolution. Automatic recovery starts a new session, rather than seamlessly resuming the old one.
 
-### Compile from source
+## Downloads
 
-See [Local development](?tab=readme-ov-file#local-development).
+- [Fork releases](https://github.com/RepGraphics/greenlight/releases): published releases, when available.
+- [Fork desktop installers](https://github.com/RepGraphics/greenlight/actions/workflows/fork-installers.yml): development builds from successful workflow runs on `main-v2`.
 
-## Keyboard controls
+Open a successful workflow run and download the artifact for your platform. GitHub may require you to sign in. Extract the artifact archive before launching the installer.
 
-Keys are mapped as following by default:
+| Platform | Package |
+| --- | --- |
+| Windows | NSIS installer (.exe) or ZIP |
+| Linux | AppImage or Debian package (.deb) |
+| macOS | Universal DMG |
 
-    Dpad: Keypad direction controls
-    Buttons: A, B, X, Y, Backspace (Mapped as B), Enter (Mapped as A)
-    Nexus (Xbox button): N
-    Left Bumper: [
-    Right Bumper: ]
-    Left Trigger: -
-    Right Trigger: =
-    View: V
-    Menu: M
+Development installers are not guaranteed to be signed or notarized. Verify the source before running them. Artifacts expire according to GitHub retention settings.
 
-## Streaming stats
+The original [Flathub package](https://flathub.org/apps/details/io.github.unknownskl.greenlight) belongs to upstream Greenlight and does not include this fork's changes.
 
-During the stream you can show debug statistics that contain extra data about the buffer queues and other information. To bring this up you can press `~` on your keyboard.
+## Getting started
 
-At the bottom-left you can see the status (although not always accurate). At the top-right you can find the FPS of the video and audio decoders including the latency. At the bottom-right you can find debug information about the buffer queues and other information that is useful for debugging perposes.
+1. Sign in with your Microsoft/Xbox account.
+2. For Remote Play, enable remote features on your Xbox and select your console.
+3. For Cloud Gaming, select an entitled game in the cloud library. Availability depends on account, subscription, game and region.
+4. Configure streaming quality in **Settings → Streaming**.
 
-When possible always provide this information with your issue, if it is related.
+### Experimental V3 player
 
-## Online friends list
+Select V3 under **Settings → Streaming → Streaming engine**. Begin with standard video rendering, automatic bitrate and automatic H.264 profile selection. Return to Classic if you encounter stability or compatibility issues.
 
-The application also provides a way to see which of your friends are online. This can be useful when you want to quickly check if anyone is online to play with :)
+If your controller is paired directly to the Xbox, enable **Controller connected to Xbox** under **Settings → Input** before opening the stream. This prevents V3 from registering a virtual controller or forwarding local input. The setting is saved between sessions.
 
-## Steam Deck Setup
+Press **F8** to pin the streaming toolbar. Use it to access network graphs, video adjustments, screenshots, clips and recovery controls.
 
-This application is reported to be working on the Steam Deck with some small bugs and side-effects. You can map one of the Steam Deck back buttons to the 'N' key to simulate the Xbox button.
+Recording is opt-in, local WebM capture (up to five minutes, with a 128 MiB stop threshold). Screenshots and clips do not include visual filters or interface overlays. Save recordings before leaving the session; temporary clips are held in memory.
 
-## Optional launch arguments
+### Keyboard gamepad emulation
 
-| Argument | Description |
-|----------|--------------|
-| --fullscreen | Starts the application in fullscreen |
-| --connect=<value> | Will start stream once the user is authenticated. |
+Enable keyboard emulation in input settings. Default mappings include:
 
-For console use `F000000000000000` format and for xCloud use `xcloud_<title>`.
+| Control | Key |
+| --- | --- |
+| D-pad | Arrow keys |
+| A / B | A or Enter / B or Backspace |
+| X / Y | X / Y |
+| Nexus | N |
+| LB / RB | [ / ] |
+| LT / RT | - / = |
+| View / Menu | V / M |
 
-## To close the application
+## Troubleshooting
 
-Click on the Xbox logo at the top-left. It will ask you to confirm to close the window.
+- **Black screen or frozen stream:** compare Classic and V3 with the same console and quality settings. V3 has media and statistics stall detection and an optional persistent auto-reconnect setting. A recurring failure should still be reported.
+- **Console controller stops responding:** enable console-connected controller mode before starting V3 and reconnect the stream.
+- **WebGPU or capture problems:** use standard video rendering. Screenshot, picture-in-picture and recording support depends on the platform.
+- **Handheld controls:** enable the handheld layout in settings and configure the device's controller mapping as needed.
 
-## Local Development
+For V3 issues, press F8, open the toolbar and select **Export diagnostics**. Current exports retain up to three preceding attempts and include connection states and stale-statistics detection. Review any attachments before sharing. Never post authentication tokens, passwords, account identifiers or unredacted network logs.
 
-### Requirements
+Report fork-specific bugs and requests in [Issues](https://github.com/RepGraphics/greenlight/issues). Include the exact commit/build, OS, player engine, controller connection method and reproduction steps.
 
-- NodeJS ([https://nodejs.org/](https://nodejs.org/))
-- Yarn ([https://yarnpkg.com/](https://yarnpkg.com/))
+## Development
 
-### Steps to get up and running
+Use Node.js 24 (the installer CI version) and Yarn Classic 1.22.22. The repository also contains a Node 22 version pin in `.nvmrc`; match CI when diagnosing build issues.
 
-Clone the repository:
+```sh
+git clone --branch main-v2 https://github.com/RepGraphics/greenlight.git
+cd greenlight
+git submodule update --init --recursive
+npm install --global yarn@1.22.22
+yarn install --frozen-lockfile
+yarn desktop test
+yarn desktop dev
+```
 
-    git clone https://github.com/unknownskl/greenlight.git
-    cd greenlight
+Build installers:
 
-Install dependencies:
+```sh
+yarn desktop build
+```
 
-    yarn
+Output: `packages/desktop/dist/`. To compile without packaging, use `yarn desktop build --no-pack`.
 
-Run development build:
+See [desktop development](packages/desktop/README.md), [player internals](packages/player/README.md), [contribution guidance](CONTRIBUTING.md) and the [fork changelog](CHANGELOG.md).
 
-    yarn desktop dev
+## Privacy and security
 
-Create production build:
+Microsoft authentication is required for Xbox services. Desktop token storage uses Electron secure storage where supported; protection depends on the OS. The optional WebUI is intended for localhost and uses authentication. Do not expose it directly to the public internet. Session history is disabled by default; diagnostic and gameplay exports are user-initiated.
 
-    yarn desktop build
+See [security reporting](SECURITY.md).
 
-## Translations
+## Credits and licence
 
-Want to help out with new translations? Help us on [https://poeditor.com/join/project/9SfHRQDbfN](Poeditor.com)
+Based on [Greenlight by UnknownSKL (Jim Kroon)](https://github.com/unknownskl/greenlight) and its contributors, including [xbox-xcloud-player](https://github.com/unknownskl/xbox-xcloud-player). Fork maintained in [RepGraphics/greenlight](https://github.com/RepGraphics/greenlight). Original copyright and [MIT licence](LICENSE) retained.
 
-## Changelog
-
-See [changelog](https://unknownskl.github.io/greenlight/docs/desktop/changelog).
+Greenlight is unofficial and not affiliated with Microsoft or Xbox. All trademarks belong to their respective owners.
