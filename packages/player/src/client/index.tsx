@@ -41,6 +41,11 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
         onStatusChanged,
         communicationHandler
     }, ref): ReactElement => {
+        const handler = useRef(communicationHandler);
+        handler.current = communicationHandler;
+        const statusCallback = useRef(onStatusChanged);
+        statusCallback.current = onStatusChanged;
+        const inputs = useRef<Array<{ detach: () => void }>>([]);
         const [playerState, setPlayerState] = useState<string>('Initializing');
 
         const playerInstance = useRef<HTMLDivElement | null>(null);
@@ -58,6 +63,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 }
                 const gamepad = new VirtualGamepad(player)
                 gamepad.attach(index)
+                inputs.current.push(gamepad)
                 return gamepad
             },
             attachMouseKeyboard(index = 0) {
@@ -66,6 +72,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 }
                 const mkb = new VirtualMKB(player)
                 mkb.attach(index)
+                inputs.current.push(mkb)
                 return mkb
             },
             toggleDebugOverlay() {
@@ -76,103 +83,77 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             }
         }));
 
-        useEffect(() => {
-            let interval: NodeJS.Timeout;
-
-            if(playerState == 'Initializing'){
-                interval = setInterval(() => {
-                    console.log('Player useEffect - playerState:', playerState);
-                    communicationHandler.getStreamStatus().then((state:any) => {
-                        console.log('Stream status:', state);
-
-                        if(state.error){
-                            console.error('Error in stream status:', state.error);
-
-                            clearInterval(interval)
-                            setPlayerState('Error');
-                        } else {
-                            if(state.state === 'Provisioned'){
-                                // Console is ready
-
-                                clearInterval(interval)
-                                setPlayerState('Provisioned')
-
-                            } else if(state.state === 'ReadyToConnect'){
-                                // Perform MSAL Auth, then refetch state and wait for Provisioned
-                                communicationHandler.sendMSALToken()
-
-                            } else if(state.state === 'Failed'){
-                                clearInterval(interval)
-                                setPlayerState('Error');
-                            }
-                        }
-
-                    })
-
-                }, 1000)
-            }
-
-            if(playerState === 'Provisioned'){
-                console.log('Xbox is ready to connect... Lets render xCloudPlayer lib...')
-                setPlayer(new xCloudPlayer('playerContainer'))
-            }
-
-            return () => {
-                console.log('Cleaning up player useEffect interval');
-                clearInterval(interval)
-            }
-        }, [playerState]);
+        useEffect(() => { statusCallback.current?.(playerState) }, [playerState]);
 
         useEffect(() => {
-            let keepaliveInterval : NodeJS.Timeout;
-            if(player){
-                player.init();
-
-                player.createOffer().then(async (offer) => {
-                    console.log('Created offer:', offer);
-                    const serverOffer = await communicationHandler.sendSDPOffer(offer)
-                    const remoteSDP = JSON.parse(serverOffer.exchangeResponse);
-
-                    console.log('Received SDP Offer:', serverOffer);
-
-                    player.setRemoteSDP(remoteSDP.sdp);
-
-                    // Start ICE handshake
-                    const localIce = await player.getICECandidates()
-                    console.log('Retrieved local ICE:', localIce);
-                    const iceCandidates = localIce.map((candidate) => {
-                        return JSON.stringify({ candidate: candidate.candidate, sdpMid: candidate.sdpMid, sdpMLineIndex: candidate.sdpMLineIndex, usernameFragment: candidate.usernameFragment })
-                    })
-
-                    const remoteIce = await communicationHandler.sendICECandidates(iceCandidates)
-                    console.log('Received ICE Candidates:', remoteIce);
-                    const serverIce = JSON.parse(remoteIce.exchangeResponse);
-                    console.log('Received ICE Candidates 2:', serverIce);
-                    player.setRemoteIceCandidates(serverIce)
-
-                    keepaliveInterval = setInterval(async () => {
-                        console.log('Sending keepalive...');
-                        await communicationHandler.sendKeepalive()
-                    }, 30 * 1000);
-                })
-            }
-
-            return () => {
-                if(player){
-                    player.destroy();
-                    clearInterval(keepaliveInterval)
+            let disposed = false;
+            let timer: ReturnType<typeof setTimeout>;
+            let keepalive: ReturnType<typeof setTimeout>;
+            let instance: xCloudPlayer | undefined;
+            let authSent = false;
+            let failures = 0;
+            const current = handler.current;
+            const status = (value: string) => { if (!disposed) setPlayerState(value) };
+            const heartbeat = async () => {
+                if (disposed) return;
+                try { await current.sendKeepalive(); failures = 0 }
+                catch { if (++failures >= 3) { status('Error'); return } }
+                if (!disposed) keepalive = setTimeout(heartbeat, 30000);
+            };
+            const connect = async () => {
+                instance = new xCloudPlayer('playerContainer');
+                instance.init();
+                setPlayer(instance);
+                status('Connecting');
+                const offer = await instance.createOffer();
+                if (disposed) return;
+                const answer = await current.sendSDPOffer(offer);
+                if (disposed) return;
+                const remote = JSON.parse(answer.exchangeResponse);
+                if (typeof remote?.sdp !== 'string') throw new Error('Invalid SDP answer');
+                instance.setRemoteSDP(remote.sdp);
+                const localIce = await instance.getICECandidates();
+                if (disposed) return;
+                const candidates = localIce.map(candidate => JSON.stringify({ candidate: candidate.candidate, sdpMid: candidate.sdpMid, sdpMLineIndex: candidate.sdpMLineIndex, usernameFragment: candidate.usernameFragment }));
+                const response = await current.sendICECandidates(candidates);
+                if (disposed) return;
+                const ice = JSON.parse(response.exchangeResponse);
+                if (!Array.isArray(ice)) throw new Error('Invalid ICE response');
+                instance.setRemoteIceCandidates(ice);
+                status('Negotiated');
+                keepalive = setTimeout(heartbeat, 30000);
+            };
+            const poll = async () => {
+                if (disposed) return;
+                try {
+                    const state = await current.getStreamStatus();
+                    if (disposed) return;
+                    if (!state || state.error || state.state === 'Failed') { status('Error'); return }
+                    if (state.state === 'Provisioned') { await connect(); return }
+                    if (state.state === 'ReadyToConnect' && !authSent) { await current.sendMSALToken(); authSent = true }
+                    failures = 0;
+                    if (!disposed) timer = setTimeout(poll, 1000);
+                } catch {
+                    if (disposed) return;
+                    if (instance || ++failures >= 5) { status('Error'); return }
+                    timer = setTimeout(poll, 1500);
                 }
-            }
-        }, [player]);
+            };
+            void poll();
+            return () => {
+                disposed = true;
+                clearTimeout(timer);
+                clearTimeout(keepalive);
+                inputs.current.forEach(input => input.detach());
+                inputs.current = [];
+                instance?.destroy();
+            };
+        }, [communicationHandler.getSessionPath()]);
 
         return (
             <div ref={playerInstance}>
                 <div id="playerContainer"></div>
-                <p>
-                    Player loaded from <span className='redPlayer'>@greenlight/player/client</span>
-                </p>
-                <pre>{JSON.stringify(communicationHandler.getStreamConfig(), null, 2)}</pre>
-                <pre>Status: {playerState}</pre>
+                <p role="status">{playerState}</p>
             </div>
         );
     }

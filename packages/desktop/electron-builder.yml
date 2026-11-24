@@ -1,5 +1,5 @@
-appId: com.unknownskl.greenlight
-productName: Greenlight
+appId: uk.repgraphics.greenlight
+productName: Greenlight Fork
 copyright: Copyright © 2021-2024 UnknownSKL
 
 directories:
@@ -46,7 +46,7 @@ win:
 # Config for the windows installer
 nsis:
   oneClick: true
-  perMachine: true
+  perMachine: false
 
 # Linux configuration
 linux:

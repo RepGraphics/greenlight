@@ -20,6 +20,14 @@ function Stream() {
     const [xPlayer, setxPlayer] = React.useState(undefined)
     const [sessionId, setSessionId] = React.useState('')
     const [queueTime, setQueueTime] = React.useState(0)
+    const activeSession = React.useRef('')
+    React.useEffect(() => {
+        return () => {
+            const id = activeSession.current
+            activeSession.current = ''
+            if (id) void Ipc.send('streaming', 'stopStream', { sessionId: id }).catch(() => {})
+        }
+    }, [])
 
     React.useEffect(() => {
         if (!router.isReady || typeof router.query.serverid !== 'string') return
@@ -34,7 +42,12 @@ function Stream() {
         }
 
         if(xPlayer !== undefined){
-            document.getElementById('streamComponentHolder').innerHTML = '<div id="streamComponent" class="size_'+settings.video_size+'"></div>'
+            const holder = document.getElementById('streamComponentHolder')
+            if (!holder) return
+            const surface = document.createElement('div')
+            surface.id = 'streamComponent'
+            surface.className = 'size_' + settings.video_size
+            holder.replaceChildren(surface)
             xPlayer.bind()
 
             // Set bitrates & video codec profiles
@@ -66,6 +79,7 @@ function Stream() {
                     sessionId: sessionId,
                     sdp: offer.sdp,
                 }).then((sdpResult:any) => {
+                    if (cancelled) return
                     xPlayer.setRemoteOffer(sdpResult.sdp)
 
                     // Gather candidates
@@ -83,7 +97,7 @@ function Stream() {
                         sessionId: sessionId,
                         ice: candidates,
                     }).then((iceResult:any) => {
-                        console.log(iceResult)
+                        if (cancelled) return
                         xPlayer.setIceCandidates(iceResult)
 
                         // All done. Waiting for the event 'connectionstate' to be triggered
@@ -154,6 +168,7 @@ function Stream() {
             }).then((result:string) => {
                 console.log('StartStream session:', result)
                 if (cancelled) { void Ipc.send('streaming', 'stopStream', { sessionId: result }).catch(() => {}); return }
+                activeSession.current = result
                 setSessionId(result)
 
             }).catch((error) => {
@@ -248,7 +263,8 @@ function Stream() {
     }
 
     function onDisconnect(){
-        if (!sessionId) return
+        if (!sessionId) { void router.replace('/home'); return }
+        activeSession.current = ''
         Ipc.send('streaming', 'stopStream', {
             sessionId: sessionId,
         }).then((result) => {
