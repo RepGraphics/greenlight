@@ -3,11 +3,11 @@ import type { StreamMetrics } from '../../../player/src/client/index'
 export type DiagnosticSample = StreamMetrics & { elapsedSeconds: number }
 export function sanitizeSample(metrics: StreamMetrics, elapsedSeconds: number): DiagnosticSample {
     const number = (value: number) => Number.isFinite(value) ? Math.max(0, Math.round(value * 100) / 100) : 0
-    return { elapsedSeconds: number(elapsedSeconds), width: number(metrics.width), height: number(metrics.height), fps: number(metrics.fps), bitrate: number(metrics.bitrate), jitter: number(metrics.jitter), loss: number(metrics.loss), rtt: number(metrics.rtt) }
+    return { elapsedSeconds: number(elapsedSeconds), width: number(metrics.width), height: number(metrics.height), fps: number(metrics.fps), bitrate: number(metrics.bitrate), jitter: number(metrics.jitter), loss: number(metrics.loss), rtt: number(metrics.rtt), ...(typeof metrics.statsFresh==='boolean'?{statsFresh:metrics.statsFresh,statsAgeMs:number(metrics.statsAgeMs??0)}:{}) }
 }
 
 export function summarizeDiagnostics(samples: DiagnosticSample[]) {
-    const valid = samples.filter(sample => sample.width > 0 && sample.height > 0)
+    const valid = samples.filter(sample => sample.width > 0 && sample.height > 0 && sample.statsFresh!==false)
     const round = (value: number) => Math.round(value * 100) / 100
     const mean = (values: number[]) => values.length ? round(values.reduce((sum,value) => sum + value,0) / values.length) : null
     const percentile = (values: number[], p: number) => values.length ? [...values].sort((a,b) => a-b)[Math.max(0,Math.ceil(values.length*p)-1)] : null
@@ -21,7 +21,7 @@ export function summarizeDiagnostics(samples: DiagnosticSample[]) {
 }
 
 export function downloadDiagnostics(samples: DiagnosticSample[], type: 'cloud' | 'home', state: string, renderer: string) {
-    const report = { schema: 2, summary: summarizeDiagnostics(samples), engine: 'v3', type, renderer: renderer === 'webgpu' ? 'webgpu' : 'video', state, units: { bitrate: 'Mbps', jitter: 'ms', rtt: 'ms', loss: 'cumulative packets' }, samples }
+    const report = { schema: 3, summary: summarizeDiagnostics(samples), engine: 'v3', type, renderer: renderer === 'webgpu' ? 'webgpu' : 'video', state, units: { bitrate: 'Mbps', jitter: 'ms', rtt: 'ms', loss: 'cumulative packets' }, samples }
     const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }))
     const link = document.createElement('a')
     link.href = url

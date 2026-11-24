@@ -10,6 +10,10 @@ export default class Stats {
     private mediaMonitor = new MediaStallMonitor()
     mediaStalled = false
     lastStatsAt = 0
+    private requestGeneration=0
+    private requestStarted=0
+    private replacedPending=false
+    private lastReportTimestamp=0
     private previous?: { id: string; bytes: number; time: number }
     _bitrate = 0
     _jitter = 0
@@ -39,10 +43,20 @@ export default class Stats {
     destroy() { this.disposed = true; clearInterval(this.timer) }
 
     loop(){
-        if (this.disposed || this.busy) return
+        if (this.disposed) return
+        if(this.busy && performance.now()-this.requestStarted<5000)return
+        // At most one replacement request; a hung native getStats promise cannot be cancelled.
+        if(this.busy && this.replacedPending)return
+        if(this.busy)this.replacedPending=true
         this.busy = true
+        this.requestStarted=performance.now()
+        const generation=++this.requestGeneration
         this._peerConnection.getStats().then((stats) => {
-            if (this.disposed) return
+            if (this.disposed || generation!==this.requestGeneration) return
+            let latest=0
+            stats.forEach(report=>{if(report.type==='inbound-rtp'&&Number.isFinite(report.timestamp))latest=Math.max(latest,report.timestamp)})
+            if(latest<=this.lastReportTimestamp)return
+            this.lastReportTimestamp=latest
             this.lastStatsAt=performance.now()
             const inbound=Array.from(stats.values()).filter(r=>r.type==='inbound-rtp'&&(r.kind==='video'||r.kind==='audio')).map(r=>({id:r.id,bytes:r.bytesReceived}))
             this.mediaStalled=this.mediaMonitor.sample(this.lastStatsAt,inbound,this._peerConnection.connectionState==='connected'&&!document.hidden)
@@ -70,7 +84,7 @@ export default class Stats {
                     this.readRemoteCandidate(report)
                 }
             })
-        }).catch(() => {}).finally(() => { this.busy = false })
+        }).catch(() => {}).finally(() => { if(generation===this.requestGeneration){this.busy=false;this.replacedPending=false} })
     }
 
     readInboundRtp(report:RTCInboundRtpStreamStats){

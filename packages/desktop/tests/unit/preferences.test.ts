@@ -94,3 +94,6 @@ test('automatic recovery is opt-in, limited to established Remote Play and bound
 
 import { MediaStallMonitor } from '../../../player/src/client/lib/mediastall'
 test('media stalls require established inbound traffic and sustained inactivity',()=>{const monitor=new MediaStallMonitor();assert.equal(monitor.sample(0,[{id:'v',bytes:10}],true),false);for(let t=1000;t<15000;t+=1000)assert.equal(monitor.sample(t,[{id:'v',bytes:10}],true),false);assert.equal(monitor.sample(15000,[{id:'v',bytes:10}],true),true);assert.equal(monitor.sample(16000,[{id:'v',bytes:11}],true),false);assert.equal(monitor.sample(17000,[],false),false)})
+
+import { statsExpired } from '../../../player/src/client/lib/statsfreshness'
+test('stale native reports are detected independently of packet counters',()=>{assert.equal(statsExpired(16000,1000,0),true);assert.equal(statsExpired(15999,1000,0),false);assert.equal(statsExpired(20000,1000,19000),false);assert.equal(statsExpired(15000,0,0),true)})

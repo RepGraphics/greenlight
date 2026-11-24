@@ -5,6 +5,7 @@ import type { xStreamToken, xCloudStreamConfig, startStreamResponse } from '../t
 export type { xStreamToken, startStreamResponse, xCloudStreamConfig };
 
 import xCloudPlayer from './lib/player';
+import { statsExpired } from './lib/statsfreshness';
 
 // Proxy inputs
 import Gamepad from './lib/input/gamepad';
@@ -13,7 +14,7 @@ import Touch from './lib/input/touch';
 
 // export { Gamepad, MouseKeyboard, Touch };
 
-export interface StreamMetrics { width: number; height: number; fps: number; bitrate: number; jitter: number; loss: number; rtt: number }
+export interface StreamMetrics { width: number; height: number; fps: number; bitrate: number; jitter: number; loss: number; rtt: number; statsAgeMs?:number; statsFresh?:boolean }
 
 export interface StreamPlayerProps {
     onStatusChanged: (newStatus: string) => void;
@@ -138,7 +139,9 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 if (audio) { audio.volume = Math.max(0, Math.min(1, volume)); audio.muted = muted }
                 if (showStats || metricsCallback.current) {
                     const stats = player.getStats();
-                    const next = { width: stats._videoWidth, height: stats._videoHeight, fps: stats._videoFps, bitrate: stats._bitrate, jitter: stats._jitter, loss: stats._packetsLost, rtt: stats._rtt * 1000 };
+                    const age=stats.lastStatsAt?performance.now()-stats.lastStatsAt:0;
+                    const fresh=stats.lastStatsAt>0&&age<5000;
+                    const next = { width: stats._videoWidth, height: stats._videoHeight, fps: fresh?stats._videoFps:0, bitrate: fresh?stats._bitrate:0, jitter: fresh?stats._jitter:0, loss: stats._packetsLost, rtt: fresh?stats._rtt * 1000:0, statsAgeMs:age, statsFresh:fresh };
                     if (showStats) setMetrics(next);
                     metricsCallback.current?.(next);
                 }
@@ -234,7 +237,8 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 connectionDeadline = setTimeout(() => { if (peer.connectionState !== 'connected') status('Error') }, 30000);
                 status('Negotiated'); onConnection();
                 void heartbeat();
-                mediaWatchdog=setInterval(()=>{if(disposed||terminal||document.hidden||peer.connectionState!=='connected')return;if(instance?.getStats().mediaStalled)fail('media')},1000);
+                let visibleConnectedAt=performance.now();
+                mediaWatchdog=setInterval(()=>{const now=performance.now();if(disposed||terminal)return;if(document.hidden||peer.connectionState!=='connected'){visibleConnectedAt=now;return}const stats=instance?.getStats();if(!stats)return;if(statsExpired(now,stats.lastStatsAt,visibleConnectedAt))fail('stats');else if(stats.mediaStalled)fail('media')},1000);
             };
             const poll = async () => {
                 if (disposed) return;
