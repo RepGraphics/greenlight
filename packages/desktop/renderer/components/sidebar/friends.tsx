@@ -11,7 +11,7 @@ function SidebarFriends() {
 
         const updateFriends = () => {
             Ipc.send('app', 'getOnlineFriends').then((onlineFriends) => {
-                setOnlineFriends(onlineFriends)
+                setOnlineFriends(Array.isArray(onlineFriends) ? onlineFriends : [])
             })
         }
         setTimeout(() => {

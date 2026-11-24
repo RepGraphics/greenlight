@@ -1,117 +1,53 @@
 import React from 'react'
 import Link from 'next/link'
-import Ipc from '../lib/ipc'
+import { useRouter } from 'next/router'
 import { useTranslation } from 'react-i18next'
-
-// import { ipcRenderer } from 'electron'
+import Ipc from '../lib/ipc'
 
 interface HeaderProps {
-  hidden?: boolean;
-  gamertag: string;
-  level: number;
+    hidden?: boolean;
+    gamertag: string;
+    gamerpic?: string;
+    level: number;
 }
 
-function Header({
-    hidden = false,
-    gamertag,
-    level = 0,
-}: HeaderProps) {
+export default function Header({ hidden = false, gamertag, gamerpic, level = 0 }: HeaderProps) {
     const { t } = useTranslation()
-
-    // console.log('level:', level)
-    const [activeIndex, setActiveIndex] = React.useState(0);
-    const [headerLinks, setHeaderLinks] = React.useState([]);
-
-    function createLinks(level){
-        return (level > 1) ? [
-            {
-                name: t('header.myConsoles'),
-                title: t('header.viewConsoles'),
-                url: '/home',
-                active: false,
-            }, {
-                name: t('header.xCloudLibrary'),
-                title: t('header.browseXCloudLibrary'),
-                url: '/xcloud/home',
-                active: false,
-                // },{
-                //   name: 'Debug',
-                //   title: 'Debug page',
-                //   url: '/debug'
-            }, {
-                name: t('header.settings'),
-                title: t('header.changeSettings'),
-                url: '/settings/home',
-                active: false,
-            }, {
-                name: gamertag,
-                title: t('header.viewProfile'),
-                url: '/profile',
-                active: false,
-            },
-        ] : [
-            {
-                name: t('header.myConsoles'),
-                title: t('header.viewConsoles'),
-                url: '/home',
-                active: false,
-            }, {
-                name: t('header.settings'),
-                title: t('header.changeSettings'),
-                url: '/settings/home',
-                active: false,
-            }, {
-                name: gamertag,
-                title: t('header.viewProfile'),
-                url: '/profile',
-                active: false,
-            },
-        ]
-    }
-
-    function setMenuActive(id) {
-        setActiveIndex(id);
-    }
-
-    function drawMenu() {
-        return headerLinks.map((link, idx) => (
-            <li key={idx}>
-                <Link legacyBehavior href={link.url} key={link.url}>
-                    <a title={link.title} onClick={() => setMenuActive(idx)} className={idx === activeIndex ? 'active' : ''}>{link.name}</a>
-                </Link>
-            </li>
-        ));
-    }
-
-    function confirmQuit() {
-        if(window.Greenlight.isWebUI() === true)
-            return
-
-        if(confirm(t('header.quitQuestion'))){
-            Ipc.send('app', 'quit')
-        }
-    }
-
-    React.useEffect(() => {
-        if (!isNaN(level)) {
-            const links = createLinks(level).map((link, idx) => ({ ...link, active: idx === activeIndex }));
-            setHeaderLinks(links);
-        }
-    }, [level, t, activeIndex]);
-
+    const router = useRouter()
+    const links = [
+        { name: t('header.myConsoles'), url: '/home', icon: 'fa-gamepad' },
+        ...(level > 1 ? [{ name: t('header.xCloudLibrary'), url: '/xcloud/home', icon: 'fa-cloud' }] : []),
+        { name: t('header.settings'), url: '/settings/home', icon: 'fa-gear' },
+    ]
+    const isActive = (url: string) => router.pathname === url || (url.startsWith('/xcloud') && router.pathname.startsWith('/xcloud/')) || (url.startsWith('/settings') && router.pathname.startsWith('/settings/'))
     return (
-        <React.Fragment>
-            <div id="component_header" className={hidden === true ? 'disabled' : ''}>
-                <a onClick={ confirmQuit } id="actionBarLogo" title={t('header.home')}>
-                    <i className="fa-brands fa-xbox"></i>
-                </a>
-
-                <ul className="menu">
-                    { drawMenu() }
-                </ul>
-            </div>
-        </React.Fragment>
+        <nav id="component_header" className={hidden ? 'disabled' : ''} aria-label="Main navigation">
+            <Link href="/home" className="gl-brand" aria-label="Greenlight home">
+                <i className="fa-brands fa-xbox" aria-hidden="true" />
+                <span>Greenlight</span>
+            </Link>
+            <ul className="menu gl-nav">
+                {links.map(link => (
+                    <li key={link.url}>
+                        <Link href={link.url} className={isActive(link.url) ? 'active' : ''} aria-current={isActive(link.url) ? 'page' : undefined}>
+                            <i className={'fa-solid ' + link.icon} aria-hidden="true" />
+                            <span>{link.name}</span>
+                        </Link>
+                    </li>
+                ))}
+            </ul>
+            <Link href="/profile" className={'gl-account ' + (router.pathname === '/profile' ? 'active' : '')} aria-current={router.pathname === '/profile' ? 'page' : undefined}>
+                <span className="gl-avatar gl-avatar-small">
+                    {gamerpic ? <img src={gamerpic} alt="" onError={e => { e.currentTarget.style.display = 'none' }} /> : null}
+                    <i className="fa-solid fa-user" aria-hidden="true" />
+                </span>
+                <span>{gamertag}</span>
+            </Link>
+            <button type="button" className="gl-quit" title={t('header.quitQuestion')} aria-label={t('header.quitQuestion')} onClick={() => {
+                if (window.Greenlight && !window.Greenlight.isWebUI() && confirm(t('header.quitQuestion'))) {
+                    void Ipc.send('app', 'quit')
+                }
+            }}><i className="fa-solid fa-power-off" aria-hidden="true" /></button>
+        </nav>
     )
 }
-
-export default Header

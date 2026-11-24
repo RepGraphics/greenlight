@@ -109,11 +109,11 @@ export default function MyApp({ Component, pageProps }) {
     if(loggedIn && prevUserState.gamertag !== ''){
         appBody = (
             <React.Fragment>
-                <Header gamertag={ prevUserState.gamertag } level={ parseInt(prevUserState.level) } />
+                <Header gamertag={ prevUserState.gamertag } gamerpic={ prevUserState.gamerpic } level={ parseInt(prevUserState.level) } />
 
                 <div id="app_body">
                     <div id="app_body_container">
-                        <Component {...pageProps} />
+                        <Component {...pageProps} account={prevUserState} />
                     </div>
                 </div>
 
@@ -139,7 +139,7 @@ export default function MyApp({ Component, pageProps }) {
             </Head>
 
             <div style={ {
-                background: 'radial-gradient(ellipse at top left, #203b35 0%, #151e27 45%, #10161d 85%)',
+                background: 'radial-gradient(ellipse at top left, #17351b 0%, #171917 32%, #121212 72%)',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
                 backgroundSize: 'cover',

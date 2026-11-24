@@ -207,3 +207,69 @@ div#component_settings_sidebar_menu ul li:hover a { background: var(--gl-raised)
 @media (prefers-reduced-motion: reduce) {
     #component_header, #component_header a, #component_footer, .btn { transition: none; }
 }
+
+/* Xbox-inspired desktop shell */
+:root {
+    --gl-surface: #202020;
+    --gl-raised: #303030;
+    --gl-border: #393939;
+    --gl-text: #f5f5f5;
+    --gl-muted: #b5b5b5;
+    --gl-accent: #9bf00b;
+    --gl-nav-width: clamp(158px, 18vw, 220px);
+    --gl-social-width: clamp(190px, 25vw, 300px);
+}
+body { background: #121212; }
+#component_header { width: var(--gl-nav-width); height: auto; bottom: 40px; right: auto; background: #171717; border-bottom: 0; border-right: 1px solid #333; box-sizing: border-box; display: flex; flex-direction: column; padding: 18px 12px; gap: 18px; overflow-y: auto; }
+#component_header .gl-brand { display: flex; align-items: center; gap: 10px; padding: 8px; color: #fff; font-weight: 700; font-size: 19px; }
+.gl-brand i { color: var(--gl-accent); font-size: 26px; }
+#component_header ul.gl-nav { float: none; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+#component_header ul.gl-nav li { display: block; padding: 0; }
+#component_header ul.gl-nav li a { display: flex; align-items: center; gap: 12px; padding: 13px 10px; border-radius: 5px; border-left: 3px solid transparent; border-bottom: 0; opacity: 1; color: #ddd; font-size: 14px; }
+#component_header ul.gl-nav li a i { width: 20px; text-align: center; }
+#component_header ul.gl-nav li a.active, #component_header .gl-account.active { color: #fff; background: #303030; border-left-color: var(--gl-accent); }
+#component_header ul.gl-nav li a.active i { color: var(--gl-accent); }
+.gl-account { margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 10px 7px; color: #fff; border-left: 3px solid transparent; border-radius: 5px; min-width: 0; }
+.gl-account > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 14px; }
+.gl-account:hover, .gl-quit:hover { background: #303030; }
+.gl-quit { align-self: flex-start; background: none; border: 0; color: #aaa; cursor: pointer; padding: 10px; border-radius: 5px; }
+.gl-avatar { position: relative; display: grid; place-items: center; flex-shrink: 0; border-radius: 50%; overflow: hidden; background: #363636; color: #ddd; }
+.gl-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+.gl-avatar-small { width: 36px; height: 36px; }
+.gl-avatar-large { width: 104px; height: 104px; font-size: 40px; border: 3px solid #83b758; }
+div#app_body { margin-left: var(--gl-nav-width); width: calc(100vw - var(--gl-nav-width) - var(--gl-social-width)); height: calc(100vh - 40px); }
+div#app_body_container { padding-top: 0; padding-bottom: 24px; }
+div#app_sidebar { top: 0; width: var(--gl-social-width); background: #171717; }
+div#app_sidebar::before { content: 'Social'; display: block; padding: 24px 18px 8px; font-size: 20px; font-weight: 700; }
+div#component_settings_sidebar { top: 0; left: var(--gl-nav-width); right: var(--gl-social-width); bottom: 40px; }
+div#component_settings_sidebar_menu { width: 150px; }
+div#component_settings_sidebar_content { left: 150px; }
+div#component_settings_sidebar_menu ul li.active a { color: var(--gl-accent); background: #303030; }
+#component_footer { background: #171717; }
+div.component_card { border-radius: 8px; }
+.gl-console-grid .component_card { background: linear-gradient(150deg, #303830, #202020 65%); border-radius: 8px; }
+.gl-console-grid .component_card:hover { border-color: #7bb643; }
+.btn { border-radius: 4px; }
+.btn-primary { background: #107c10; border-color: #107c10; color: #fff; }
+.btn-primary:not(:disabled):hover { background: #168817; }
+.gl-profile-page { padding: clamp(16px, 3vw, 36px); }
+.gl-profile-page > h1 { font-size: 30px; margin-bottom: 24px; }
+.gl-profile-hero { display: flex; align-items: center; flex-wrap: wrap; gap: 24px; padding: 28px; border: 1px solid #465c39; border-radius: 8px; background: linear-gradient(115deg, #214f21, #252b25 75%); }
+.gl-profile-hero h2 { font-size: clamp(22px, 3vw, 36px); overflow-wrap: anywhere; }
+.gl-eyebrow { color: #d2dfd2; font-size: 13px; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 8px; }
+.gl-profile-status { display: flex; align-items: center; gap: 8px; margin-top: 10px; color: #d8e5d8; font-size: 14px; }
+.gl-profile-status span { width: 8px; height: 8px; border-radius: 50%; background: var(--gl-accent); }
+.gl-profile-stats, .gl-profile-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 145px), 1fr)); gap: 12px; margin-top: 16px; }
+.gl-profile-stats article, .gl-profile-links a { background: var(--gl-surface); border: 1px solid var(--gl-border); border-radius: 6px; padding: 18px; }
+.gl-profile-stats i, .gl-profile-links i { color: var(--gl-accent); }
+.gl-profile-stats p { color: var(--gl-muted); margin: 12px 0 6px; }
+.gl-profile-stats strong { font-size: 24px; }
+.gl-section-heading { margin-top: 28px; font-size: 20px; }
+.gl-profile-links a { display: flex; align-items: center; gap: 12px; color: #fff; }
+.gl-profile-links a:hover { background: var(--gl-raised); }
+@media (max-width: 800px) {
+    :root { --gl-nav-width: 64px; --gl-social-width: 0px; }
+    #component_header { padding: 12px 6px; }
+    #component_header .gl-brand span, #component_header .gl-nav span, .gl-account > span:last-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    div#app_sidebar { display: none !important; }
+}
