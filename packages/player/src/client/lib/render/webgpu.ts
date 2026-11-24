@@ -1,3 +1,6 @@
+/// <reference types="@webgpu/types" />
+/// <reference types="@types/dom-webcodecs" />
+/// <reference types="@types/dom-mediacapture-transform" />
 import xCloudPlayer from '../player'
 import Overlay from './overlay'
 
@@ -8,7 +11,7 @@ export default class WebGpuComponent {
     private _overlay:Overlay
     private _isActive: boolean = true
 
-    private _gpuReader:GPUCanvasContext | undefined
+    private _gpuReader:ReadableStreamDefaultReader<VideoFrame> | undefined
     private _gpuVideoTexture:GPUTexture | null = null
     private _gpuDevice:GPUDevice | null = null
     private _gpuContext:GPUCanvasContext | null = null
