@@ -26,6 +26,8 @@ export interface StreamPlayerProps {
     codecProfiles?: string[];
     touchControls?: boolean;
     keyboardMapping?: Record<string, string>;
+    microphone?: boolean;
+    onMicrophoneStatus?: (active: boolean, error?: boolean) => void;
 }
 export interface StreamPlayerHandle {
     ping: (echo: string) => void;
@@ -42,13 +44,14 @@ export interface communicationHandler {
     sendSDPOffer: (sdpOffer:RTCSessionDescriptionInit) => Promise<any>;
     sendICECandidates: (candidates:Array<any>) => Promise<any>;
     sendMSALToken: () => Promise<any>;
+    sendChatSDP?: (offer: RTCSessionDescriptionInit) => Promise<string>;
     sendKeepalive: () => Promise<any>;
 }
 
 export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
     ({
         onStatusChanged,
-        communicationHandler, useWebGpu = true, autoGamepad = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false, codecProfiles = [], touchControls = false, keyboardMapping
+        communicationHandler, useWebGpu = true, autoGamepad = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false, codecProfiles = [], touchControls = false, keyboardMapping, microphone = false, onMicrophoneStatus
     }, ref): ReactElement => {
         const handler = useRef(communicationHandler);
         handler.current = communicationHandler;
@@ -56,7 +59,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
         statusCallback.current = onStatusChanged;
         const controller = useRef<Gamepad | undefined>(undefined);
         const pressed = useRef(new Map<number, string>());
-        const releaseTouch = () => { pressed.current.forEach(button => controller.current?.sendButtonState(button, 0)); pressed.current.clear() };
+        const releaseTouch = () => { pressed.current.forEach(button => controller.current?.sendButtonState(button, 0)); pressed.current.clear(); controller.current?.releaseVirtualStick('Left'); controller.current?.releaseVirtualStick('Right') };
         useEffect(() => { if (!touchControls) releaseTouch(); window.addEventListener('blur', releaseTouch); return () => { window.removeEventListener('blur', releaseTouch); releaseTouch() } }, [touchControls]);
         const inputs = useRef<Array<{ detach: () => void }>>([]);
         const [playerState, setPlayerState] = useState<string>('Initializing');
@@ -65,6 +68,14 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
         // let player = new xCloudPlayer('playerContainer');
         const [player, setPlayer] = useState<xCloudPlayer | undefined>(undefined);
 
+        const micCallback = useRef(onMicrophoneStatus);
+        micCallback.current = onMicrophoneStatus;
+        useEffect(() => {
+            if (!player || playerState !== 'Connected') return;
+            let disposed = false;
+            player._channels.chat.setMicrophone(microphone, handler.current.sendChatSDP).then(active => { if (!disposed) micCallback.current?.(active) }).catch(() => { if (!disposed) micCallback.current?.(false, true) });
+            return () => { disposed = true };
+        }, [player, playerState, microphone]);
         const [metrics, setMetrics] = useState({ width: 0, height: 0, fps: 0, bitrate: 0, jitter: 0, loss: 0 });
         useEffect(() => {
             if (!player) return;
@@ -199,12 +210,29 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
         return (
             <div ref={playerInstance}>
                 <div id="playerContainer"></div>
-                {touchControls && playerState === 'Connected' && <div className="gl-touch-overlay"><div className="gl-touch-shoulders">{touchButton('LeftTrigger','LT')}{touchButton('LeftShoulder','LB')}{touchButton('View','▣')}{touchButton('Nexus','Xbox')}{touchButton('Menu','☰')}{touchButton('RightShoulder','RB')}{touchButton('RightTrigger','RT')}</div><div className="gl-touch-dpad">{touchButton('DPadUp','↑')}{touchButton('DPadLeft','←')}{touchButton('DPadRight','→')}{touchButton('DPadDown','↓')}</div><div className="gl-touch-abxy">{touchButton('Y','Y')}{touchButton('X','X')}{touchButton('B','B')}{touchButton('A','A')}</div></div>}
+                {touchControls && playerState === 'Connected' && <div className="gl-touch-overlay"><div className="gl-touch-shoulders">{touchButton('LeftTrigger','LT')}{touchButton('LeftShoulder','LB')}{touchButton('View','▣')}{touchButton('Nexus','Xbox')}{touchButton('Menu','☰')}{touchButton('RightShoulder','RB')}{touchButton('RightTrigger','RT')}</div><div className="gl-touch-dpad">{touchButton('DPadUp','↑')}{touchButton('DPadLeft','←')}{touchButton('DPadRight','→')}{touchButton('DPadDown','↓')}</div><VirtualStick side="Left" onMove={(x,y) => controller.current?.setVirtualStick('Left', x,y)} onRelease={() => controller.current?.releaseVirtualStick('Left')} /><VirtualStick side="Right" onMove={(x,y) => controller.current?.setVirtualStick('Right', x,y)} onRelease={() => controller.current?.releaseVirtualStick('Right')} /><div className="gl-touch-abxy">{touchButton('Y','Y')}{touchButton('X','X')}{touchButton('B','B')}{touchButton('A','A')}</div></div>}
                 {showStats && <div className="gl-performance-hud"><span>{metrics.width ? metrics.width + '×' + metrics.height : '—'}</span><span>{Math.round(metrics.fps)} FPS</span><span>{metrics.bitrate.toFixed(1)} Mbps</span><span>{metrics.jitter.toFixed(1)} ms jitter</span><span>{metrics.loss} packets lost</span></div>}
             </div>
         );
     }
 );
+
+function VirtualStick({ side, onMove, onRelease }: { side: 'Left' | 'Right'; onMove: (x:number,y:number) => void; onRelease: () => void }) {
+    const pointer = useRef<number | null>(null);
+    const [position, setPosition] = useState({ x:0, y:0 });
+    const release = () => { pointer.current = null; setPosition({ x:0, y:0 }); onRelease() };
+    const move = (event: React.PointerEvent<HTMLDivElement>) => {
+        if (pointer.current !== event.pointerId) return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        const radius = Math.max(1, rect.width / 2);
+        let x = (event.clientX - rect.left - radius) / radius;
+        let y = (event.clientY - rect.top - rect.height / 2) / radius;
+        const length = Math.max(1, Math.hypot(x,y));
+        x /= length; y /= length;
+        setPosition({ x,y }); onMove(x,y);
+    };
+    return <div className={'gl-virtual-stick gl-stick-' + side.toLowerCase()} aria-label={side + ' analogue stick'} onPointerDown={event => { if (pointer.current !== null) return; event.preventDefault(); pointer.current = event.pointerId; event.currentTarget.setPointerCapture(event.pointerId); move(event) }} onPointerMove={move} onLostPointerCapture={event => { if (pointer.current === event.pointerId) release() }}><span style={{ transform: 'translate(' + position.x * 55 + '%, ' + position.y * 55 + '%)' }} /></div>
+}
 
 // CONTROLS
 

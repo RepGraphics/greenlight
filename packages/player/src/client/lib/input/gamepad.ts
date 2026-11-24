@@ -25,6 +25,7 @@ export default class Gamepad {
     private _index: number
     private _physicalGamepadId = -1
     private neutralPending = false
+    private virtualAxes: Record<string, number> = {}
     private _rumbleInterval
     private _isFocused = true
     private _gamepadOverride = {
@@ -132,6 +133,7 @@ export default class Gamepad {
         this._player._channels.control.sendGamepadState(this._index, false)
         this._physicalGamepadId = -1
         this._gamepadOverride.buttons = {}
+        this.virtualAxes = {}
         this._player = undefined
 
         if(this._rumbleInterval !== undefined){
@@ -152,6 +154,17 @@ export default class Gamepad {
             window.removeEventListener('blur', this._listener.windowBlur)
             window.removeEventListener('focus', this._listener.windowFocus)
         }
+    }
+
+    setVirtualStick(side: 'Left' | 'Right', x: number, y: number) {
+        this.virtualAxes[side + 'ThumbXAxis'] = Math.max(-1, Math.min(1, x))
+        this.virtualAxes[side + 'ThumbYAxis'] = Math.max(-1, Math.min(1, y))
+    }
+
+    releaseVirtualStick(side: 'Left' | 'Right') {
+        delete this.virtualAxes[side + 'ThumbXAxis']
+        delete this.virtualAxes[side + 'ThumbYAxis']
+        this.neutralPending = true
     }
 
     sendButtonState(button, value){
@@ -203,6 +216,7 @@ export default class Gamepad {
     onWindowBlur(){
         this._isFocused = false
         this._gamepadOverride.buttons = {}
+        this.virtualAxes = {}
         this.neutralPending = true
     }
 
@@ -287,7 +301,7 @@ export default class Gamepad {
     }
 
     hasOverrideButtons(){
-        return Object.keys(this._gamepadOverride.buttons).length > 0
+        return Object.keys(this._gamepadOverride.buttons).length > 0 || Object.keys(this.virtualAxes).length > 0
     }
 
     getGamepadState(){
@@ -334,6 +348,8 @@ export default class Gamepad {
         for(const button in this._gamepadOverride.buttons){
             frame[button] = this._gamepadOverride.buttons[button]
         }
+
+        for (const axis of Object.keys(this.virtualAxes)) frame[axis] = this.virtualAxes[axis]
 
         // Clean up released buttons in a separate pass
         const buttonsToRemove = []

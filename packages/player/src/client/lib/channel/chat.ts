@@ -1,84 +1,56 @@
 import Channel from './channel'
 
 export default class ChatChannel extends Channel {
+    private stream?: MediaStream
+    private disposed = false
+    private operation = 0
 
-    _micPermissions:'granted'|'denied'|'prompt' = 'prompt'
-    _micStream:MediaStream | undefined
+    getChannelName() { return 'chat' }
+    getChannelConfig() { return { ordered: true, protocol: 'chatV1' } }
 
-    constructor(player:any){
-        super(player)
-
-        navigator.permissions.query({ name: 'microphone' }).then((permissionStatus) => {
-            this._micPermissions = permissionStatus.state
-        
-            permissionStatus.onchange = () => {
-                this._micPermissions = permissionStatus.state
-            }
-        })
-    }
-
-    getChannelName() {
-        return 'chat'
-    }
-
-    getChannelConfig() {
-        return {
-            ordered: true,
-            protocol: 'chatV1',
+    async setMicrophone(enabled: boolean, negotiate?: (sdp: RTCSessionDescriptionInit) => Promise<string>) {
+        const request = ++this.operation
+        const peer = this.getPlayer()._peerConnection
+        const sender = peer.getTransceivers().find(item => item.receiver.track.kind === 'audio')?.sender
+        if (!enabled) {
+            this.stream?.getTracks().forEach(track => track.stop())
+            this.stream = undefined
+            if (sender && peer.signalingState !== 'closed') await sender.replaceTrack(null)
+            return false
+        }
+        if (this.disposed || !sender || !negotiate || peer.signalingState !== 'stable') throw new Error('Microphone unavailable')
+        if (this.stream) return true
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error('Microphone access unavailable')
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } })
+        if (this.disposed || request !== this.operation) { stream.getTracks().forEach(track => track.stop()); return false }
+        const track = stream.getAudioTracks()[0]
+        if (!track) { stream.getTracks().forEach(item => item.stop()); throw new Error('No microphone track') }
+        track.enabled = false
+        this.stream = stream
+        try {
+            await sender.replaceTrack(track)
+            if (this.disposed || request !== this.operation) return false
+            const offer = await this.getPlayer().createOffer()
+            const answer = await negotiate(offer)
+            if (this.disposed || request !== this.operation) return false
+            if (typeof answer !== 'string' || !answer) throw new Error('Invalid chat SDP answer')
+            await this.getPlayer().setRemoteSDP(answer)
+            if (this.disposed || request !== this.operation) return false
+            track.enabled = true
+            return true
+        } catch (error) {
+            stream.getTracks().forEach(item => item.stop())
+            if (this.stream === stream) this.stream = undefined
+            if (peer.signalingState !== 'closed' && sender.track === track) await sender.replaceTrack(null).catch(() => {})
+            if (peer.signalingState === 'have-local-offer') await peer.setLocalDescription({ type: 'rollback' }).catch(() => {})
+            throw error
         }
     }
 
-    // startMicrophone() {
-    //     if(this._micPermissions === 'denied'){
-    //         alert('Microphone permissions are denied. Please enable them in your browser settings.')
-    //         return
-    //     }
-    //     if(this._micStream !== undefined){
-    //         console.log('Microphone already started. You need to stop it first by calling stopMicrophone()')
-    //         return
-    //     }
-
-    //     navigator.mediaDevices.getUserMedia({ audio: {
-    //         channelCount: 1,
-    //         sampleRate: 24e3,
-    //     } }).then((stream) => {
-    //         if(this._micStream !== undefined){
-    //             return
-    //         }
-
-    //         this._micStream = stream
-
-    //         // Add to SDP
-    //         this.getPlayer()._peerConnection.addTrack(stream.getAudioTracks()[0], stream)
-    //         this.getPlayer().createOffer().then((offer) => {
-    //             if(this.getPlayer()._sdpHandler){
-    //                 this.getPlayer()._sdpHandler(offer)
-    //             } else {
-    //                 console.log('No SDP handler set. Set an SDP Handler via player.setChatSdpHandler()')
-    //             }
-    //         })
-    //     }).catch((err) => {
-    //         alert(`Error connecting to microphone: ${err}`)
-    //     })
-    // }
-
-    // stopMicrophone() {
-    //     if(this._micStream === undefined) {return}
-
-    //     this._micStream.getTracks().forEach((track) => {
-    //         track.stop()
-    //     })
-
-    //     this.getPlayer()._peerConnection.getSenders().forEach((sender) => {
-    //         if(sender.track && sender.track.kind === 'audio'){
-    //             this.getPlayer()._peerConnection.removeTrack(sender)
-    //         }
-    //     })
-
-    //     this._micStream = undefined
-    // }
-
     destroy() {
-        // console.log('DebugChannel destroy() called')
+        this.disposed = true
+        ++this.operation
+        this.stream?.getTracks().forEach(track => track.stop())
+        this.stream = undefined
     }
 }

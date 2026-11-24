@@ -331,11 +331,12 @@
       "streamingEngine": "Streaming engine",
       "legacyPlayer": "Classic player (recommended)",
       "experimentalPlayer": "V3 player (experimental)",
-      "experimentalWarning": "Experimental player supports bitrate and codec preferences, controller input, basic touch buttons, keyboard mapping and audio controls. Classic player retains advanced microphone and touch features.",
+      "experimentalWarning": "Experimental player supports bitrate and codec preferences, physical and virtual controller input, microphone negotiation and audio controls. Some Xbox services may not support all features.",
       "experimentalFailed": "Experimental player could not connect. Return to settings and select the classic player.",
       "muteAudio": "Mute audio",
       "volume": "Volume",
-      "touchControls": "Touch controls"
+      "touchControls": "Touch controls",
+      "microphoneFailed": "Microphone could not be enabled. Check permissions or use the classic player."
     }
   }
 }
