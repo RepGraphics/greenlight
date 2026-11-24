@@ -41,8 +41,9 @@ export default class ChatChannel extends Channel {
         } catch (error) {
             stream.getTracks().forEach(item => item.stop())
             if (this.stream === stream) this.stream = undefined
-            if (peer.signalingState !== 'closed' && sender.track === track) await sender.replaceTrack(null).catch(() => {})
-            if (peer.signalingState === 'have-local-offer') await peer.setLocalDescription({ type: 'rollback' }).catch(() => {})
+            const signalingState = (): RTCSignalingState => peer.signalingState
+            if (signalingState() !== 'closed' && sender.track === track) await sender.replaceTrack(null).catch(() => {})
+            if (signalingState() === 'have-local-offer') await peer.setLocalDescription({ type: 'rollback' }).catch(() => {})
             throw error
         }
     }
