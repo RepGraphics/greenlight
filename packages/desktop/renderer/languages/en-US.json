@@ -380,7 +380,10 @@
       "gameProfileDescription": "Override global bitrate for this cloud game. Renderer and controller profile overrides apply only to V3.",
       "useGlobalSettings": "Use global settings",
       "resetGameProfile": "Reset game preferences",
-      "gameDetailsFailed": "Could not load game details."
+      "gameDetailsFailed": "Could not load game details.",
+      "consoleStreamProfile": "Console streaming preferences",
+      "consoleProfileDescription": "Override bitrate for this console. Renderer and controller profile overrides apply only to V3.",
+      "consoleProfileLimit": "You have reached the limit of 50 console profiles."
     }
   }
 }

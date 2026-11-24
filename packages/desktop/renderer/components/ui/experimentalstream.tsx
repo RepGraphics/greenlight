@@ -1,4 +1,5 @@
 import React from 'react'
+import { readConsoleProfiles } from '../../lib/consoleprofiles'
 import { readGameProfiles } from '../../lib/gameprofiles'
 import { readProfiles } from '../../lib/controllerprofiles'
 import { downloadDiagnostics, sanitizeSample, summarizeDiagnostics } from '../../lib/streamdiagnostics'
@@ -14,9 +15,10 @@ const SharedPlayer = dynamic(() => import('../../../../player/src/client/index')
 export default function ExperimentalStream({ target, onExit }: { target: string; onExit: () => void }) {
     const { settings: globalSettings } = useSettings()
     const [settings] = React.useState(() => {
-        const game = target.startsWith('xcloud_') ? readGameProfiles(globalSettings.v3_game_profiles).find(item => item.titleId === target.slice(7)) : undefined
+        const cloud = target.startsWith('xcloud_')
+        const game = cloud ? readGameProfiles(globalSettings.v3_game_profiles).find(item => item.titleId === target.slice(7)) : readConsoleProfiles(globalSettings.console_profiles).find(item => item.consoleId === target)
         const profile = game?.controllerProfile ? readProfiles(globalSettings.v3_controller_profiles).find(item => item.name === game.controllerProfile) : undefined
-        return {...globalSettings, ...(profile || {}), xcloud_bitrate:game?.bitrate ?? globalSettings.xcloud_bitrate, v3_renderer:game && game.renderer !== 'default' ? game.renderer : globalSettings.v3_renderer}
+        return {...globalSettings, ...(profile || {}), xcloud_bitrate:cloud ? game?.bitrate ?? globalSettings.xcloud_bitrate : globalSettings.xcloud_bitrate, xhome_bitrate:!cloud ? game?.bitrate ?? globalSettings.xhome_bitrate : globalSettings.xhome_bitrate, v3_renderer:game && game.renderer !== 'default' ? game.renderer : globalSettings.v3_renderer}
     })
     const { t } = useTranslation()
     const [summary, setSummary] = React.useState<ReturnType<typeof summarizeDiagnostics> | null>(null)

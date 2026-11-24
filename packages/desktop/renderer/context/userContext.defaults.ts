@@ -1,3 +1,4 @@
+import type { ConsoleProfile } from '../lib/consoleprofiles'
 import type { GameProfile } from '../lib/gameprofiles'
 import type { ControllerProfile } from '../lib/controllerprofiles'
 
@@ -12,6 +13,7 @@ export const defaultSettings = {
     v3_button_mapping: {} as Record<string, string>,
     v3_controller_profiles: [] as ControllerProfile[],
     v3_game_profiles: [] as GameProfile[],
+    console_profiles: [] as ConsoleProfile[],
     xhome_bitrate: 0,
     xcloud_bitrate: 0,
     xcloud_show_non_entitled: true,

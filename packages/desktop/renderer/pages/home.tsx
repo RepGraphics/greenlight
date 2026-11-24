@@ -1,4 +1,5 @@
 import React from 'react'
+import ConsoleProfileSettings from '../components/ui/consoleprofile'
 import TitleRow from '../components/xcloud/titleRow'
 import { useGameFavourites } from '../context/gameFavourites'
 import Head from 'next/head'
@@ -105,6 +106,7 @@ function Home({ account }: { account?: { gamertag?: string; level?: string | num
                                 <p>Remote: {item.remoteManagementEnabled ? 'Enabled' : 'Disabled'}</p>
                                 <p>Streaming: {item.consoleStreamingEnabled ? 'Enabled' : 'Disabled'}</p><br /> */}
 
+                                <ConsoleProfileSettings id={String(item.id)} name={String(item.name || item.id)} />
                                 <div className='gl-console-actions'>
                                     <Link href={ `/stream/${encodeURIComponent(item.id)}` } onClick={() => save(favourites, item.id)}>
                                         <span className='btn btn-primary'>{t('page.myConsoles.startStreamBtn')}</span>
