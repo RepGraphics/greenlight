@@ -9,10 +9,10 @@ import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
  */
 export const baseOptions: BaseLayoutProps = {
   nav: {
-    title: 'Greenlight',
+    title: 'Greenlight Fork',
     url: '/docs'
   },
-  githubUrl: 'https://github.com/unknownskl/greenlight',
+  githubUrl: 'https://github.com/RepGraphics/greenlight',
   links: [
     {
       text: 'Home',

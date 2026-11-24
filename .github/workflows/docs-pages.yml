@@ -1,0 +1,49 @@
+name: Documentation Pages
+
+on:
+  push:
+    branches: [main-v2]
+    paths:
+      - 'packages/docs/**'
+      - 'package.json'
+      - 'yarn.lock'
+      - '.github/workflows/docs-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - run: npm install --global yarn@1.22.22
+      - run: yarn install --frozen-lockfile
+      - run: yarn docs build
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: packages/docs/out/
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy documentation
+        id: deployment
+        uses: actions/deploy-pages@v5
