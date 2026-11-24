@@ -19,6 +19,10 @@ export interface StreamPlayerProps {
     useWebGpu?: boolean;
     autoGamepad?: boolean;
     vibration?: boolean;
+    videoBitrate?: number;
+    showStats?: boolean;
+    volume?: number;
+    muted?: boolean;
 }
 export interface StreamPlayerHandle {
     ping: (echo: string) => void;
@@ -41,7 +45,7 @@ export interface communicationHandler {
 export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
     ({
         onStatusChanged,
-        communicationHandler, useWebGpu = true, autoGamepad = false, vibration = true
+        communicationHandler, useWebGpu = true, autoGamepad = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false
     }, ref): ReactElement => {
         const handler = useRef(communicationHandler);
         handler.current = communicationHandler;
@@ -53,6 +57,22 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
         const playerInstance = useRef<HTMLDivElement | null>(null);
         // let player = new xCloudPlayer('playerContainer');
         const [player, setPlayer] = useState<xCloudPlayer | undefined>(undefined);
+
+        const [metrics, setMetrics] = useState({ width: 0, height: 0, fps: 0, bitrate: 0, jitter: 0, loss: 0 });
+        useEffect(() => {
+            if (!player) return;
+            const update = () => {
+                const audio = player.getAudioElement();
+                if (audio) { audio.volume = Math.max(0, Math.min(1, volume)); audio.muted = muted }
+                if (showStats) {
+                    const stats = player.getStats();
+                    setMetrics({ width: stats._videoWidth, height: stats._videoHeight, fps: stats._videoFps, bitrate: stats._bitrate, jitter: stats._jitter, loss: stats._packetsLost });
+                }
+            };
+            update();
+            const timer = setInterval(update, 1000);
+            return () => clearInterval(timer);
+        }, [player, showStats, volume, muted]);
 
         useImperativeHandle(ref, () => ({
             ping(echo: string) {
@@ -103,7 +123,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 if (!disposed) keepalive = setTimeout(heartbeat, 30000);
             };
             const connect = async () => {
-                instance = new xCloudPlayer('playerContainer', useWebGpu);
+                instance = new xCloudPlayer('playerContainer', useWebGpu, videoBitrate);
                 instance.init();
                 setPlayer(instance);
                 status('Connecting');
@@ -169,7 +189,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
         return (
             <div ref={playerInstance}>
                 <div id="playerContainer"></div>
-                <p role="status">{playerState}</p>
+                {showStats && <div className="gl-performance-hud"><span>{metrics.width ? metrics.width + '×' + metrics.height : '—'}</span><span>{Math.round(metrics.fps)} FPS</span><span>{metrics.bitrate.toFixed(1)} Mbps</span><span>{metrics.jitter.toFixed(1)} ms jitter</span><span>{metrics.loss} packets lost</span></div>}
             </div>
         );
     }

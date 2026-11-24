@@ -331,8 +331,10 @@
       "streamingEngine": "Streaming engine",
       "legacyPlayer": "Classic player (recommended)",
       "experimentalPlayer": "V3 player (experimental)",
-      "experimentalWarning": "Experimental player uses basic video and controller support. Classic player retains advanced controls and quality settings. Changes apply to the next stream.",
-      "experimentalFailed": "Experimental player could not connect. Return to settings and select the classic player."
+      "experimentalWarning": "Experimental player supports video, controller input, bitrate limits and basic performance and audio controls. Classic player retains microphone and touch controls.",
+      "experimentalFailed": "Experimental player could not connect. Return to settings and select the classic player.",
+      "muteAudio": "Mute audio",
+      "volume": "Volume"
     }
   }
 }

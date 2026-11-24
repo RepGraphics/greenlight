@@ -30,7 +30,7 @@ export default class xCloudPlayer {
     private _videoComponent: VideoComponent | WebGpuComponent | undefined
     private _audioComponent: AudioComponent | undefined
 
-    constructor(elementId: string, useWebGpu = true) {
+    constructor(elementId: string, useWebGpu = true, private videoBitrate = 0) {
         console.log('xCloudPlayer constructing...');
 
         this._elementId = elementId;
@@ -70,7 +70,7 @@ export default class xCloudPlayer {
             offerToReceiveAudio: true,
             offerToReceiveVideo: true,
         })
-        const finalOffer = this._sdpHelper.setLocalSDP(offer)
+        const finalOffer = this._sdpHelper.setLocalSDP(offer, this.videoBitrate)
         await this._peerConnection.setLocalDescription(finalOffer)
 
         return finalOffer
@@ -122,6 +122,9 @@ export default class xCloudPlayer {
 
     destroy() {
         if(this._isDestoyed === false){
+            this._isDestoyed = true
+            this._statsHelper.destroy()
+            this._peerConnection.ontrack = null
             this._peerConnection.close()
 
             if(this._peerConnection.onconnectionstatechange){

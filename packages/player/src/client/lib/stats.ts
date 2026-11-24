@@ -3,6 +3,13 @@ import xCloudPlayer from './player'
 export default class Stats {
     private _player: xCloudPlayer
     private _peerConnection:RTCPeerConnection
+    private timer: ReturnType<typeof setInterval>
+    private disposed = false
+    private busy = false
+    private previous?: { id: string; bytes: number; time: number }
+    _bitrate = 0
+    _jitter = 0
+    _packetsLost = 0
 
     _videoCodec:string = ''
     _audioCodec:string = ''
@@ -22,16 +29,30 @@ export default class Stats {
         this._player = player
         this._peerConnection = player._peerConnection
 
-        setInterval(this.loop.bind(this), 1000)
+        this.timer = setInterval(this.loop.bind(this), 1000)
     }
 
+    destroy() { this.disposed = true; clearInterval(this.timer) }
+
     loop(){
+        if (this.disposed || this.busy) return
+        this.busy = true
         this._peerConnection.getStats().then((stats) => {
+            if (this.disposed) return
             stats.forEach((report) => {
                 //  @TODO: Implement chat stats using type outbound-rtp
 
                 if(report.type === 'inbound-rtp'){
                     this.readInboundRtp(report)
+                    if (report.kind === 'video') {
+                        const codec = stats.get(report.codecId)
+                        if (codec?.mimeType) this._videoCodec = codec.mimeType
+                        const old = this.previous
+                        if (old && old.id === report.id && report.timestamp > old.time && report.bytesReceived >= old.bytes) this._bitrate = (report.bytesReceived - old.bytes) * 8 / (report.timestamp - old.time) / 1000
+                        if (typeof report.bytesReceived === 'number') this.previous = { id: report.id, bytes: report.bytesReceived, time: report.timestamp }
+                        this._jitter = (report.jitter || 0) * 1000
+                        this._packetsLost = report.packetsLost || 0
+                    }
 
                 } else if(report.type === 'candidate-pair' && report.packetsReceived !== undefined && report.packetsReceived > 0){
                     this.readCandidatePair(report)
@@ -40,7 +61,7 @@ export default class Stats {
                     this.readRemoteCandidate(report)
                 }
             })
-        })
+        }).catch(() => {}).finally(() => { this.busy = false })
     }
 
     readInboundRtp(report:RTCInboundRtpStreamStats){
@@ -77,7 +98,7 @@ export default class Stats {
     }
 
     readRemoteCandidate(report){
-        if(report.id !== this._activeRemoteCandidate) {return}
+        if(report.id !== this._activeRemoteCandidate || typeof report.address !== 'string') {return}
 
         if(this.isPrivateIP(report.address)){
             this._remoteIsLocal = true

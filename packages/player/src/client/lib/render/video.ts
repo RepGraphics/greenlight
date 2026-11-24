@@ -6,6 +6,7 @@ export default class VideoComponent {
 
     private _element:HTMLVideoElement | undefined
     private _overlay:Overlay
+    private frameCallback?: number
 
     constructor(player:any){
         this._player = player
@@ -34,13 +35,13 @@ export default class VideoComponent {
             element.style.position = 'relative'
         }
 
-        this._element.requestVideoFrameCallback(this.processVideoMetadata.bind(this))
+        this.frameCallback = this._element.requestVideoFrameCallback(this.processVideoMetadata.bind(this))
     }
 
     processVideoMetadata(timestamp, data:VideoFrameCallbackMetadata) {
         if(this._element === undefined) {return}
 
-        this._element.requestVideoFrameCallback(this.processVideoMetadata.bind(this))
+        this.frameCallback = this._element.requestVideoFrameCallback(this.processVideoMetadata.bind(this))
 
         this._player._channels.input.queueMetadataFrame({
             serverDataKey: data.rtpTimestamp as number,
@@ -60,8 +61,10 @@ export default class VideoComponent {
     }
 
     destroy(){
-        const streamHolder = document.getElementById(this._player.getElementId())
-        const element = streamHolder?.querySelector('video')
+        const element = this._element
+        if (element && this.frameCallback !== undefined) element.cancelVideoFrameCallback(this.frameCallback)
+        this._element = undefined
+        if (element) { element.pause(); element.srcObject = null }
 
         if(this._overlay !== undefined){
             this._overlay.destroy()

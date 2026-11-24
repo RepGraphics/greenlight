@@ -11,6 +11,9 @@ export default function ExperimentalStream({ target, onExit }: { target: string;
     const { t } = useTranslation()
     const [session, setSession] = React.useState('')
     const [state, setState] = React.useState('Initializing')
+    const [hud, setHud] = React.useState(Boolean(settings.stream_performance_hud))
+    const [volume, setVolume] = React.useState(1)
+    const [muted, setMuted] = React.useState(!settings.audio_enabled)
     const cloud = target.startsWith('xcloud_')
     const id = cloud ? target.slice(7) : target
     React.useEffect(() => {
@@ -36,8 +39,8 @@ export default function ExperimentalStream({ target, onExit }: { target: string;
         sendKeepalive: () => Ipc.send('streaming', 'sendKeepalive', { sessionId: session }),
     }), [session, id, cloud, settings.preferred_game_language])
     return <section className="gl-experimental-stream">
-        {session && state !== 'Error' && <SharedPlayer communicationHandler={adapter} onStatusChanged={setState} useWebGpu={false} autoGamepad vibration={settings.controller_vibration} />}
-        <div className="gl-experimental-controls"><span>{t('dashboard.experimentalPlayer')} · {state}</span><button type="button" className="btn" onClick={() => { if (document.fullscreenElement) void document.exitFullscreen(); else void document.documentElement.requestFullscreen() }}>{t('dashboard.fullscreen')}</button><button type="button" className="btn btn-cancel" onClick={onExit}>{t('streamWindow.endStreamBtn')}</button></div>
+        {session && state !== 'Error' && <SharedPlayer communicationHandler={adapter} onStatusChanged={setState} useWebGpu={false} autoGamepad vibration={settings.controller_vibration} videoBitrate={cloud ? settings.xcloud_bitrate : settings.xhome_bitrate} showStats={hud} volume={volume} muted={muted} />}
+        <div className="gl-experimental-controls"><span>{t('dashboard.experimentalPlayer')} · {state}</span><button type="button" className="btn" aria-pressed={hud} onClick={() => setHud(value => !value)}>{t('dashboard.performanceHud')}</button><button type="button" className="btn" aria-pressed={muted} onClick={() => setMuted(value => !value)}>{t('dashboard.muteAudio')}</button><input type="range" min="0" max="1" step="0.01" aria-label={t('dashboard.volume')} value={volume} onChange={e => setVolume(Number(e.target.value))} /><button type="button" className="btn" onClick={() => { if (document.fullscreenElement) void document.exitFullscreen(); else void document.documentElement.requestFullscreen() }}>{t('dashboard.fullscreen')}</button><button type="button" className="btn btn-cancel" onClick={onExit}>{t('streamWindow.endStreamBtn')}</button></div>
         {state === 'Error' && <div className="gl-experimental-error" role="alert">{t('dashboard.experimentalFailed')} <button className="btn" onClick={onExit}>{t('dashboard.backHint')}</button></div>}
     </section>
 }

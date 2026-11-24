@@ -27,8 +27,10 @@ export default class Sdp {
     //     }
     // }
 
-    setLocalSDP(sdp:RTCSessionDescriptionInit) {
-        console.log('[SDP] setLocalSDP() Setting local SDP:', sdp)
+    setLocalSDP(sdp:RTCSessionDescriptionInit, bitrate = 0) {
+        if (sdp.sdp && Number.isFinite(bitrate) && bitrate > 0) {
+            sdp.sdp = this._setBitrate(sdp.sdp, 'video', Math.min(40960, Math.floor(bitrate)))
+        }
 
         // if(this._player._config.video_bitrate > 0){
         //     console.log('[SDP] Set max video bitrate to:', this._player._config.video_bitrate, 'kbps')
@@ -51,7 +53,6 @@ export default class Sdp {
     }
 
     setRemoteSDP(sdp:string) {
-        console.log('[SDP] setRemoteSDP() Setting remote SDP:', sdp)
         return sdp
     }
 
@@ -94,34 +95,16 @@ export default class Sdp {
         return codecOrder
     }
 
-    _setBitrate(sdp, media, bitrate) {
-        const lines = sdp.split('\n')
-        let line = -1
-        for(let i=0; i < lines.length; i++) {
-            if(lines[i].indexOf('m='+media) === 0) {
-                line = i
-                break
-            }
-        }
-        if (line === -1) {
-            console.debug('Could not find the m line for', media)
-            return sdp
-        }
-        line++
-
-        while(lines[line].indexOf('i=') === 0 || lines[line].indexOf('c=') === 0) {
-            line++
-        }
-       
-        if (lines[line].indexOf('b') === 0) {
-            lines[line] = 'b=AS:'+bitrate
-            return lines.join('\n')
-        }
-        
-        let newLines = lines.slice(0, line)
-        newLines.push('b=AS:'+bitrate)
-        newLines = newLines.concat(lines.slice(line, lines.length))
-
-        return newLines.join('\n')
+    _setBitrate(sdp: string, media: string, bitrate: number) {
+        const lines = sdp.split(/\r?\n/)
+        const start = lines.findIndex(line => line.startsWith('m=' + media + ' '))
+        if (start < 0) return sdp
+        let end = start + 1
+        while (end < lines.length && !lines[end].startsWith('m=')) end++
+        const section = lines.slice(start, end).filter(line => !/^b=(AS|TIAS):/.test(line))
+        let insert = 1
+        while (insert < section.length && /^(i|c)=/.test(section[insert])) insert++
+        section.splice(insert, 0, 'b=AS:' + bitrate)
+        return [...lines.slice(0, start), ...section, ...lines.slice(end)].join('\r\n')
     }
 }
