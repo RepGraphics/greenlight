@@ -14,11 +14,11 @@ export default class WebsocketIPC {
     }
 
     private failPending() {
-        for (const [id, request] of this.pending) {
+        this.pending.forEach((request) => {
             clearTimeout(request.timer)
             request.reject(new Error('WebUI connection closed'))
-            this.pending.delete(id)
-        }
+        })
+        this.pending.clear()
     }
 
     send(channel: string, action: string, data: any) {
@@ -66,8 +66,8 @@ export default class WebsocketIPC {
             else request.resolve(message.data)
             return
         }
-        for (const [listener, filter] of this.listeners) {
+        this.listeners.forEach((filter, listener) => {
             if (filter.channel === message.channel && (!filter.action || filter.action === message.action)) listener(message, message.data)
-        }
+        })
     }
 }
