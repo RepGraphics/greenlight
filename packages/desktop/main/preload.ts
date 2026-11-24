@@ -59,7 +59,10 @@ export const Preload = {
     },
 
     openExternal(url:string){
-        shell.openExternal(url)
+        try {
+            const parsed = new URL(url)
+            if (parsed.protocol === 'https:' || parsed.protocol === 'http:') void shell.openExternal(parsed.href)
+        } catch { /* Ignore invalid external links. */ }
     },
 
     getVersion(){

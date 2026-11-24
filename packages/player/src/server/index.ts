@@ -71,9 +71,7 @@ export const sendSDPOffer = async (xStreamToken:xStreamToken, xCloudStreamConfig
         },
     }))
 
-    // @TODO: Await for 200 status?
-    const sdpResponse = await httpGet<SDPResponse>(xStreamToken, xCloudStreamConfig, '/'+sessionPath+'/sdp')
-    return sdpResponse
+    return await pollExchange<SDPResponse>(xStreamToken, xCloudStreamConfig, '/'+sessionPath+'/sdp')
 }
 
 export const sendICECandidates = async (xStreamToken:xStreamToken, xCloudStreamConfig:xCloudStreamConfig, sessionPath:string, candidates:Array<any>) => {
@@ -81,17 +79,14 @@ export const sendICECandidates = async (xStreamToken:xStreamToken, xCloudStreamC
         candidates: candidates
     }))
 
-    let iceResponse = await httpGet<any>(xStreamToken, xCloudStreamConfig, '/'+sessionPath+'/ice')
-    while(iceResponse.status && iceResponse.status === 204){
-        iceResponse = await httpGet<any>(xStreamToken, xCloudStreamConfig, '/'+sessionPath+'/ice')
-    }
-    return iceResponse
+    return await pollExchange<any>(xStreamToken, xCloudStreamConfig, '/'+sessionPath+'/ice')
 }
 
 export const sendMsalToken = async (xStreamToken:xStreamToken, xCloudStreamConfig:xCloudStreamConfig, sessionPath:string, userRefreshToken:string) => {
     // Fetch token server sided
     const tokenData = await fetch('https://login.live.com/oauth20_token.srf', {
       method: 'POST',
+      signal: AbortSignal.timeout(15000),
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
@@ -102,7 +97,9 @@ export const sendMsalToken = async (xStreamToken:xStreamToken, xCloudStreamConfi
         refresh_token: userRefreshToken,
       }),
     })
+    if (!tokenData.ok) throw new Error('Unable to retrieve console transfer token');
     const token = await tokenData.json();
+    if (typeof token.access_token !== 'string') throw new Error('Invalid console transfer token');
 
     return await httpPost<StatusResponse>(xStreamToken, xCloudStreamConfig, '/'+sessionPath+'/connect', JSON.stringify({
         userToken: token.access_token
@@ -113,6 +110,16 @@ export const sendKeepalive = async (xStreamToken:xStreamToken, xCloudStreamConfi
     return await httpPost<StatusResponse>(xStreamToken, xCloudStreamConfig, '/'+sessionPath+'/keepalive', JSON.stringify({}))
 }
 
+async function pollExchange<T>(token: xStreamToken, config: xCloudStreamConfig, url: string) {
+    const deadline = Date.now() + 45000
+    do {
+        const response = await httpGet<T>(token, config, url)
+        if ((response as StatusResponse)?.status !== 204) return response
+        await new Promise(resolve => setTimeout(resolve, 750))
+    } while (Date.now() < deadline)
+    throw new Error('Streaming handshake timed out')
+}
+
 const httpGet = <T>(xStreamToken:xStreamToken, xCloudStreamConfig:xCloudStreamConfig, url:string, headers = {}) => {
     return new Promise<T | StatusResponse | ErrorResponse>((resolve, reject) => {
         const deviceInfo = getDeviceInfo(xCloudStreamConfig)
@@ -120,6 +127,7 @@ const httpGet = <T>(xStreamToken:xStreamToken, xCloudStreamConfig:xCloudStreamCo
         try {
             fetch(xCloudStreamConfig.host+url, {
                 method: 'GET',
+                signal: AbortSignal.timeout(15000),
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',
@@ -142,12 +150,12 @@ const httpGet = <T>(xStreamToken:xStreamToken, xCloudStreamConfig:xCloudStreamCo
                 } else {
                     reject({
                         error: {
-                            satus: response.status,
+                            status: response.status,
                             data: response
                         }
                     } as ErrorResponse)
                 }
-            })
+            }).catch(reject)
         } catch (error) {
             reject({ error: error } as ErrorResponse)
         }
@@ -161,6 +169,7 @@ const httpPost = <T>(xStreamToken:xStreamToken, xCloudStreamConfig:xCloudStreamC
         try {
             fetch(xCloudStreamConfig.host+url, {
                 method: 'POST',
+                signal: AbortSignal.timeout(15000),
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',
@@ -184,12 +193,12 @@ const httpPost = <T>(xStreamToken:xStreamToken, xCloudStreamConfig:xCloudStreamC
                 } else {
                     reject({
                         error: {
-                            satus: response.status,
+                            status: response.status,
                             data: response.body
                         }
                     } as ErrorResponse)
                 }
-            })
+            }).catch(reject)
         } catch (error) {
             reject({ error: error } as ErrorResponse)
         }

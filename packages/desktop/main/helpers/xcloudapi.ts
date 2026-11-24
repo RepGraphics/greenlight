@@ -37,7 +37,7 @@ export default class xCloudApi {
         this._type = type
     }
 
-    get(url: string, method = 'GET') {
+    get(url: string, method = 'GET', deadline = Date.now() + 45000) {
         return new Promise((resolve, reject) => {
             let responseData = ''
 
@@ -64,10 +64,11 @@ export default class xCloudApi {
                             // Data is not JSON..
                         }
 
-                        if(response.statusCode === 204){
+                        if(response.statusCode === 204 && method === 'GET' && /\/(sdp|ice)$/.test(url)){
+                            if (Date.now() + 750 >= deadline) { reject(new Error('Streaming handshake timed out')); return }
                             // We have to retry..
                             setTimeout(() => {
-                                this.get(url, method).then((result) => {
+                                this.get(url, method, deadline).then((result) => {
                                     resolve(result)
 
                                 }).catch((error) => {
@@ -75,7 +76,7 @@ export default class xCloudApi {
                                 })
                             }, 750)
                         } else {
-                            resolve(returnData)
+                            resolve(response.statusCode === 204 ? {} : returnData)
                         }
                     } else {
                         this._application.log('xCloudApi', 'get('+url+') reject:', response.statusCode)
@@ -88,6 +89,7 @@ export default class xCloudApi {
                 })
             })
 
+            req.setTimeout(15000, () => req.destroy(new Error('Xbox API request timed out')))
             req.on('error', (error) => {
                 reject(error)
             })
@@ -116,7 +118,7 @@ export default class xCloudApi {
 
                 response.on('end', () => {
                     if(response.statusCode >= 200 && response.statusCode <= 299){
-                        this._application.log('xCloudApi', 'post('+url+') resolve:', response.statusCode, responseData)
+                        this._application.log('xCloudApi', 'post('+url+') resolve:', response.statusCode)
 
                         let returnData = responseData
                         try {
@@ -265,7 +267,9 @@ export default class xCloudApi {
             this.post('/v5/sessions/'+this._type+'/'+sessionId+'/sdp', postData).then(() => {
 
                 this.get('/v5/sessions/'+this._type+'/'+sessionId+'/sdp').then((sdpResult:exchangeResult) => {
+                    if (typeof sdpResult?.exchangeResponse !== 'string') throw new Error('Invalid SDP response')
                     const exchangeSdp = JSON.parse(sdpResult.exchangeResponse)
+                    if (typeof exchangeSdp?.sdp !== 'string') throw new Error('Missing SDP answer')
                     
                     resolve(exchangeSdp)
 
@@ -292,7 +296,9 @@ export default class xCloudApi {
             this.post('/v5/sessions/'+this._type+'/'+sessionId+'/sdp', postData).then(() => {
 
                 this.get('/v5/sessions/'+this._type+'/'+sessionId+'/sdp').then((sdpResult:exchangeResult) => {
+                    if (typeof sdpResult?.exchangeResponse !== 'string') throw new Error('Invalid SDP response')
                     const exchangeSdp = JSON.parse(sdpResult.exchangeResponse)
+                    if (typeof exchangeSdp?.sdp !== 'string') throw new Error('Missing SDP answer')
                     
                     resolve(exchangeSdp)
 
@@ -316,12 +322,15 @@ export default class xCloudApi {
             this.post('/v5/sessions/'+this._type+'/'+sessionId+'/ice', postData).then(() => {
 
                 this.get('/v5/sessions/'+this._type+'/'+sessionId+'/ice').then((iceResult:exchangeResult) => {
+                    if (typeof iceResult?.exchangeResponse !== 'string') throw new Error('Invalid ICE response')
                     const exchangeIce = JSON.parse(iceResult.exchangeResponse)
+                    if (!Array.isArray(exchangeIce)) throw new Error('Invalid ICE candidates')
 
                     const computedCandidates = []
 
                     // Find Teredo Address and extract remote ip
                     for(const candidate in exchangeIce){
+                        if (typeof exchangeIce[candidate]?.candidate !== 'string') continue
                         const candidateAddress = exchangeIce[candidate].candidate.split(' ')
                         
                         if(candidateAddress.length > 4 && candidateAddress[4].substr(0, 4) === '2001'){
