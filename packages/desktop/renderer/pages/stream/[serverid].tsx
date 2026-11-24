@@ -28,6 +28,8 @@ function LegacyStream() {
 
     const [xPlayer, setxPlayer] = React.useState(undefined)
     const [sessionId, setSessionId] = React.useState('')
+    const [connectionError,setConnectionError]=React.useState('')
+    const intentionalExit=React.useRef(false)
     const [queueTime, setQueueTime] = React.useState(0)
     const activeSession = React.useRef('')
     React.useEffect(() => {
@@ -42,6 +44,14 @@ function LegacyStream() {
         if (!router.isReady || typeof router.query.serverid !== 'string') return
         let cancelled = false
         let polling = false
+        let heartbeatBusy=false
+        let heartbeatFailures=0
+        let heartbeatStarted=false
+        const heartbeat=async()=>{
+            if(cancelled||heartbeatBusy||intentionalExit.current)return
+            heartbeatBusy=true
+            try{await Ipc.send('streaming','sendKeepalive',{sessionId});heartbeatFailures=0}catch(error){if(!cancelled){heartbeatFailures++;console.warn('Classic keepalive failed',heartbeatFailures,error);if(heartbeatFailures>=3)setConnectionError('keepalive')}}finally{heartbeatBusy=false;if(!cancelled&&!intentionalExit.current)keepaliveInterval.current=setTimeout(heartbeat,heartbeatFailures?5000:20000)}
+        }
         // Detect stream type and title / server id
         let streamType = 'home'
         let serverId = router.query.serverid
@@ -143,17 +153,7 @@ function LegacyStream() {
                             xPlayer._videoComponent._videoRender.style.opacity = 0
                         }
 
-                        // Start keepalive loop
-                        if (keepaliveInterval.current) clearInterval(keepaliveInterval.current)
-                        keepaliveInterval.current = setInterval(() => {
-                            Ipc.send('streaming', 'sendKeepalive', {
-                                sessionId: sessionId,
-                            }).then((result) => {
-                                console.log('StartStream keepalive:', result)
-                            }).catch((error) => {
-                                console.error('Failed to send keepalive. Error details:\n'+JSON.stringify(error))
-                            })
-                        }, 30000) // Send every 30 seconds
+                        if(!heartbeatStarted){heartbeatStarted=true;void heartbeat()}
 
                     } else if(event.state === 'new'){
                         connStatus.innerText = t('streamWindow.startingConnection')
@@ -165,7 +165,8 @@ function LegacyStream() {
                         // Client has been disconnected. Lets return to home.
                         // xPlayer.close()
                         console.log('Client has been disconnected. Returning to prev page.')
-                        window.history.back()
+                        if(intentionalExit.current){void router.replace('/home');return}
+                        setConnectionError('closed')
                     }
                 }
             })
@@ -274,6 +275,7 @@ function LegacyStream() {
     }
 
     function onDisconnect(){
+        intentionalExit.current=true
         if (!sessionId) { void router.replace('/home'); return }
         activeSession.current = ''
         Ipc.send('streaming', 'stopStream', {
@@ -293,7 +295,8 @@ function LegacyStream() {
                 <title>Greenlight - {t('streamWindow.pageTitle')} {router.query.serverid}</title>
             </Head>
 
-            { (xPlayer !== undefined) ? <StreamComponent onDisconnect={ () => {
+            {connectionError && <div className='gl-experimental-error' role='alert'><p>{t('dashboard.classicConnectionLost')}</p><p>{t('dashboard.classicFailure_'+connectionError)}</p><button className='btn btn-primary' onClick={()=>{onDisconnect();void router.replace('/home')}}>{t('dashboard.backHint')}</button></div>}
+            { (xPlayer !== undefined) ? <StreamComponent onLeave={()=>{intentionalExit.current=true;activeSession.current='';void router.replace('/home')}} onDisconnect={ () => {
                 onDisconnect()
             }} onMenu={ consoleController ? undefined : () => {
                 gamepadSend('nexus')

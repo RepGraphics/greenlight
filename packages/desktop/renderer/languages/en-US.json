@@ -522,7 +522,10 @@
       "diagnosticsImportFailed": "Unable to read this diagnostic report. Select a supported Greenlight V3 JSON export.",
       "diagnosticAttempt": "Streaming attempt",
       "diagnosticSamples": "Valid samples",
-      "diagnosticLoss": "Packets lost during sample window"
+      "diagnosticLoss": "Packets lost during sample window",
+      "classicConnectionLost": "Classic stream connection interrupted",
+      "classicFailure_closed": "The streaming input channel closed unexpectedly. Return to the dashboard and reconnect.",
+      "classicFailure_keepalive": "Three consecutive session keepalive requests failed. Return to the dashboard and reconnect."
     }
   }
 }

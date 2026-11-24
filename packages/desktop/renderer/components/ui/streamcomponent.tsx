@@ -11,12 +11,14 @@ import { useTranslation } from 'react-i18next'
 
 interface StreamComponentProps {
     onDisconnect?: () => void;
+    onLeave?: () => void;
     onMenu?: () => void;
     xPlayer: xPlayer;
 }
 
 function StreamComponent({
     onDisconnect,
+    onLeave,
     onMenu,
     xPlayer,
 }: StreamComponentProps) {
@@ -339,6 +341,7 @@ function StreamComponent({
     }
 
     function streamDisconnect() {
+        onLeave?.()
         document.getElementById('streamComponentHolder').innerHTML = ''
 
         xPlayer.close()

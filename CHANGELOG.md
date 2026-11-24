@@ -35,6 +35,8 @@ Changes on `main-v2` are development changes, not a new numbered release. See [c
 
 ### Changed / fixed
 
+- Classic sends an immediate non-overlapping keepalive, retries failed requests and shows unexpected channel closures instead of silently navigating away. Explicit disconnect preserves the remote session.
+
 - Classic Remote Play now honours console-paired controller mode, preventing virtual controller registration while preserving frame acknowledgements.
 
 - Electron build entry point and packaging checks.
