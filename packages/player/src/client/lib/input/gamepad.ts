@@ -314,7 +314,7 @@ export default class Gamepad {
         if (this.neutralPending) { this.neutralPending = false; return { ...this.getDefaultFamepadFrame(), GamepadIndex: this._index } }
         if (!this._isFocused) return undefined
         const gamepad = this.getGamepad(this._physicalGamepadId)
-        if((this._physicalGamepadId < 0 || gamepad === undefined || this._isFocused === false) && (this.hasOverrideButtons() === false)){
+        if((this._physicalGamepadId < 0 || gamepad === undefined) && (this.hasOverrideButtons() === false)){
             return undefined
         }
 
