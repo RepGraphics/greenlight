@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react'
 import Ipc from '../lib/ipc'
+import { portableSettings } from '../lib/settingsbackup'
 import { defaultSettings } from './userContext.defaults'
 
 export const SettingsContext = React.createContext({
@@ -22,24 +23,26 @@ export const UserProvider = ({ children }) => {
 
     useEffect(() => {
 
-        const localSettings = localStorage.getItem('settings')
+        let localSettings: string | null = null
+        try { localSettings = localStorage.getItem('settings') } catch { /* storage unavailable */ }
         if(localSettings !== null) {
             // We have a local settings item. Lets migrate to backend.
             console.log('Settings found in localStorage. Migrating to backend:', localSettings)
-            const migSetting = JSON.parse(localSettings)
+            let migSetting = {}
+            try { migSetting = portableSettings(JSON.parse(localSettings)) } catch { /* corrupt legacy settings */ }
             Ipc.send('settings', 'setSettings', migSetting).then(() => {
                 console.log('Settings migrated. Removing from localStorage and loading from backend')
                 localStorage.removeItem('settings')
                 Ipc.send('settings', 'getSettings').then((settings) => {
-                    setSettings(settings)
+                    setSettings({...defaultSettings,...settings})
                 }).catch((error) => {
                     console.log('Failed to migrate settings. Error:', error)
                 })
             })
         } else {
             Ipc.send('settings', 'getSettings').then((settings) => {
-                setSettings(settings)
-            })
+                setSettings({...defaultSettings,...settings})
+            }).catch(() => {})
         }
         
     }, [])
