@@ -11,6 +11,8 @@ interface GamepadHandlers {
 }
 
 export default class ControlChannel extends Channel {
+    private authorizationRequested = false
+    private authorized = false
     _keyframeInterval
     _gamepadHandlers:GamepadHandlers = {
         0: undefined,
@@ -40,7 +42,12 @@ export default class ControlChannel extends Channel {
         this._gamepadHandlers[3]?.detach()
     }
 
+    onOpen() { if (this.authorizationRequested) this.sendAuthorization() }
+
     sendAuthorization(){
+        this.authorizationRequested = true
+        if (!this.isOpen() || this.authorized) return
+        this.authorized = true
         const authRequest = JSON.stringify({
             'message':'authorizationRequest',
             'accessKey':'4BDB3609-C1F1-4195-9B37-FEFF45DA8B8E',
@@ -48,8 +55,8 @@ export default class ControlChannel extends Channel {
 
         this.send(authRequest)
 
-        this.sendGamepadState(0, true)
-        this.sendGamepadState(0, false)
+        if (!this._gamepadHandlers[0]) { this.sendGamepadState(0, true); this.sendGamepadState(0, false) }
+        for (const index of [0,1,2,3]) if (this._gamepadHandlers[index]) this.sendGamepadState(index, true)
 
         // if(this.getPlayer()._config.keyframe_interval > 0) {
         //     this._keyframeInterval = setInterval(() => {
@@ -62,7 +69,7 @@ export default class ControlChannel extends Channel {
        
         if(wasAdded === true){
             if(handler !== undefined){
-                if(this._gamepadHandlers[gamepadIndex] !== undefined){
+                if(this._gamepadHandlers[gamepadIndex] !== undefined && this._gamepadHandlers[gamepadIndex] !== handler){
                     this._gamepadHandlers[gamepadIndex]?.detach()
                 }
                 this._gamepadHandlers[gamepadIndex] = handler
@@ -71,6 +78,7 @@ export default class ControlChannel extends Channel {
             this._gamepadHandlers[gamepadIndex] = undefined
         }
 
+        if (!this.authorized) return
         const gamepadRequest = JSON.stringify({
             'message': 'gamepadChanged',
             'gamepadIndex': gamepadIndex,

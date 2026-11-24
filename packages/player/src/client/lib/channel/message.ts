@@ -29,11 +29,14 @@ export default class MessageChannel extends Channel {
     }
 
     onMessage(event: MessageEvent<any>) {
-        const data = JSON.parse(event.data)
+        let data: any
+        try { data = JSON.parse(typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data)) } catch { return }
+        if (!data || typeof data.type !== 'string') return
         // console.log('[MessageChannel] received:', data)
 
         switch(data.type){
             case 'HandshakeAck':
+                if (this._handshakeCompleted) return
                 console.log('[MessageChannel] Handshake completed')
                 this._handshakeCompleted = true
                 // Start control & input channels

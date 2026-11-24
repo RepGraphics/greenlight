@@ -18,6 +18,8 @@ export interface VibrationFrame {
 export default class InputChannel extends Channel {
     private loopTimer: ReturnType<typeof setTimeout> | undefined
     private stopped = false
+    private startRequested = false
+    private started = false
     private _serverVideoWidth = 0
     private _serverVideoHeight = 0
 
@@ -42,7 +44,12 @@ export default class InputChannel extends Channel {
         return this._serverVideoHeight
     }
 
+    onOpen() { if (this.startRequested) this.start() }
+
     start(){
+        this.startRequested = true
+        if (this.stopped || this.started || !this.isOpen()) return
+        this.started = true
         const Packet = new InputPacket(0)
         Packet.setMetadata(navigator.maxTouchPoints > 1 ? navigator.maxTouchPoints : 1)
         this.send(Packet.toBuffer())
@@ -54,12 +61,14 @@ export default class InputChannel extends Channel {
     }
 
     onMessage(event: MessageEvent<any>) {
+        if (!(event.data instanceof ArrayBuffer) || event.data.byteLength < 1) return
         const dataView = new DataView(event.data)
         const reportType = dataView.getUint8(0)
 
         console.log('[InputChannel] received:', dataView)
 
         if(reportType === ReportTypes.Vibration){
+            if (dataView.byteLength < 13) return
             console.log('Received a vibration report')
             dataView.getUint8(2) // rumbleType: 0 = FourMotorRumble
             const gamepadIndex = dataView.getUint8(3)
@@ -92,6 +101,7 @@ export default class InputChannel extends Channel {
             }
 
         } else if(reportType === ReportTypes.ServerMetadata){
+            if (dataView.byteLength < 10) return
             console.log('[InputChannel] Received server video dimensions:', dataView.getUint32(2, true), dataView.getUint32(6, true))
             this._serverVideoHeight = dataView.getUint32(2, true)
             this._serverVideoWidth = dataView.getUint32(6, true)
@@ -117,7 +127,7 @@ export default class InputChannel extends Channel {
             this.queueGamepadFrames(gamepadFrames)
         }
 
-        setTimeout(this.gamepadStateLoop.bind(this), 16)
+        if (!this.stopped) this.loopTimer = setTimeout(this.gamepadStateLoop.bind(this), 16)
     }
 
     queueMetadataFrame(data:MetadataFrame){
@@ -143,5 +153,6 @@ export default class InputChannel extends Channel {
     destroy() {
         this.stopped = true
         clearTimeout(this.loopTimer)
+        this._inputQueue.clearQueues()
     }
 }

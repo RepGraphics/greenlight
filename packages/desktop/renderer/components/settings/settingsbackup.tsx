@@ -24,7 +24,7 @@ export default function SettingsBackup() {
         try {
             const updated = {...settings,...pending}
             await Ipc.send('settings','setSettings',updated)
-            setSettings(updated)
+            setSettings(updated, false)
             setPending(null); setStatus('backupRestored')
         } catch { setStatus('backupFailed') }
         finally { setBusy(false) }

@@ -47,6 +47,8 @@ export default class Channel {
         console.log(this.getChannelName(), 'Error channel:', event)
     }
 
+    isOpen() { return this._dataChannel.readyState === 'open' }
+
     send(data:any) {
         if(this._dataChannel.readyState !== 'open'){
             console.log('['+this.getChannelName()+'] Tried to send data while channel is not open. readyState is:', this._dataChannel.readyState)
@@ -57,7 +59,7 @@ export default class Channel {
             data = (new TextEncoder).encode(data)
         }
         
-        return this._dataChannel.send(data)
+        try { return this._dataChannel.send(data) } catch { return }
     }
 
     getPlayer(){
