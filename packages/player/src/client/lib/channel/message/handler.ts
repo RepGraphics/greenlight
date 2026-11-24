@@ -1,4 +1,4 @@
-import Channel from '../../lib/channel'
+import Channel from '../channel'
 
 export default class MessageHandler {
     private _channel:Channel
