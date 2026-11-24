@@ -13,7 +13,7 @@ import AudioComponent from './render/audio'
 
 export default class xCloudPlayer {
 
-    _peerConnection = new RTCPeerConnection({})
+    _peerConnection = new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]})
     _channels = {
         input: new InputChannel(this),
         chat: new ChatChannel(this),

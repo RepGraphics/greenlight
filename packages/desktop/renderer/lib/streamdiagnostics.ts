@@ -3,7 +3,7 @@ import type { StreamMetrics } from '../../../player/src/client/index'
 export type DiagnosticSample = StreamMetrics & { elapsedSeconds: number }
 export function sanitizeSample(metrics: StreamMetrics, elapsedSeconds: number): DiagnosticSample {
     const number = (value: number) => Number.isFinite(value) ? Math.max(0, Math.round(value * 100) / 100) : 0
-    return { elapsedSeconds: number(elapsedSeconds), width: number(metrics.width), height: number(metrics.height), fps: number(metrics.fps), bitrate: number(metrics.bitrate), jitter: number(metrics.jitter), loss: number(metrics.loss), rtt: number(metrics.rtt), ...(typeof metrics.statsFresh==='boolean'?{statsFresh:metrics.statsFresh,statsAgeMs:number(metrics.statsAgeMs??0)}:{}) }
+    return { elapsedSeconds: number(elapsedSeconds), width: number(metrics.width), height: number(metrics.height), fps: number(metrics.fps), bitrate: number(metrics.bitrate), jitter: number(metrics.jitter), loss: number(metrics.loss), rtt: number(metrics.rtt), ...(typeof metrics.statsFresh==='boolean'?{statsFresh:metrics.statsFresh,statsAgeMs:number(metrics.statsAgeMs??0)}:{}), ...(typeof metrics.peerState==='string'&&['new','connecting','connected','disconnected','failed','closed'].includes(metrics.peerState)?{peerState:metrics.peerState}:{}), ...(typeof metrics.iceState==='string'&&['new','checking','connected','completed','disconnected','failed','closed'].includes(metrics.iceState)?{iceState:metrics.iceState}:{}), ...(typeof metrics.signalingState==='string'&&['stable','have-local-offer','have-remote-offer','have-local-pranswer','have-remote-pranswer','closed'].includes(metrics.signalingState)?{signalingState:metrics.signalingState}:{}) }
 }
 
 export function summarizeDiagnostics(samples: DiagnosticSample[]) {
@@ -20,8 +20,8 @@ export function summarizeDiagnostics(samples: DiagnosticSample[]) {
     return { sampleCount:valid.length, averageFps:mean(valid.map(sample => sample.fps)), averageBitrate:mean(valid.map(sample => sample.bitrate).filter(value => value > 0)), rtt95, jitter95, packetsLostDuringWindow:loss, quality }
 }
 
-export function downloadDiagnostics(samples: DiagnosticSample[], type: 'cloud' | 'home', state: string, renderer: string) {
-    const report = { schema: 3, summary: summarizeDiagnostics(samples), engine: 'v3', type, renderer: renderer === 'webgpu' ? 'webgpu' : 'video', state, units: { bitrate: 'Mbps', jitter: 'ms', rtt: 'ms', loss: 'cumulative packets' }, samples }
+export function downloadDiagnostics(samples: DiagnosticSample[], type: 'cloud' | 'home', state: string, renderer: string, previousAttempts: Array<{state:string;reason:string;samples:DiagnosticSample[]}>=[], failureReason='') {
+    const report = { schema: 4, previousAttempts, failureReason, summary: summarizeDiagnostics(samples), engine: 'v3', type, renderer: renderer === 'webgpu' ? 'webgpu' : 'video', state, units: { bitrate: 'Mbps', jitter: 'ms', rtt: 'ms', loss: 'cumulative packets' }, samples }
     const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }))
     const link = document.createElement('a')
     link.href = url

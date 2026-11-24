@@ -14,7 +14,7 @@ import Touch from './lib/input/touch';
 
 // export { Gamepad, MouseKeyboard, Touch };
 
-export interface StreamMetrics { width: number; height: number; fps: number; bitrate: number; jitter: number; loss: number; rtt: number; statsAgeMs?:number; statsFresh?:boolean }
+export interface StreamMetrics { width: number; height: number; fps: number; bitrate: number; jitter: number; loss: number; rtt: number; statsAgeMs?:number; statsFresh?:boolean; peerState?:string; iceState?:string; signalingState?:string }
 
 export interface StreamPlayerProps {
     onStatusChanged: (newStatus: string) => void;
@@ -141,7 +141,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                     const stats = player.getStats();
                     const age=stats.lastStatsAt?performance.now()-stats.lastStatsAt:0;
                     const fresh=stats.lastStatsAt>0&&age<5000;
-                    const next = { width: stats._videoWidth, height: stats._videoHeight, fps: fresh?stats._videoFps:0, bitrate: fresh?stats._bitrate:0, jitter: fresh?stats._jitter:0, loss: stats._packetsLost, rtt: fresh?stats._rtt * 1000:0, statsAgeMs:age, statsFresh:fresh };
+                    const next = { width: stats._videoWidth, height: stats._videoHeight, fps: fresh?stats._videoFps:0, bitrate: fresh?stats._bitrate:0, jitter: fresh?stats._jitter:0, loss: stats._packetsLost, rtt: fresh?stats._rtt * 1000:0, statsAgeMs:age, statsFresh:fresh, peerState:player._peerConnection.connectionState, iceState:player._peerConnection.iceConnectionState, signalingState:player._peerConnection.signalingState };
                     if (showStats) setMetrics(next);
                     metricsCallback.current?.(next);
                 }
