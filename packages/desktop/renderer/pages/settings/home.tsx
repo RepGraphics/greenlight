@@ -54,7 +54,7 @@ function SettingsHome() {
                             marginLeft: 20,
                             marginRight: 40,
                         }}>
-                            <Image src={ user.gamerpic } alt={ user.gamertag } width='100' height='100' className="component_auth_profile_gamerpic_img" />
+                            {user.gamerpic ? <Image src={ user.gamerpic } alt={ user.gamertag || 'Xbox profile' } width='100' height='100' className="component_auth_profile_gamerpic_img" /> : <i className='fa-solid fa-user' aria-hidden='true' />}
                         </div>
 
                         <div className="component_auth_profile_userdetails">
@@ -62,7 +62,7 @@ function SettingsHome() {
                             <p>
                                 {t('settings.about.gamerscore')}: { user.gamerscore }
                             </p>
-                            <Button label={t('settings.about.logout')} className='btn' disabled={(window.Greenlight.isWebUI() === false) ? false : true } onClick={ () => {
+                            <Button label={t('settings.about.logout')} className='btn' disabled={(typeof window !== 'undefined' && window.Greenlight?.isWebUI() === false) ? false : true } onClick={ () => {
                                 logout()
                             } }></Button>
                         </div>
@@ -79,10 +79,10 @@ function SettingsHome() {
 
                         <h2>Greenlight</h2>
                         <p>
-                            {t('settings.about.version')}: { window.Greenlight.getVersion() }<br /><br />
+                            {t('settings.about.version')}: { typeof window !== 'undefined' ? window.Greenlight?.getVersion() : '' }<br /><br />
                             <small>{t('settings.about.website')}: <Link href="#" title={t('settings.about.websiteLinkTitle')} onClick={ () => {
-                                window.Greenlight.openExternal('https://github.com/unknownskl/greenlight')
-                            }}>github.com/unknownskl/greenlight</Link></small><br />
+                                window.Greenlight.openExternal('https://github.com/RepGraphics/greenlight')
+                            }}>github.com/RepGraphics/greenlight</Link></small><br />
                             <small>{t('authorOfLocalization')}</small>
                         </p>
                     </div>

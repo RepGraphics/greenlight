@@ -5,7 +5,7 @@
   "author": "UnknownSKL <info+github@jimkroon.nl>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/unknownskl/greenlight.git"
+    "url": "git+https://github.com/RepGraphics/greenlight.git"
   },
   "scripts": {
     "desktop": "yarn workspace greenlight-desktop",
@@ -16,7 +16,6 @@
     "playground": "yarn workspace @greenlight/platform-playground",
     "player": "yarn workspace @greenlight/player",
     "pages": "yarn workspace @greenlight/pages",
-
     "build:depsv3": "yarn logger build && yarn player build && yarn platform build",
     "build:pages": "yarn build:depsv3 && yarn pages build",
     "deploy:pages": "yarn pages deploy",

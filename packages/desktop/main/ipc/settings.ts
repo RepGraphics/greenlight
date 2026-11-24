@@ -23,6 +23,10 @@ export default class IpcSettings extends IpcBase {
         })
     }
 
+    getWebUIAccessToken(){
+        return Promise.resolve(this._application._webUI.getAccessToken())
+    }
+
     getWebUIStatus(){
         return new Promise((resolve) => {
             resolve((this._application._webUI._express ? true : false))

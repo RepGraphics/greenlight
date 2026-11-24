@@ -3,6 +3,7 @@ import express from 'express'
 import expressWS from 'express-ws'
 import expressProxy from 'express-http-proxy'
 import path from 'path'
+import { randomBytes, timingSafeEqual } from 'node:crypto'
 import Ipc from './ipc'
 import { defaultSettings } from '../renderer/context/userContext.defaults'
 
@@ -12,6 +13,18 @@ export default class WebUI {
     _ws:expressWS
     _ipc:Ipc
     _server
+    private accessToken = randomBytes(32).toString('hex')
+
+    getAccessToken() { return this.accessToken }
+
+    private authorized(req) {
+        const header = req.headers.authorization || ''
+        if (!header.startsWith('Basic ')) return false
+        const credential = Buffer.from(header.slice(6), 'base64').toString('utf8')
+        const expected = Buffer.from('greenlight:' + this.accessToken)
+        const actual = Buffer.from(credential)
+        return expected.length === actual.length && timingSafeEqual(expected, actual)
+    }
 
     constructor(application:Application){
         this._application = application
@@ -30,6 +43,10 @@ export default class WebUI {
     }
 
     startServer(port:number = 3000){
+        if (this._server) return
+        port = Number(port)
+        if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Invalid WebUI port')
+        this.accessToken = randomBytes(32).toString('hex')
         this._application.log('webui', 'Starting webserver...')
         this._express = express()
         this._ws = expressWS(this._express)
@@ -39,6 +56,18 @@ export default class WebUI {
         //     this._ipc.onUserLoaded()
         // })
 
+        this._express.use((req, res, next) => {
+            res.setHeader('Cache-Control', 'no-store')
+            res.setHeader('X-Content-Type-Options', 'nosniff')
+            res.setHeader('Referrer-Policy', 'no-referrer')
+            if (!this.authorized(req)) {
+                res.setHeader('WWW-Authenticate', 'Basic realm="Greenlight WebUI", charset="UTF-8"')
+                res.status(401).send('Authentication required')
+                return
+            }
+            next()
+        })
+
         this._express.get('/', (req, res) => {
             // res.send('Hello World!')
             // res.sendFile(path.join(__dirname, "../app/", "home.html"));
@@ -47,8 +76,8 @@ export default class WebUI {
 
         this._express.ws('/ipc', (ws, req) => {
             // WebUI is local-only until an authenticated remote-access design exists.
-            const expectedOrigin = 'http://' + req.headers.host
-            if (req.headers.origin !== expectedOrigin) {
+            const origins = ['http://' + req.headers.host, 'https://' + req.headers.host]
+            if (!this.authorized(req) || !origins.includes(req.headers.origin || '')) {
                 ws.close(1008, 'Origin not allowed')
                 return
             }
@@ -90,13 +119,20 @@ export default class WebUI {
             this._application.log('webui', 'Webserver running on port:', port)
             console.log(`Webserver started on port: ${port}`)
         })
+        this._server.on('error', () => {
+            this._application.log('webui', 'Unable to bind WebUI port')
+            this._server = undefined
+            this._express = undefined
+        })
     }
 
     stopServer(){
         this._application.log('webui', 'Stopping webserver...')
         if(this._express){
             this._ws.getWss().clients.forEach(client => client.close(1001, 'Server stopped'))
-            this._server.close()
+            this._server?.close()
+            this._server = undefined
+            this.accessToken = randomBytes(32).toString('hex')
             delete this._express
         }
     }

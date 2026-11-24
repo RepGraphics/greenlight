@@ -7,7 +7,7 @@
   "main": "app/background.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/unknownskl/greenlight.git"
+    "url": "git+https://github.com/RepGraphics/greenlight.git"
   },
   "scripts": {
     "dev": "DEBUG=greenlight:* nextron",

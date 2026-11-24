@@ -13,7 +13,9 @@ export const UserProvider = ({ children }) => {
 
     function setSettingsAndSaveToLocalStorage(newSettings: any) {
         setSettings(newSettings)
-        Ipc.send('settings', 'setSettings', newSettings)
+        if (typeof window !== 'undefined' && window.Greenlight?.isWebUI() !== true) {
+            void Ipc.send('settings', 'setSettings', newSettings).catch(() => {})
+        }
 
         return newSettings
     }

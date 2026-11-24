@@ -12,7 +12,9 @@ files:
       - package.json
       - app
 publish:
-- github
+  - provider: github
+    owner: RepGraphics
+    repo: greenlight
 
 
 # Mac OS configuration
