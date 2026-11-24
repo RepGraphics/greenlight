@@ -308,7 +308,7 @@
       "searchFriends": "Search friends",
       "onlineOnly": "Online only",
       "noFriendsFound": "No friends match your filters.",
-      "pinControls": "Keep controls visible (F8)",
+      "pinControls": "Pin controls",
       "fullscreen": "Toggle fullscreen",
       "handheldMode": "Handheld layout",
       "handheldDescription": "Compact navigation, larger controls and more space for games. Automatic mode follows the window size.",
@@ -431,7 +431,18 @@
       "videoFilter_brightness": "Brightness",
       "videoFilter_contrast": "Contrast",
       "videoFilter_saturation": "Saturation",
-      "saveVideoDefaults": "Save as global defaults"
+      "saveVideoDefaults": "Save as global defaults",
+      "showStreamControls": "Show controls",
+      "exitFullscreen": "Exit fullscreen",
+      "confirmEndStream": "End this stream?",
+      "endStreamDescription": "The remote streaming session will be stopped. Your game may continue running on the console.",
+      "streamConnectingDescription": "Establishing the remote streaming connection.",
+      "streamState_Initializing": "Preparing session",
+      "streamState_Connecting": "Connecting",
+      "streamState_Negotiated": "Establishing media connection",
+      "streamState_Reconnecting": "Reconnecting",
+      "streamState_Connected": "Connected",
+      "streamState_Error": "Connection failed"
     }
   }
 }

@@ -160,6 +160,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             let instance: xCloudPlayer | undefined;
             let authSent = false;
             let failures = 0;
+            const provisioningStarted = Date.now();
             const current = handler.current;
             const status = (value: string) => { if (!disposed) setPlayerState(value) };
             const heartbeat = async () => {
@@ -210,6 +211,8 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             };
             const poll = async () => {
                 if (disposed) return;
+                // Bound provisioning stalls while allowing cloud queue time.
+                if (Date.now() - provisioningStarted > 30 * 60 * 1000) { status('Error'); return }
                 try {
                     const state = await current.getStreamStatus();
                     if (disposed) return;
@@ -232,7 +235,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 clearTimeout(connectionDeadline);
                 clearTimeout(disconnectDeadline);
                 releaseTouch(); controller.current = undefined;
-                inputs.current.forEach(input => input.detach());
+                inputs.current.forEach(input => { try { input.detach() } catch { /* continue cleanup */ } });
                 inputs.current = [];
                 instance?.destroy();
             };
