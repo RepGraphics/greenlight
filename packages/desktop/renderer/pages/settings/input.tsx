@@ -1,3 +1,5 @@
+import { validateShortcuts, assignShortcut, shortcutDefaults, shortcutKeys } from '../../lib/streamshortcuts'
+import type { StreamAction } from '../../lib/streamshortcuts'
 import React from 'react'
 import ControllerTest from '../../components/settings/controllertest'
 import { controllerPresets, readProfiles, snapshotProfile } from '../../lib/controllerprofiles'
@@ -236,6 +238,7 @@ function SettingsInput() {
 
                 <Card><h1>{t('dashboard.consoleController')}</h1><p>{t('dashboard.consoleControllerDescription')}</p><label><input type='checkbox' checked={settings.v3_console_controller} onChange={event=>setSettings({...settings,v3_console_controller:event.target.checked})}/> {t('dashboard.consoleController')}</label></Card>
                 <ControllerTest />
+                <Card hidden={settings.streaming_engine !== 'experimental'}><h1>{t('dashboard.streamShortcuts')}</h1><p>{t('dashboard.streamShortcutsHint')}</p>{(Object.keys(shortcutDefaults) as StreamAction[]).map(action=><p key={action}><label htmlFor={'stream-key-'+action}>{t('dashboard.shortcut_'+action)}</label><select id={'stream-key-'+action} value={validateShortcuts(settings.v3_stream_shortcuts)[action]} onChange={event=>setSettings({...settings,v3_stream_shortcuts:assignShortcut(settings.v3_stream_shortcuts,action,event.target.value)})}>{shortcutKeys.map(key=><option key={key} value={key}>{key||t('settings.input.disabledLabel')}</option>)}</select></p>)}<button className='btn' type='button' onClick={()=>setSettings({...settings,v3_stream_shortcuts:{...shortcutDefaults}})}>{t('dashboard.resetShortcuts')}</button></Card>
                 <Card hidden={settings.streaming_engine !== 'experimental'}>
                     <h1>{t('dashboard.advancedInput')}</h1>
                     <p><label htmlFor='v3-deadzone'>{t('dashboard.deadzone')}</label><input id='v3-deadzone' type='range' min='0' max='0.5' step='0.01' value={settings.v3_deadzone} onChange={e => setSettings({...settings, v3_deadzone:Number(e.target.value)})} /> {Math.round(settings.v3_deadzone*100)}%</p>

@@ -58,5 +58,14 @@
     "v3_console_controller": false,
     "xhome_resolution": 1080,
     "xcloud_resolution": 1080,
-    "v3_auto_reconnect": false
+    "v3_auto_reconnect": false,
+    "v3_stream_shortcuts": {
+        "controls": "F8",
+        "fullscreen": "",
+        "mute": "",
+        "hud": "",
+        "screenshot": "",
+        "recording": "",
+        "graphs": ""
+    }
 }

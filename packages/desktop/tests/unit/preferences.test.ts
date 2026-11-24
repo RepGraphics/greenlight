@@ -107,3 +107,6 @@ test('per-title and console resolution overrides accept supported display sizes 
     assert.equal(readConsoleProfiles([{consoleId:'console',resolution:'720'}])[0].resolution,null)
     assert.equal(readConsoleProfiles([{consoleId:'console'}])[0].resolution,null)
 })
+
+import { validateShortcuts, assignShortcut, shortcutAction } from '../../renderer/lib/streamshortcuts'
+test('stream shortcuts reject unsafe keys and resolve duplicates',()=>{assert.equal(validateShortcuts({controls:'Escape'}).controls,'F8');assert.equal(assignShortcut({},'mute','F8').controls,'');assert.equal(assignShortcut({},'mute','F8').mute,'F8');assert.equal(validateShortcuts({controls:'F8',mute:'F8'}).mute,'');const event={key:'F8',repeat:false,altKey:false,ctrlKey:false,metaKey:false,shiftKey:false,editable:false};assert.equal(shortcutAction({},event),'controls');assert.equal(shortcutAction({}, {...event,editable:true}),undefined);assert.equal(shortcutAction({}, {...event,repeat:true}),undefined)})
