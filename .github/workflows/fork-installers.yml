@@ -46,6 +46,8 @@ jobs:
         run: npm install --global yarn@1.22.22
       - name: Install dependencies
         run: yarn install --frozen-lockfile
+      - name: Run regression tests
+        run: yarn desktop test
       - name: Build renderer and main process
         run: yarn desktop build --no-pack
       - name: Package installer without publishing

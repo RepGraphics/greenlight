@@ -25,10 +25,11 @@ export default function ExperimentalStream({ target, onExit }: { target: string;
     const [showSummary, setShowSummary] = React.useState(false)
     const samples = React.useRef<DiagnosticSample[]>([])
     const started = React.useRef(0)
+    const sampleCount = React.useRef(0)
     const recordMetrics = React.useCallback((metrics: StreamMetrics) => {
         samples.current.push(sanitizeSample(metrics, (Date.now() - started.current) / 1000))
         if (samples.current.length > 300) samples.current.shift()
-        if (samples.current.length % 5 === 0) setSummary(summarizeDiagnostics(samples.current))
+        if (++sampleCount.current % 5 === 0) setSummary(summarizeDiagnostics(samples.current))
     }, [])
     const [attempt, setAttempt] = React.useState(0)
     const [session, setSession] = React.useState('')
@@ -46,7 +47,7 @@ export default function ExperimentalStream({ target, onExit }: { target: string;
     React.useEffect(() => {
         let disposed = false
         let active = ''
-        samples.current = []; started.current = Date.now(); setSummary(null)
+        samples.current = []; sampleCount.current = 0; started.current = Date.now(); setSummary(null)
         setSession(''); setState('Initializing'); setMic(false); setMicBusy(false); setMicActive(false); setMicError(false)
         Ipc.send('streaming', 'startStream', { type: cloud ? 'cloud' : 'home', target: id }).then((result: string) => {
             if (disposed) { void Ipc.send('streaming', 'stopStream', { sessionId: result }).catch(() => {}); return }
