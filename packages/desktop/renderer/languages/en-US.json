@@ -479,7 +479,8 @@
       "failure_media": "No inbound audio or video progress for 15 seconds, despite a connected transport.",
       "failure_transport": "The WebRTC transport disconnected or failed.",
       "failure_heartbeat": "The Xbox session stopped responding to keepalive requests.",
-      "failure_stats": "WebRTC statistics stopped updating for 15 seconds. The native media pipeline may be stalled."
+      "failure_stats": "WebRTC statistics stopped updating for 15 seconds. The native media pipeline may be stalled.",
+      "autoRecoveryPreference": "Remember automatic recovery across V3 Remote Play sessions. Recovery is limited to two attempts and may interrupt gameplay."
     }
   }
 }

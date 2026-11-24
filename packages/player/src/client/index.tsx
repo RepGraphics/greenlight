@@ -238,7 +238,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 status('Negotiated'); onConnection();
                 void heartbeat();
                 let visibleConnectedAt=performance.now();
-                mediaWatchdog=setInterval(()=>{const now=performance.now();if(disposed||terminal)return;if(document.hidden||peer.connectionState!=='connected'){visibleConnectedAt=now;return}const stats=instance?.getStats();if(!stats)return;if(statsExpired(now,stats.lastStatsAt,visibleConnectedAt))fail('stats');else if(stats.mediaStalled)fail('media')},1000);
+                mediaWatchdog=setInterval(()=>{const now=performance.now();if(disposed||terminal)return;if(peer.connectionState==='new'||peer.connectionState==='connecting' && !instance?.getStats().lastStatsAt){visibleConnectedAt=now;return}const stats=instance?.getStats();if(!stats)return;if(statsExpired(now,stats.lastStatsAt,visibleConnectedAt))fail('stats');else if(stats.mediaStalled)fail('media')},1000);
             };
             const poll = async () => {
                 if (disposed) return;
