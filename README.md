@@ -105,7 +105,7 @@ Enable Instant replay in the streaming toolbar to keep recent standalone WebM se
 - **WebGPU or capture problems:** use standard video rendering. Screenshot, picture-in-picture and recording support depends on the platform.
 - **Handheld controls:** enable the handheld layout in settings and configure the device's controller mapping as needed.
 
-For V3 issues, press F8, open the toolbar and select **Export diagnostics**. Current exports retain up to three preceding attempts and include connection states and stale-statistics detection. Review any attachments before sharing. Never post authentication tokens, passwords, account identifiers or unredacted network logs.
+For V3 issues, press F8, open the toolbar and select **Export diagnostics**. Current exports retain up to three preceding attempts and include connection states and stale-statistics detection. Open exported reports locally under Settings → Diagnostics viewer to inspect individual recovery attempts and network graphs. Review any attachments before sharing. Never post authentication tokens, passwords, account identifiers or unredacted network logs.
 
 Report fork-specific bugs and requests in [Issues](https://github.com/RepGraphics/greenlight/issues). Include the exact commit/build, OS, player engine, controller connection method and reproduction steps.
 

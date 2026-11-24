@@ -6,6 +6,8 @@ Changes on `main-v2` are development changes, not a new numbered release. See [c
 
 ### Added
 
+- Local diagnostics viewer for V3 exports with validated import, per-attempt summaries and network graphs.
+
 - Configurable instant replay segment duration and an optional save-replay keyboard shortcut, with bounded finalization wait.
 
 - Opt-in adaptive quality during existing Remote Play recovery attempts, using fresh sustained congestion evidence without restarting healthy streams.

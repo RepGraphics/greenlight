@@ -125,3 +125,6 @@ test('adaptive recovery only lowers caps on sustained fresh congestion evidence'
 
 import { replayDuration } from '../../renderer/lib/instantreplay'
 test('replay duration is bounded and replay shortcuts are opt-in',()=>{assert.equal(replayDuration(15),15);assert.equal(replayDuration(60),60);assert.equal(replayDuration(120),30);assert.equal(replayDuration('60'),30);assert.equal(validateShortcuts({}).replay,'');assert.equal(assignShortcut({},'replay','F8').controls,'');assert.equal(portableSettings({v3_replay_seconds:60}).v3_replay_seconds,60)})
+
+import { parseDiagnostics } from '../../renderer/lib/diagnosticsimport'
+test('diagnostic import recalculates summaries and restricts untrusted data',()=>{const result=parseDiagnostics(JSON.stringify({schema:4,engine:'v3',type:'home',renderer:'video',state:'Error',failureReason:'stats',summary:{averageFps:999},samples:[{elapsedSeconds:2,width:1920,height:1080,fps:60,statsFresh:false,token:'secret'},{elapsedSeconds:1,width:1920,height:1080,fps:59},{elapsedSeconds:-1}],previousAttempts:[{state:'Connected',samples:[]}]}));assert.equal(result.attempts.length,2);assert.equal(result.attempts[1].reason,'stats');assert.equal(result.attempts[1].samples.length,2);assert.equal(result.attempts[1].samples[0].fps,59);assert.equal('token' in result.attempts[1].samples[1],false);assert.throws(()=>parseDiagnostics('{}'))})
