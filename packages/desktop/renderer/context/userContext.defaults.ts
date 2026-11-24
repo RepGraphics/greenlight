@@ -36,6 +36,8 @@ export const defaultSettings = {
     },
     input_newgamepad: false,
     app_lowresolution: false,
+    handheld_mode: 'auto',
+    stream_performance_hud: false,
 
     video_enabled: true,
     audio_enabled: true,

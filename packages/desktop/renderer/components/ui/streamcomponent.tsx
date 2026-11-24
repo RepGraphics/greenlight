@@ -1,4 +1,5 @@
 import React from 'react'
+import { useSettings } from '../../context/userContext'
 import Button from './button'
 import Slider from './slider'
 import xPlayer from 'xbox-xcloud-player'
@@ -20,6 +21,32 @@ function StreamComponent({
     xPlayer,
 }: StreamComponentProps) {
     const { t } = useTranslation()
+    const { settings } = useSettings()
+    const [hud, setHud] = React.useState(settings.stream_performance_hud)
+    const [metrics, setMetrics] = React.useState<{ fps?: number; width?: number; height?: number; jitter?: number; loss?: number; bitrate?: number }>({})
+    React.useEffect(() => {
+        if (!hud) return
+        let disposed = false, busy = false
+        let previous: { bytes: number; time: number } | undefined
+        const sample = async () => {
+            if (busy || disposed || !xPlayer._webrtcClient) return
+            busy = true
+            try {
+                const stats = await xPlayer._webrtcClient.getStats()
+                if (disposed) return
+                stats.forEach(report => {
+                    if (report.type !== 'inbound-rtp' || report.kind !== 'video') return
+                    const bytes = report.bytesReceived, time = report.timestamp
+                    const bitrate = previous && time > previous.time && bytes >= previous.bytes ? (bytes - previous.bytes) * 8 / (time - previous.time) / 1000 : undefined
+                    if (typeof bytes === 'number' && typeof time === 'number') previous = { bytes, time }
+                    setMetrics({ fps: report.framesPerSecond, width: report.frameWidth, height: report.frameHeight, jitter: typeof report.jitter === 'number' ? report.jitter * 1000 : undefined, loss: report.packetsLost, bitrate })
+                })
+            } catch { /* stats may be unavailable during disconnect */ } finally { busy = false }
+        }
+        void sample()
+        const interval = setInterval(sample, 1000)
+        return () => { disposed = true; clearInterval(interval) }
+    }, [hud, xPlayer])
 
     function performance_now_seconds() {
         return performance.now() / 1000.0
@@ -354,6 +381,7 @@ function StreamComponent({
     return (
         <React.Fragment>
             <div>
+                {hud && <div className='gl-performance-hud' aria-label={t('dashboard.performanceHud')}><span>{metrics.width && metrics.height ? metrics.width + '×' + metrics.height : '—'}</span><span>{metrics.fps != null ? Math.round(metrics.fps) : '—'} FPS</span><span>{metrics.bitrate != null ? metrics.bitrate.toFixed(1) : '—'} Mbps</span><span>{metrics.jitter != null ? metrics.jitter.toFixed(1) : '—'} ms {t('dashboard.jitter')}</span><span>{metrics.loss ?? '—'} {t('dashboard.packetsLost')}</span></div>}
                 <div id="streamComponentHolder">
                 </div>
 
@@ -411,6 +439,7 @@ function StreamComponent({
                             width: '25%',
                             textAlign: 'right',
                         }}>
+                            <button type='button' className='btn' aria-label={t('dashboard.performanceHud')} aria-pressed={hud} onClick={() => setHud(value => !value)}><i className='fa-solid fa-chart-line' aria-hidden='true' /></button>
                             <button type='button' className='btn' aria-pressed={controlsPinned} title={t('dashboard.pinControls')} onClick={togglePin}><i className='fa-solid fa-thumbtack' aria-hidden='true' /></button>
                             <button type='button' className='btn' aria-label={t('dashboard.fullscreen')} aria-pressed={fullscreen} onClick={() => { void toggleFullscreen() }}><i className={'fa-solid ' + (fullscreen ? 'fa-compress' : 'fa-expand')} aria-hidden='true' /></button>
                             <Button label={<i className="fa-solid fa-bug"></i>} title={t("streamWindow.debugTitle")} onClick={(e) => {

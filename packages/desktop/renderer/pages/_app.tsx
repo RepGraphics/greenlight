@@ -4,6 +4,7 @@ import React from 'react'
 import Head from 'next/head'
 import Ipc from '../lib/ipc'
 import { useRouter } from 'next/router'
+import HandheldLayout from '../components/ui/handheldlayout'
 import DashboardInput from '../components/ui/dashboardinput'
 import Notifications from '../components/ui/notifications'
 import Header from '../components/header'
@@ -139,7 +140,7 @@ export default function MyApp({ Component, pageProps }) {
                     <UserProvider>
                         <LanguageProvider>
                             <GameFavouritesProvider key={prevUserState.gamertag} account={prevUserState.gamertag || 'local'}>
-                                {appBody}
+                                <HandheldLayout streaming={router.pathname.startsWith('/stream/')}>{appBody}</HandheldLayout>
                             </GameFavouritesProvider>
                             <DashboardInput enabled={!router.pathname.startsWith('/stream/')} onBack={onDashboardBack} />
                             <Notifications />

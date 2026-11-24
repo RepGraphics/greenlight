@@ -163,6 +163,9 @@ function SettingsInput() {
             <SettingsSidebar>
                 <Card>
                     <h1>{t('settings.input.title')}</h1>
+                    <p><label htmlFor='handheld-mode'>{t('dashboard.handheldMode')}</label><select id='handheld-mode' value={settings.handheld_mode} onChange={e => setSettings({...settings, handheld_mode: e.target.value})}><option value='auto'>{t('dashboard.preset_auto')}</option><option value='on'>{t('settings.input.enabledLabel')}</option><option value='off'>{t('settings.input.disabledLabel')}</option></select></p>
+                    <p>{t('dashboard.handheldDescription')}</p>
+                    <p><label htmlFor='performance-hud'>{t('dashboard.performanceHud')}</label><input id='performance-hud' type='checkbox' checked={settings.stream_performance_hud} onChange={e => setSettings({...settings, stream_performance_hud:e.target.checked})} /></p>
 
                     <p>
                         <label>{t('settings.input.enableVibration')}</label>

@@ -337,3 +337,14 @@ div.component_gametitle .gl-art-placeholder { width: 140px; height: 140px; displ
 .gl-stream-extra { display:flex; justify-content:flex-end; align-items:center; gap:5px; }
 .gl-stream-extra button[aria-pressed=true] { color:#9bf00b; }
 @media(max-width:800px) { .gl-library-grid { gap:10px; padding:5px; } .gl-console-page { padding:12px; } .gl-dashboard-welcome,.gl-resume-card { padding:16px; } }
+
+.gl-handheld { --gl-nav-width:72px; --gl-social-width:0px; }
+.gl-handheld #app_sidebar { display:none !important; }
+.gl-handheld #component_header { padding:10px 6px; gap:12px; }
+.gl-handheld #component_header .gl-brand span,.gl-handheld #component_header .gl-nav span,.gl-handheld .gl-account > span:last-child { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.gl-handheld #component_header ul.gl-nav li a { justify-content:center; min-height:28px; padding:12px 8px; }
+.gl-handheld .btn,.gl-handheld .gl-quality-preset { min-height:42px; box-sizing:border-box; }
+.gl-handheld .gl-console-page { padding:16px; }
+.gl-handheld .gl-console-grid { grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); }
+.gl-handheld-hints { position:fixed; bottom:0; left:var(--gl-nav-width); right:0; height:38px; display:flex; align-items:center; justify-content:center; gap:18px; background:#171717; z-index:81; font-size:13px; color:#ddd; pointer-events:none; }
+.gl-performance-hud { position:fixed; top:12px; left:12px; z-index:108; display:flex; flex-wrap:wrap; gap:12px; padding:9px 12px; background:#121212e8; border:1px solid #555; border-radius:6px; color:white; font-size:12px; font-variant-numeric:tabular-nums; pointer-events:none; max-width:calc(100vw - 48px); }

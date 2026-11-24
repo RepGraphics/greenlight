@@ -309,7 +309,15 @@
       "onlineOnly": "Online only",
       "noFriendsFound": "No friends match your filters.",
       "pinControls": "Keep controls visible (F8)",
-      "fullscreen": "Toggle fullscreen"
+      "fullscreen": "Toggle fullscreen",
+      "handheldMode": "Handheld layout",
+      "handheldDescription": "Compact navigation, larger controls and more space for games. Automatic mode follows the window size.",
+      "selectHint": "Select",
+      "backHint": "Home",
+      "navigateHint": "Navigate",
+      "performanceHud": "Performance HUD",
+      "jitter": "jitter",
+      "packetsLost": "packets lost"
     }
   }
 }
