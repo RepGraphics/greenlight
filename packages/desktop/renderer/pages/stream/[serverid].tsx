@@ -22,6 +22,7 @@ function Stream() {
     const [queueTime, setQueueTime] = React.useState(0)
 
     React.useEffect(() => {
+        if (!router.isReady || typeof router.query.serverid !== 'string') return
         // Detect stream type and title / server id
         let streamType = 'home'
         let serverId = router.query.serverid
@@ -35,11 +36,11 @@ function Stream() {
             xPlayer.bind()
 
             // Set bitrates & video codec profiles
-            if((streamType === 'cloud') ? settings.xcloud_bitrate : settings.xhome_bitrate > 0){
+            if(((streamType === 'cloud') ? settings.xcloud_bitrate : settings.xhome_bitrate) > 0){
                 xPlayer.setVideoBitrate((streamType === 'cloud') ? settings.xcloud_bitrate : settings.xhome_bitrate)
             }
 
-            if(settings.video_profiles.length > 0){
+            if(settings.video_profiles?.length > 0){
                 xPlayer.setCodecPreferences('video/H264', { profiles: settings.video_profiles || [] }) // 4d = high, 42e = mid, 420 = low
             }
 
@@ -116,6 +117,7 @@ function Stream() {
                         }
 
                         // Start keepalive loop
+                        if (keepaliveInterval) clearInterval(keepaliveInterval)
                         keepaliveInterval = setInterval(() => {
                             Ipc.send('streaming', 'sendKeepalive', {
                                 sessionId: sessionId,
@@ -186,22 +188,22 @@ function Stream() {
                             // Error
                             clearInterval(streamStateInterval)
 
-                            if(session.errorDetails.code === 'WNSError' && session.errorDetails.message.includes('WaitingForServerToRegister')){
+                            if(session.errorDetails?.code === 'WNSError' && session.errorDetails?.message?.includes('WaitingForServerToRegister')){
                                 // Detected the "WaitingForServerToRegister" error. This means the console is not connected to the xbox servers
-                                alert(t('errors.unableToStartStreamSession') + '\n\n' + t('errors.streamErrorResult') + ' ' + session.state + '\n' + t('errors.details') + ' [' + session.errorDetails.code + '] ' + session.errorDetails.message)
+                                alert(t('errors.unableToStartStreamSession') + '\n\n' + t('errors.streamErrorResult') + ' ' + session.state + '\n' + t('errors.details') + ' [' + session.errorDetails?.code + '] ' + session.errorDetails?.message)
                             } else {
-                                alert(t('errors.streamErrorResult') + ' ' + session.state + '\n' + t('errors.details') + ' [' + session.errorDetails.code + '] ' + session.errorDetails.message)
+                                alert(t('errors.streamErrorResult') + ' ' + session.state + '\n' + t('errors.details') + ' [' + session.errorDetails?.code + '] ' + session.errorDetails?.message)
                             }
                             console.log('Full stream error:', session.errorDetails)
                             onDisconnect()
-                            xPlayer.close()
+                            xPlayer?.close()
                             break
 
                         case 'queued':
                             // Waiting in queue
                             // @TODO: Show queue position
                             if(queueTime === 0){
-                                setQueueTime(session.waitingTimes.estimatedTotalWaitTimeInSeconds)
+                                setQueueTime((session.waitingTimes?.estimatedTotalWaitTimeInSeconds || 0))
                                 console.log('Setting queue to:', session.waitingTimes.estimatedTotalWaitTimeInSeconds)
 
 

@@ -202,13 +202,13 @@ function SettingsInput() {
 
                     <div>
                         {
-                            navigator.getGamepads().map((item, index) => {
+                            (typeof navigator !== 'undefined' && navigator.getGamepads ? Array.from(navigator.getGamepads()) : []).map((item, index) => {
                                 return (
                                     <p key={ index }>
                                 #{ index+1 } &nbsp;
 
                                         { (item) ?
-                                            item.id + ' ' + t('settings.input.axesLabel') + ': ' + item.axes.length + ', ' + t('settings.input.buttonsLabel') + ': ' + item.buttons.length + ', ' + t('settings.input.rumbleLabel') + ': ' + ((item.vibrationActuator !== null) ? (item.vibrationActuator as any).type : t('settings.input.notSupportedLabel'))
+                                            item.id + ' ' + t('settings.input.axesLabel') + ': ' + item.axes.length + ', ' + t('settings.input.buttonsLabel') + ': ' + item.buttons.length + ', ' + t('settings.input.rumbleLabel') + ': ' + ((item.vibrationActuator != null) ? (item.vibrationActuator as any).type : t('settings.input.notSupportedLabel'))
                                             : t('settings.input.noControllerDetected')
                                         }
                                     </p>

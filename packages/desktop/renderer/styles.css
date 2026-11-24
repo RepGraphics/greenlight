@@ -273,3 +273,13 @@ div.component_card { border-radius: 8px; }
     #component_header .gl-brand span, #component_header .gl-nav span, .gl-account > span:last-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
     div#app_sidebar { display: none !important; }
 }
+
+/* Directional navigation and notifications */
+.gl-gamepad-focus :focus { outline: 3px solid var(--gl-accent) !important; outline-offset: 3px; }
+.gl-notifications { position: fixed; right: 20px; bottom: 56px; z-index: 110; display: grid; gap: 10px; width: min(380px, calc(100vw - 40px)); pointer-events: none; }
+.gl-notification { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid #555; border-left: 4px solid var(--gl-accent); background: #252525; border-radius: 6px; box-shadow: 0 6px 24px #0008; pointer-events: auto; }
+.gl-notification span { flex: 1; font-size: 14px; }
+.gl-notification button { color: white; background: transparent; border: 0; padding: 6px; font-size: 20px; cursor: pointer; }
+#component_settings_sidebar_content select, #component_settings_sidebar_content input { accent-color: #107c10; }
+#component_settings_sidebar_content select { max-width: 100%; border: 1px solid #555; }
+#component_settings_sidebar_content label { min-width: min(250px, 100%); }

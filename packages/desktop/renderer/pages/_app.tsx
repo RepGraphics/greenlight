@@ -3,7 +3,9 @@ import '../styles.css'
 import React from 'react'
 import Head from 'next/head'
 import Ipc from '../lib/ipc'
-import { useRouter } from 'next/navigation'
+import { useRouter } from 'next/router'
+import DashboardInput from '../components/ui/dashboardinput'
+import Notifications from '../components/ui/notifications'
 import Header from '../components/header'
 import Footer from '../components/footer'
 import Auth from '../components/auth'
@@ -82,19 +84,9 @@ export default function MyApp({ Component, pageProps }) {
             })
         }, 500)
 
-        const errorHandler = function(event) {
-            console.error('Unhandled rejection (promise: ', event.promise, ', reason: ', event.reason, ').')
-            if(event.reason.status){
-                alert('HTTP Status: ' + event.reason.status + '\nPath:' + event.reason.url + '\n' + event.reason.body)
-            } else {
-                alert(event.reason)
-            }
-        }
-        window.addEventListener('unhandledrejection', errorHandler)
 
         // cleanup this component
         return () => {
-            window.removeEventListener('unhandledrejection', errorHandler)
 
             if(authInterval)
                 clearInterval(authInterval)
@@ -150,6 +142,8 @@ export default function MyApp({ Component, pageProps }) {
                     <LanguageProvider>
                         <UserProvider>
                             {appBody}
+                            <DashboardInput enabled={!router.pathname.startsWith('/stream/')} />
+                            <Notifications />
                         </UserProvider>
                     </LanguageProvider>
                 </QueryClientProvider>
