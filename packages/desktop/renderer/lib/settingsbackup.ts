@@ -1,3 +1,4 @@
+import { validateVideoFilters } from './videofilters'
 import type { defaultSettings } from '../context/userContext.defaults'
 import { readProfiles, snapshotProfile } from './controllerprofiles'
 import { readGameProfiles } from './gameprofiles'
@@ -17,6 +18,7 @@ export function portableSettings(value: unknown): Partial<Settings> {
     }
     number('xhome_bitrate',0,40960); number('xcloud_bitrate',0,40960); number('v3_deadzone',0,0.5); number('v3_mouse_sensitivity',0.25,4)
     if (raw.streaming_engine === 'legacy' || raw.streaming_engine === 'experimental') result.streaming_engine = raw.streaming_engine
+    if (raw.v3_video_filters && typeof raw.v3_video_filters === 'object') result.v3_video_filters = validateVideoFilters(raw.v3_video_filters)
     if (raw.v3_renderer === 'video' || raw.v3_renderer === 'webgpu') result.v3_renderer = raw.v3_renderer
     if (raw.video_size === 'default' || raw.video_size === 'stretch' || raw.video_size === 'zoom') result.video_size = raw.video_size
     if (raw.handheld_mode === 'auto' || raw.handheld_mode === 'on' || raw.handheld_mode === 'off') result.handheld_mode = raw.handheld_mode

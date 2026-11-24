@@ -5,6 +5,7 @@ import type { ControllerProfile } from '../lib/controllerprofiles'
 export const defaultSettings = {
     streaming_engine: 'legacy',
     v3_renderer: 'video',
+    v3_video_filters: {brightness:100,contrast:100,saturation:100},
     v3_native_mkb: false,
     v3_session_history: false,
     v3_deadzone: 0.08,

@@ -421,7 +421,17 @@
       "calibrateDeadzone": "Measure resting drift",
       "calibrationFailed": "Calibration interrupted or excessive movement detected. Release the sticks and try again.",
       "calibrationResult": "Suggested V3 deadzone: {{value}}%",
-      "nonstandardController": "This device does not expose the standard gamepad layout. Raw button and axis readings remain available."
+      "nonstandardController": "This device does not expose the standard gamepad layout. Raw button and axis readings remain available.",
+      "videoFilters": "Video filters",
+      "videoFilterDescription": "Adjust the displayed V3 video without changing the encoded stream. Effects apply to standard video and WebGPU output.",
+      "videoPreset_neutral": "Neutral",
+      "videoPreset_vivid": "Vivid",
+      "videoPreset_cinema": "Cinema",
+      "videoPreset_monochrome": "Monochrome",
+      "videoFilter_brightness": "Brightness",
+      "videoFilter_contrast": "Contrast",
+      "videoFilter_saturation": "Saturation",
+      "saveVideoDefaults": "Save as global defaults"
     }
   }
 }

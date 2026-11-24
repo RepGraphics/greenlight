@@ -71,3 +71,6 @@ test('session history records connected duration without target identifiers',()=
 
 import { recommendDeadzone } from '../../renderer/lib/controllercalibration'
 test('calibration recommends a bounded deadzone and rejects movement',()=>{assert.equal(recommendDeadzone(Array.from({length:60},()=>[0,0,0,0])),0.03);assert.equal(recommendDeadzone(Array.from({length:60},()=>[0.1,0,0,0])),0.12);assert.equal(recommendDeadzone(Array.from({length:60},()=>[0.7,0,0,0])),null);assert.equal(recommendDeadzone([[0,0,0,0]]),null)})
+
+import { validateVideoFilters,videoFilterCss } from '../../renderer/lib/videofilters'
+test('video filters clamp imported preferences and generate safe CSS',()=>{assert.deepEqual(validateVideoFilters({brightness:999,contrast:-1,saturation:NaN}),{brightness:150,contrast:50,saturation:100});assert.equal(videoFilterCss({saturation:0}),'brightness(100%) contrast(100%) saturate(0%)')})

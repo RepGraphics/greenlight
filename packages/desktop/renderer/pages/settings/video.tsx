@@ -1,4 +1,5 @@
 import React from 'react'
+import VideoFilterControls from '../../components/ui/videofiltercontrols'
 import Head from 'next/head'
 import SettingsSidebar from '../../components/settings/sidebar'
 import Card from '../../components/ui/card'
@@ -83,6 +84,9 @@ function SettingsVideo() {
                     </p>
                 </Card>
 
+                <Card>
+                    <h1>{t('dashboard.videoFilters')}</h1><p>{t('dashboard.videoFilterDescription')}</p><VideoFilterControls value={settings.v3_video_filters} onChange={value=>setSettings({...settings,v3_video_filters:value})}/>
+                </Card>
                 <Card>
                     <h1>{t('settings.videoAudio.audioTitle')}</h1>
 
