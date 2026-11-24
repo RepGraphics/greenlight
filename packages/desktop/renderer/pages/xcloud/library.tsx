@@ -33,12 +33,14 @@ function xCloudLibrary() {
         { staleTime: 60 * 1000, keepPreviousData: true }
     )
 
-    const titles: string[] = titlesQuery.data || []
+    const titles: string[] = Array.isArray(titlesQuery.data) ? titlesQuery.data : []
 
     const renderContent = () => {
         if (titlesQuery.isLoading && !titlesQuery.data) {
             return <Loader />
         }
+
+        if (titlesQuery.isError && !titlesQuery.data) return <div className='gl-console-feedback' role='alert'>{t('dashboard.requestFailed')} <button className='btn' onClick={() => { void titlesQuery.refetch() }}>{t('dashboard.refresh')}</button></div>
 
         if (titles.length === 0) {
             return (
@@ -71,10 +73,10 @@ function xCloudLibrary() {
                 <Link href="/xcloud/library">{t('page.xCloudLibrary.breadcrumb2')}</Link>
             </BreadcrumbBar>
 
-            <h2 className="title">
-                {t('page.xCloudLibrary.title')}
+            <div className="gl-library-heading"><h2>
+                {t('page.xCloudLibrary.title')}</h2>
 
-                <div style={{ float: 'right', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div className="gl-library-filters">
                     <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer', userSelect: 'none', fontWeight: 300, minWidth: 0, paddingRight: '4px' }}>
                         <input
                             type="checkbox"
@@ -89,12 +91,13 @@ function xCloudLibrary() {
                         type="text"
                         className="text h2-search"
                         style={{ float: 'none', margin: 0 }}
+                        aria-label={t('page.xCloudLibrary.searchPlaceholder')}
                         placeholder={t('page.xCloudLibrary.searchPlaceholder')}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-            </h2>
+            </div>
 
             { renderContent() }
 

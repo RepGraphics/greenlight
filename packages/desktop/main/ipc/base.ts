@@ -7,55 +7,42 @@ interface EventArgs {
     error?: any;
 }
 
-export default class IpcBase {
-    _application:Application
+const allowed: Record<string, string[]> = {
+    app: ['loadCachedUser', 'getAuthState', 'login', 'quit', 'restart', 'clearData', 'getOnlineFriends', 'onUiShown', 'setForceRegionIp', 'setPreferredGameLanguage', 'debug'],
+    settings: ['setSettings', 'getSettings', 'getWebUIStatus', 'startWebUI', 'stopWebUI', 'setLowResolution'],
+    consoles: ['get'],
+    xCloud: ['getRecentTitles', 'getTitles', 'filterTitles', 'getNewTitles', 'getTitle'],
+    streaming: ['startStream', 'stopStream', 'sendSdp', 'sendChatSdp', 'sendIce', 'sendKeepalive', 'getPlayerState', 'activeSessions'],
+}
 
-    constructor(application:Application){
+export default class IpcBase {
+    _application: Application
+
+    constructor(application: Application) {
         this._application = application
     }
 
-    onEvent(channel, event, args:EventArgs){
-        this._application.log('Ipc:Recv', 'Received event: ['+channel+']', args)
-        if(typeof this[args.action] === 'function') {
-            const response = (Object.keys(args.data).length > 0) ? this[args.action](args.data) : this[args.action]()
-            response.then((result) => {
-                this.send(channel, {
-                    action: args.action,
-                    id: args.id,
-                    data: result,
-                })
-            }).catch((error) => {
-                console.log('ERROR: IPC communication error from backend:', error)
-                const serializedError = error instanceof Error ? {
-                    name: error.name,
-                    message: error.message,
-                } : error
-                this.send(channel, {
-                    action: args.action,
-                    id: args.id,
-                    data: {},
-                    error: serializedError,
-                })
-            })
-
-        } else {
-            this._application.log('Ipc', 'ERROR: Action was not found:', args.action, 'on channel', channel)
-            this.send(channel, {
-                action: args.action,
-                id: args.id,
-                data: {},
-                error: 'IPC action failure. Action was not found: '+channel+':'+args.action,
-            })
+    async onEvent(channel, event, args: EventArgs, reply?: (args: EventArgs) => void) {
+        if (!args || typeof args.action !== 'string' || !Number.isSafeInteger(args.id)) return
+        const respond = (data: EventArgs) => {
+            if (reply) reply(data)
+            else if (event?.sender && !event.sender.isDestroyed()) event.sender.send(channel, data)
+            else this.send(channel, data)
+        }
+        try {
+            if (!Object.prototype.hasOwnProperty.call(allowed, channel) || !allowed[channel].includes(args.action) || typeof this[args.action] !== 'function') {
+                throw new Error('Unsupported IPC action')
+            }
+            const result = await this[args.action](args.data ?? {})
+            respond({ action: args.action, id: args.id, data: result })
+        } catch (error) {
+            const status = typeof error?.status === 'number' ? error.status : undefined
+            respond({ action: args.action, id: args.id, data: {}, error: { name: error?.name || 'Error', message: error instanceof Error ? error.message : 'Application request failed', status } })
         }
     }
 
-    send(channel, args:EventArgs){
-        this._application.log('Ipc:Send', 'Sending event: ['+channel+']', JSON.stringify(args))
-        this._application._mainWindow.webContents.send(channel, {
-            action: args.action,
-            id: args.id,
-            data: args.data,
-            error: args.error,
-        })
+    send(channel, args: EventArgs) {
+        const contents = this._application._mainWindow?.webContents
+        if (contents && !contents.isDestroyed()) contents.send(channel, args)
     }
 }

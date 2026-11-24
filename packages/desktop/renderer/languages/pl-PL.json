@@ -2,7 +2,6 @@
   "translation": {
     "languageName": "Polski",
     "authorOfLocalization": "Polskie tłumaczenie autorstwa PlFarmer",
-
     "header": {
       "myConsoles": "Moje Konsole",
       "viewConsoles": "Wyświetl konsole",
@@ -14,7 +13,6 @@
       "quitQuestion": "Na pewno chcesz wyjść?",
       "home": "Strona główna"
     },
-
     "auth": {
       "logoutQuestion": "Na pewno chcesz się wylogować?",
       "clearDataBtn": "Wyczyść Dane",
@@ -27,7 +25,6 @@
       "pleaseAuthenticate": "Proszę uwierzytelnić się poniżej, aby uzyskać dostęp do xCloud i strumieniowania xHome",
       "windowTitle": "Authentication"
     },
-
     "settings": {
       "sidebar": {
         "about": "Informacje",
@@ -37,7 +34,6 @@
         "webUI": "Interfejs webowy",
         "debug": "Debugowanie"
       },
-
       "about": {
         "logoutQuestion": "Na pewno chcesz się wylogować?",
         "title": "Ustawienia",
@@ -48,7 +44,6 @@
         "website": "Strona",
         "websiteLinkTitle": "Otwórz link w zewnętrznej przeglądarce"
       },
-
       "input": {
         "settingsInputPageTitle": "Ustawienia: Wejścia",
         "dPadUp": "Pad kierunkowy Góra",
@@ -83,7 +78,6 @@
         "noControllerDetected": "Nie wykryto kontrolera",
         "keyboardMappingsTitle": "Mapowanie klawiatury"
       },
-
       "streaming": {
         "pageTitle": "Ustawienia: Strumieniowanie",
         "title": "Ustawienia Strumieniowania",
@@ -135,7 +129,6 @@
         "preferredGameLanguageValueChineseCN": "Chiński (Uproszczony)",
         "preferredGameLanguageValueChineseTW": "Chiński (Tradycyjny)"
       },
-
       "videoAudio": {
         "pageTitle": "Ustawienia: Obraz i Dźwięk",
         "title": "Obraz",
@@ -151,7 +144,6 @@
         "audioTitle": "Dźwięk",
         "disableAudioLabel": "Wyłącz dźwięk"
       },
-
       "webUI": {
         "pageTitle": "Ustawienia: Interfejs webowy",
         "title": "Interfejs webowy",
@@ -165,12 +157,10 @@
         "portLabel": "Port",
         "portPlaceholder": "przykład: 9003"
       },
-
       "debug": {
         "pageTitle": "Ustawienia: Debugowanie"
       }
     },
-
     "page": {
       "xCloud": {
         "pageTitle": "Biblioteka xCloud",
@@ -179,7 +169,6 @@
         "recentlyAdded": "Ostatnio dodane",
         "viewLibraryBtn": "Wyświetl Bibliotekę"
       },
-
       "xCloudLibrary": {
         "pageTitle": "Biblioteka xCloud",
         "breadcrumb1": "xCloud",
@@ -190,7 +179,6 @@
         "nextPageBtn": "Następna Strona",
         "viewGamePageIcon": "Wyświetl stronę gry"
       },
-
       "myConsoles": {
         "pageTitle": "Moje Konsole",
         "poweredOn": "Włączona",
@@ -201,7 +189,6 @@
         "startStreamBtn": "Uruchom Strumień",
         "noConsoles": "Nie znaleziono konsol na twoim koncie. Jeśli masz konsolę Xbox, upewnij się że granie zdalne jest włączone i że konsola jest widoczna w oficjalnej Aplikacji Xbox."
       },
-
       "titleInfo": {
         "pageTitle": "Wyświetlanie informacji o tytule:",
         "breadcrumb1": "xCloud",
@@ -211,22 +198,18 @@
         "capabilitiesTitle": "Funkcje",
         "startStreamBtn": "Uruchom Strumień"
       },
-
       "page404": {
         "pageTitle": "Błąd",
         "message": "Ups 404.. Nie znaleziono akcji"
       },
-
       "page500": {
         "pageTitle": "Błąd",
         "message": "Ups 500.. Aplikacja ma problem"
       }
     },
-
     "friends": {
       "allFriendsOffline": "Wszyscy twoi znajomi są offline"
     },
-
     "streamWindow": {
       "pageTitle": "Strumieniowanie",
       "endStreamConfirmMessage": "Na pewno chcesz zakończyć strumień?",
@@ -250,7 +233,6 @@
       "connectingToConsole": "Łączenie z konsolą...",
       "clientHasBeenDisconnected": "Klient został rozłączony."
     },
-
     "updater": {
       "unableToCheckForUpdates": "Nie udało się sprawdzić czy jest dostępna aktualizacja w tej chwili. Spróbuj ponownie.",
       "alreadyOnLatestVersion": "Używasz już najnowszej wersji. Aktualna wersja:",
@@ -263,7 +245,6 @@
       "updateChecker": "Sprawdzanie Aktualizacji",
       "closeBtn": "Zamknij"
     },
-
     "errors": {
       "failedToRetrieveUserProfile": "Błąd: Nie udało się uzyskać profilu użytkownika:",
       "repositoryNotFound": "Nie znaleziono URL repozytorium w pliku package.json.",
@@ -281,6 +262,21 @@
       "streamErrorResult": "Wynik błędu strumienia:",
       "details": "Szczegóły:",
       "failedToGetPlayerState": "Nie udało się uzyskać stanu gracza. Szczegóły błędu:"
+    },
+    "dashboard": {
+      "refresh": "Odśwież",
+      "refreshing": "Odświeżanie…",
+      "consoleError": "Nie udało się załadować konsol. Spróbuj ponownie.",
+      "profile": "Mój profil",
+      "profileUnavailable": "Informacje o profilu nie są jeszcze dostępne.",
+      "xboxProfile": "Profil Xbox",
+      "signedIn": "Zalogowano",
+      "account": "Konto",
+      "platform": "Platforma",
+      "quickAccess": "Szybki dostęp",
+      "requestFailed": "Żądanie nie powiodło się. Spróbuj ponownie.",
+      "httpError": "Żądanie nie powiodło się (HTTP {{status}}). Spróbuj ponownie.",
+      "dismiss": "Zamknij powiadomienie"
     }
   }
 }

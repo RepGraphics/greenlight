@@ -2,7 +2,6 @@
   "translation": {
     "languageName": "Русский",
     "authorOfLocalization": "Русская локализация: Евгений Чефранов",
-
     "header": {
       "myConsoles": "Мои консоли",
       "viewConsoles": "Просмотр консолей",
@@ -14,7 +13,6 @@
       "quitQuestion": "Вы уверены, что хотите выйти?",
       "home": "Главная"
     },
-
     "auth": {
       "logoutQuestion": "Вы уверены, что хотите выйти из аккаунта?",
       "clearDataBtn": "Очистить данные",
@@ -27,7 +25,6 @@
       "pleaseAuthenticate": "Пожалуйста, авторизуйтесь ниже для доступа к xCloud и xHome Streaming",
       "windowTitle": "Авторизация"
     },
-
     "settings": {
       "sidebar": {
         "about": "О программе",
@@ -37,7 +34,6 @@
         "webUI": "Web UI",
         "debug": "Отладка"
       },
-
       "about": {
         "logoutQuestion": "Вы уверены, что хотите выйти из аккаунта?",
         "title": "Настройки",
@@ -48,7 +44,6 @@
         "website": "Веб-сайт",
         "websiteLinkTitle": "Открыть ссылку во внешнем браузере"
       },
-
       "input": {
         "pageTitle": "Настройки: Ввод",
         "dPadUp": "Крестовина вверх",
@@ -83,7 +78,6 @@
         "noControllerDetected": "Контроллер не обнаружен",
         "keyboardMappingsTitle": "Назначения клавиш"
       },
-
       "streaming": {
         "pageTitle": "Настройки: Трансляция",
         "title": "Настройки трансляции",
@@ -136,7 +130,6 @@
         "preferredGameLanguageValueChineseCN": "Китайский (упрощенный)",
         "preferredGameLanguageValueChineseTW": "Китайский (традиционный)"
       },
-
       "videoAudio": {
         "pageTitle": "Настройки: Видео и Аудио",
         "videoTitle": "Видео",
@@ -152,7 +145,6 @@
         "audioTitle": "Аудио",
         "disableAudioLabel": "Отключить аудио"
       },
-
       "webUI": {
         "pageTitle": "Настройки: Web UI",
         "title": "WebUI",
@@ -166,12 +158,10 @@
         "portLabel": "Порт",
         "portPlaceholder": "например: 9003"
       },
-
       "debug": {
         "pageTitle": "Настройки: Отладка"
       }
     },
-
     "page": {
       "xCloud": {
         "pageTitle": "Библиотека xCloud",
@@ -180,7 +170,6 @@
         "recentlyAdded": "Недавно добавленные",
         "viewLibraryBtn": "Просмотреть библиотеку"
       },
-
       "xCloudLibrary": {
         "pageTitle": "Библиотека xCloud",
         "breadcrumb1": "xCloud",
@@ -193,7 +182,6 @@
         "nextPageBtn": "Следующая страница",
         "viewGamePageIcon": "Просмотреть страницу игры"
       },
-
       "myConsoles": {
         "pageTitle": "Мои консоли",
         "poweredOn": "Включена",
@@ -204,7 +192,6 @@
         "startStreamBtn": "Начать трансляцию",
         "noConsoles": "Консоли не найдены в вашем аккаунте. Если у вас есть консоль Xbox, убедитесь, что удалённая игра включена и консоль отображается в официальном приложении Xbox."
       },
-
       "titleInfo": {
         "pageTitle": "Просмотр информации о тайтле:",
         "breadcrumb1": "xCloud",
@@ -215,22 +202,18 @@
         "startStreamBtn": "Начать трансляцию",
         "purchaseRequiredBtn": "Требуется покупка"
       },
-
       "page404": {
         "pageTitle": "Ошибка",
         "message": "Упс.. 404.. Действие не найдено"
       },
-
       "page500": {
         "pageTitle": "Ошибка",
         "message": "Упс.. 500.. В приложении произошла ошибка"
       }
     },
-
     "friends": {
       "allFriendsOffline": "Все ваши друзья оффлайн"
     },
-
     "streamWindow": {
       "pageTitle": "Трансляция",
       "endStreamConfirmMessage": "Вы уверены, что хотите завершить свою трансляцию?",
@@ -254,7 +237,6 @@
       "connectingToConsole": "Подключение к консоли...",
       "clientHasBeenDisconnected": "Клиент был отключен."
     },
-
     "updater": {
       "unableToCheckForUpdates": "Не удалось проверить наличие обновлений в данный момент. Попробуйте еще раз.",
       "alreadyOnLatestVersion": "Вы уже используете последнюю версию. Текущая версия:",
@@ -267,7 +249,6 @@
       "updateChecker": "Проверка обновлений",
       "closeBtn": "Закрыть"
     },
-
     "errors": {
       "failedToRetrieveUserProfile": "Ошибка! Не удалось получить профиль пользователя:",
       "repositoryNotFound": "Ошибка! URL репозитория не найден в файле package.json.",
@@ -285,6 +266,21 @@
       "streamErrorResult": "Результат ошибки трансляции:",
       "details": "Подробности:",
       "failedToGetPlayerState": "Не удалось получить состояние игрока. Подробности об ошибке:"
+    },
+    "dashboard": {
+      "refresh": "Обновить",
+      "refreshing": "Обновление…",
+      "consoleError": "Не удалось загрузить консоли. Попробуйте снова.",
+      "profile": "Мой профиль",
+      "profileUnavailable": "Информация профиля пока недоступна.",
+      "xboxProfile": "Профиль Xbox",
+      "signedIn": "Вход выполнен",
+      "account": "Учётная запись",
+      "platform": "Платформа",
+      "quickAccess": "Быстрый доступ",
+      "requestFailed": "Не удалось выполнить запрос. Попробуйте снова.",
+      "httpError": "Ошибка запроса (HTTP {{status}}). Попробуйте снова.",
+      "dismiss": "Закрыть уведомление"
     }
   }
 }

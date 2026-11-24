@@ -2,7 +2,6 @@
   "translation": {
     "languageName": "Українська",
     "authorOfLocalization": "Українська локалізація: Євген Чефранов",
-
     "header": {
       "myConsoles": "Мої консолі",
       "viewConsoles": "Перегляд консолей",
@@ -14,7 +13,6 @@
       "quitQuestion": "Ви впевнені, що хочете вийти?",
       "home": "Головна"
     },
-
     "auth": {
       "logoutQuestion": "Ви впевнені, що хочете вийти з акаунту?",
       "clearDataBtn": "Очистити дані",
@@ -27,7 +25,6 @@
       "pleaseAuthenticate": "Будь ласка, авторизуйтесь нижче для доступу до xCloud та xHome Streaming",
       "windowTitle": "Авторизація"
     },
-
     "settings": {
       "sidebar": {
         "about": "Про програму",
@@ -37,7 +34,6 @@
         "webUI": "Web UI",
         "debug": "Відлагодження"
       },
-
       "about": {
         "logoutQuestion": "Ви впевнені, що хочете вийти з акаунту?",
         "title": "Налаштування",
@@ -48,7 +44,6 @@
         "website": "Веб-сайт",
         "websiteLinkTitle": "Відкрити посилання у зовнішньому браузері"
       },
-
       "input": {
         "pageTitle": "Налаштування: Ввід",
         "dPadUp": "Хрестовина вгору",
@@ -83,7 +78,6 @@
         "noControllerDetected": "Контролер не виявлено",
         "keyboardMappingsTitle": "Призначення клавіш"
       },
-
       "streaming": {
         "pageTitle": "Налаштування: Трансляція",
         "title": "Налаштування трансляції",
@@ -136,7 +130,6 @@
         "preferredGameLanguageValueChineseCN": "Китайська (спрощена)",
         "preferredGameLanguageValueChineseTW": "Китайська (традиційна)"
       },
-
       "videoAudio": {
         "pageTitle": "Налаштування: Відео та Аудіо",
         "videoTitle": "Відео",
@@ -152,7 +145,6 @@
         "audioTitle": "Аудіо",
         "disableAudioLabel": "Вимкнути аудіо"
       },
-
       "webUI": {
         "pageTitle": "Налаштування: Web UI",
         "title": "WebUI",
@@ -166,12 +158,10 @@
         "portLabel": "Порт",
         "portPlaceholder": "наприклад: 9003"
       },
-
       "debug": {
         "pageTitle": "Налаштування: Відлагодження"
       }
     },
-
     "page": {
       "xCloud": {
         "pageTitle": "Бібліотека xCloud",
@@ -180,7 +170,6 @@
         "recentlyAdded": "Нещодавно додані",
         "viewLibraryBtn": "Переглянути бібліотеку"
       },
-
       "xCloudLibrary": {
         "pageTitle": "Бібліотека xCloud",
         "breadcrumb1": "xCloud",
@@ -193,7 +182,6 @@
         "nextPageBtn": "Наступна сторінка",
         "viewGamePageIcon": "Переглянути сторінку гри"
       },
-
       "myConsoles": {
         "pageTitle": "Мої консолі",
         "poweredOn": "Увімкнена",
@@ -204,7 +192,6 @@
         "startStreamBtn": "Почати трансляцію",
         "noConsoles": "Консолі не знайдено у вашому акаунті. Якщо у вас є консоль Xbox, переконайтеся, що віддалена гра увімкнена і консоль відображається в офіційному додатку Xbox."
       },
-
       "titleInfo": {
         "pageTitle": "Перегляд інформації про тайтл:",
         "breadcrumb1": "xCloud",
@@ -215,22 +202,18 @@
         "startStreamBtn": "Почати трансляцію",
         "purchaseRequiredBtn": "Потрібна покупка"
       },
-
       "page404": {
         "pageTitle": "Помилка",
         "message": "Упс.. 404.. Дію не знайдено"
       },
-
       "page500": {
         "pageTitle": "Помилка",
         "message": "Упс.. 500.. У додатку сталася помилка"
       }
     },
-
     "friends": {
       "allFriendsOffline": "Всі ваші друзі офлайн"
     },
-
     "streamWindow": {
       "pageTitle": "Трансляція",
       "endStreamConfirmMessage": "Ви впевнені, що хочете завершити свою трансляцію?",
@@ -254,7 +237,6 @@
       "connectingToConsole": "Підключення до консолі...",
       "clientHasBeenDisconnected": "Клієнт був відключений."
     },
-
     "updater": {
       "unableToCheckForUpdates": "Не вдалося перевірити наявність оновлень зараз. Спробуйте ще раз.",
       "alreadyOnLatestVersion": "Ви вже використовуєте останню версію. Поточна версія:",
@@ -267,7 +249,6 @@
       "updateChecker": "Перевірка оновлень",
       "closeBtn": "Закрити"
     },
-
     "errors": {
       "failedToRetrieveUserProfile": "Помилка! Не вдалося отримати профіль користувача:",
       "repositoryNotFound": "Помилка! URL репозиторію не знайдено у файлі package.json.",
@@ -285,6 +266,21 @@
       "streamErrorResult": "Результат помилки трансляції:",
       "details": "Подробиці:",
       "failedToGetPlayerState": "Не вдалося отримати стан гравця. Подробиці про помилку:"
+    },
+    "dashboard": {
+      "refresh": "Оновити",
+      "refreshing": "Оновлення…",
+      "consoleError": "Не вдалося завантажити консолі. Спробуйте ще раз.",
+      "profile": "Мій профіль",
+      "profileUnavailable": "Інформація профілю ще недоступна.",
+      "xboxProfile": "Профіль Xbox",
+      "signedIn": "Вхід виконано",
+      "account": "Обліковий запис",
+      "platform": "Платформа",
+      "quickAccess": "Швидкий доступ",
+      "requestFailed": "Не вдалося виконати запит. Спробуйте ще раз.",
+      "httpError": "Помилка запиту (HTTP {{status}}). Спробуйте ще раз.",
+      "dismiss": "Закрити сповіщення"
     }
   }
 }

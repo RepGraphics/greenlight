@@ -1,100 +1,73 @@
+type Listener = (event: any, data: any) => void
+
 export default class WebsocketIPC {
-    _websocket:WebSocket
+    private socket: WebSocket
+    private nextId = 0
+    private pending = new Map<number, { channel: string; action: string; resolve: (value: any) => void; reject: (reason: any) => void; timer: ReturnType<typeof setTimeout> }>()
+    private listeners = new Map<Listener, { channel: string; action?: string }>()
 
-    _on = {}
-    _onAction = {}
-
-    constructor(url){
-        this._websocket = new WebSocket(url)
-        this._websocket.addEventListener('message', (event) => this.onMessage(event))
+    constructor(url: string) {
+        this.socket = new WebSocket(url)
+        this.socket.addEventListener('message', event => this.onMessage(event))
+        this.socket.addEventListener('close', () => this.failPending())
+        this.socket.addEventListener('error', () => this.failPending())
     }
 
-    send(channel, action, data){
+    private failPending() {
+        for (const [id, request] of this.pending) {
+            clearTimeout(request.timer)
+            request.reject(new Error('WebUI connection closed'))
+            this.pending.delete(id)
+        }
+    }
+
+    send(channel: string, action: string, data: any) {
         return new Promise((resolve, reject) => {
-            if(this._websocket.readyState === 0){
-                // Still connecting
-                setTimeout(() => {
-                    this.send(channel, action, data).then((event) => {
-                        resolve(event)
-                    }).catch((error) => {
-                        reject(error)
-                    })
-                }, 200)
-            } else {
-                const actionId = Math.floor(Math.random() * 99999)
-
-                this._websocket.send(JSON.stringify({
-                    channel: channel,
-                    id: actionId,
-                    action: action,
-                    data: data,
-                }))
-
-                const listener = this.onAction(channel, action, (event, args) => {
-                    if(event.id === actionId){
-                        this.removeListener(channel, action, listener)
-                        resolve(args)
-                    }
-                })
+            const id = ++this.nextId
+            const timer = setTimeout(() => {
+                this.pending.delete(id)
+                reject(new Error('WebUI request timed out'))
+            }, 60000)
+            this.pending.set(id, { channel, action, resolve, reject, timer })
+            const send = () => {
+                if (!this.pending.has(id)) return
+                try { this.socket.send(JSON.stringify({ channel, action, id, data })) }
+                catch (error) { clearTimeout(timer); this.pending.delete(id); reject(error) }
             }
+            if (this.socket.readyState === WebSocket.OPEN) send()
+            else if (this.socket.readyState === WebSocket.CONNECTING) this.socket.addEventListener('open', send, { once: true })
+            else { clearTimeout(timer); this.pending.delete(id); reject(new Error('WebUI connection closed')) }
         })
     }
 
-    on(channel, listener){
-        if(this._on[channel] === undefined){
-            this._on[channel] = []
-        }
-        return (this._on[channel].push(listener)-1)
+    on(channel: string, listener: Listener) {
+        this.listeners.set(listener, { channel })
+        return listener
     }
 
-    private onAction(channel, action, listener){
-        if(this._onAction[channel] === undefined){
-            this._onAction[channel] = {}
-        }
-        if(this._onAction[channel][action] === undefined){
-            this._onAction[channel][action] = []
-        }
-
-        return (this._onAction[channel][action].push(listener)-1)
+    onAction(channel: string, action: string, listener: Listener) {
+        this.listeners.set(listener, { channel, action })
+        return listener
     }
 
-    onMessage(event) {
-        const ipcData = JSON.parse(event.data)
-        console.log(ipcData, this._on, this._onAction)
-
-        if(this._on[ipcData.channel] !== undefined){
-            for(const listener in this._on[ipcData.channel]){
-                this._on[ipcData.channel][listener](ipcData, ipcData.data)
-
-            }
-        }
-
-        if(this._onAction[ipcData.channel] !== undefined){
-            if(this._onAction[ipcData.channel][ipcData.action] !== undefined){
-                for(const listener in this._onAction[ipcData.channel][ipcData.action]){
-                    this._onAction[ipcData.channel][ipcData.action][listener](ipcData, ipcData.data)
-                    // console.log('Fire listener for action:', ipcData.action, ipcData.data)
-                }
-            }
-        }
-
+    removeListener(channel: string, listener: Listener) {
+        if (this.listeners.get(listener)?.channel === channel) this.listeners.delete(listener)
     }
 
-    removeListener(channel, action, listener){
-        // console.log('removing listener:', this._onAction[channel][action][listener])
-        // const func = this._onAction[channel][action].splice(listener, 1)
-        delete this._onAction[channel][action][listener]
-
-        // Check if key is empty
-        for(const checkListener in this._onAction[channel][action]){
-            if(this._onAction[channel][action][checkListener] !== undefined){
-                return
-            }
+    onMessage(event: MessageEvent) {
+        let message
+        try { message = JSON.parse(event.data) } catch { return }
+        if (!message || typeof message !== 'object') return
+        const request = this.pending.get(message.id)
+        if (request && request.channel === message.channel && request.action === message.action) {
+            clearTimeout(request.timer)
+            this.pending.delete(message.id)
+            if (message.error !== undefined) request.reject(message.error)
+            else request.resolve(message.data)
+            return
         }
-
-        console.log('It\'s empty! Deleting key:', action)
-        delete this._onAction[channel][action]
-
-        // console.log('HOOKIPC: removeListener called:', channel, listener, this._onAction[channel])
+        for (const [listener, filter] of this.listeners) {
+            if (filter.channel === message.channel && (!filter.action || filter.action === message.action)) listener(message, message.data)
+        }
     }
 }

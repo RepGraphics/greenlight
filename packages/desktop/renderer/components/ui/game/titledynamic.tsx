@@ -26,6 +26,8 @@ function GameTitleDynamic({
 }: GameTitleProps) {
     const titleData = useQuery<titleDataState>('titledynamic_titleId_'+titleId, () => Ipc.send('xCloud', 'getTitle', { titleId: titleId }), { staleTime: 300*1000 })
     const { t } = useTranslation()
+    const artwork = titleData.data?.catalogDetails?.Image_Tile?.URL
+    const imageSrc = artwork?.startsWith('//') ? 'https:' + artwork : artwork?.startsWith('https://') ? artwork : undefined
 
     return (
         <React.Fragment>
@@ -36,14 +38,14 @@ function GameTitleDynamic({
 
                 { (titleData.isFetched === true && titleData.data?.titleId !== undefined) ? <Link href={ titleData.data?.hasEntitlement === false ? `/xcloud/info/${ titleId }` : `/stream/xcloud_${ titleId }` }>
 
-                    <Image
-                        src={ titleData.data.catalogDetails?.Image_Tile?.URL ? ('https:'+titleData.data.catalogDetails.Image_Tile.URL) : '' }
+                    {imageSrc ? <Image
+                        src={imageSrc}
                         alt={ titleData.data.catalogDetails?.ProductTitle || titleId }
                         width='280' height='280' style={{
                             width: 140,
                             height: 140,
                             borderRadius: '4px',
-                        }} ></Image>
+                        }} ></Image> : <div className='gl-art-placeholder' aria-hidden='true'><i className='fa-solid fa-gamepad' /></div>}
 
                     <div className='component_gametitle_title'><p>{ titleData.data.catalogDetails?.ProductTitle || titleId }</p></div>
                 </Link> : <Loader></Loader> }

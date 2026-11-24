@@ -285,3 +285,14 @@ div.component_card { border-radius: 8px; }
 #component_settings_sidebar_content label { min-width: min(250px, 100%); }
 
 #component_streamcomponent_debug_text { white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: hidden; }
+
+/* Cloud library focus and tile presentation */
+div.component_gametitle { border-radius: 6px; background: var(--gl-surface); }
+div.component_gametitle > a { display: block; color: #fff; border-radius: 6px; }
+div.component_gametitle div.component_gametitle_title { opacity: 1; position: relative; bottom: auto; min-height: 44px; background: #252525; border-radius: 0 0 6px 6px; }
+div.component_gametitle div.component_gametitle_title p { position: static; padding: 6px; text-transform: none; text-align: left; overflow-wrap: anywhere; font-weight: 600; }
+div.component_gametitle:focus-within div.component_gametitle_infopage { opacity: 1; }
+div.component_gametitle div.component_gametitle_infopage a { background: #222; width: 26px; height: 26px; display: grid; place-items: center; }
+div.component_gametitle .gl-art-placeholder { width: 140px; height: 140px; display: grid; place-items: center; color: var(--gl-muted); background: #333; }
+.gl-library-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; padding: 18px; }
+.gl-library-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }

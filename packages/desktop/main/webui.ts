@@ -45,47 +45,39 @@ export default class WebUI {
             res.redirect('/home')
         })
 
-        this._express.ws('/ipc', (ws) => {
-
-            // Websocket ipc hack
-            for(const channel in this._ipc._channels){
-
-                this._ipc._channels[channel].send = (channel, args) => {
-                    console.log('HOOKED IPC:', channel, args)
-                    ws.send(JSON.stringify({
-                        channel: channel,
-                        id: args.id,
-                        action: args.action,
-                        data: args.data,
-                    }))
-                    
-                    this._application._mainWindow.webContents.send(channel, {
-                        action: args.action,
-                        id: args.id,
-                        data: args.data,
-                        error: args.error,
-                    })
-                }
+        this._express.ws('/ipc', (ws, req) => {
+            // WebUI is local-only until an authenticated remote-access design exists.
+            const expectedOrigin = 'http://' + req.headers.host
+            if (req.headers.origin !== expectedOrigin) {
+                ws.close(1008, 'Origin not allowed')
+                return
             }
-
             ws.on('message', (msg) => {
-                const ipcData = JSON.parse(msg)
-                this._application.log('webui:websocket', 'Received event:', ipcData)
-
-                this._application._webUI._ipc._channels[ipcData.channel].onEvent(ipcData.channel, undefined, {
-                    action: ipcData.action,
-                    id: ipcData.id || 0,
-                    data: ipcData.data,
-                })
-
-                // ws.send(msg);
+                try {
+                    if (Buffer.byteLength(msg.toString()) > 1024 * 1024) return
+                    const request = JSON.parse(msg.toString())
+                    if (!request || typeof request.channel !== 'string' || typeof request.action !== 'string' || !Number.isSafeInteger(request.id)) return
+                    if (!Object.prototype.hasOwnProperty.call(this._ipc._channels, request.channel)) return
+                    const denied = request.channel === 'app' && ['quit', 'restart', 'clearData', 'login', 'setForceRegionIp', 'setPreferredGameLanguage', 'debug'].includes(request.action)
+                        || request.channel === 'settings' && request.action !== 'getSettings' && request.action !== 'getWebUIStatus'
+                    const reply = (response) => {
+                        if (ws.readyState === 1) ws.send(JSON.stringify({ channel: request.channel, ...response }))
+                    }
+                    if (denied) {
+                        reply({ action: request.action, id: request.id, data: {}, error: { message: 'This action is available only in the desktop app' } })
+                        return
+                    }
+                    void this._ipc._channels[request.channel].onEvent(request.channel, undefined, request, reply)
+                } catch {
+                    // Ignore malformed client messages.
+                }
             })
         })
 
         if(this._application._isProduction){
             this._express.use(express.static(path.join(__dirname, '../app/')))
 
-            this._express.get('*', (req, res) => {
+            this._express.get(/.*/, (req, res) => {
                 // res.send('Hello World!')
                 res.sendFile(path.join(__dirname, '../app/', 'home.html'))
             })
@@ -94,7 +86,7 @@ export default class WebUI {
         }
 
 
-        this._server = this._express.listen(port, () => {
+        this._server = this._express.listen(port, '127.0.0.1', () => {
             this._application.log('webui', 'Webserver running on port:', port)
             console.log(`Webserver started on port: ${port}`)
         })
@@ -103,6 +95,7 @@ export default class WebUI {
     stopServer(){
         this._application.log('webui', 'Stopping webserver...')
         if(this._express){
+            this._ws.getWss().clients.forEach(client => client.close(1001, 'Server stopped'))
             this._server.close()
             delete this._express
         }

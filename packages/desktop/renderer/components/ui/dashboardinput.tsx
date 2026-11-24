@@ -73,7 +73,7 @@ export default function DashboardInput({ enabled }: { enabled: boolean }) {
         const onKey = (event: KeyboardEvent) => {
             if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
             const target = event.target as HTMLElement
-            if (target?.closest('input, select, textarea, [contenteditable="true"]')) return
+            if (target?.closest('input:not([type="checkbox"]):not([type="radio"]), select, textarea, [contenteditable="true"]')) return
             const direction = keys[event.key]
             if (direction) {
                 event.preventDefault()

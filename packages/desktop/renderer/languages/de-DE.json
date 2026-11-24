@@ -268,6 +268,21 @@
       "streamErrorResult": "Streaming-Fehler:",
       "details": "Details:",
       "failedToGetPlayerState": "Konnte Player-Status nicht abfragen. Details:"
+    },
+    "dashboard": {
+      "refresh": "Aktualisieren",
+      "refreshing": "Wird aktualisiert…",
+      "consoleError": "Konsolen konnten nicht geladen werden. Bitte erneut versuchen.",
+      "profile": "Mein Profil",
+      "profileUnavailable": "Profilinformationen sind noch nicht verfügbar.",
+      "xboxProfile": "Xbox-Profil",
+      "signedIn": "Angemeldet",
+      "account": "Konto",
+      "platform": "Plattform",
+      "quickAccess": "Schnellzugriff",
+      "requestFailed": "Eine Anfrage ist fehlgeschlagen. Bitte erneut versuchen.",
+      "httpError": "Anfrage fehlgeschlagen (HTTP {{status}}). Bitte erneut versuchen.",
+      "dismiss": "Benachrichtigung schließen"
     }
   }
 }

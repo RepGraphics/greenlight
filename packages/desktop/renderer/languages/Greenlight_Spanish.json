@@ -268,6 +268,21 @@
       "streamErrorResult": "Resultado del error de streaming:",
       "details": "Detalles:",
       "failedToGetPlayerState": "Error al obtener el estado del jugador. Detalles del error:"
+    },
+    "dashboard": {
+      "refresh": "Actualizar",
+      "refreshing": "Actualizando…",
+      "consoleError": "No se pudieron cargar las consolas. Inténtalo de nuevo.",
+      "profile": "Mi perfil",
+      "profileUnavailable": "La información del perfil aún no está disponible.",
+      "xboxProfile": "Perfil de Xbox",
+      "signedIn": "Sesión iniciada",
+      "account": "Cuenta",
+      "platform": "Plataforma",
+      "quickAccess": "Acceso rápido",
+      "requestFailed": "La solicitud ha fallado. Inténtalo de nuevo.",
+      "httpError": "Error de solicitud (HTTP {{status}}). Inténtalo de nuevo.",
+      "dismiss": "Cerrar notificación"
     }
   }
 }
