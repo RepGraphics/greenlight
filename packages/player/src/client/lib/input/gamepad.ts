@@ -3,6 +3,7 @@ import { validateButtonMapping } from './mapping'
 import { VibrationFrame } from '../channel/input'
 
 export interface GamepadOptions {
+    physical_gamepad_id?: number;
     enable_keyboard?: boolean;
     enable_gamepad?: boolean;
     enable_vibration?: boolean;
@@ -36,6 +37,7 @@ export default class Gamepad {
     }
 
     private _options:GamepadOptionsDefaults = {
+        physical_gamepad_id: -1,
         enable_keyboard: false,
         enable_gamepad: true,
         enable_vibration: true,
@@ -128,7 +130,10 @@ export default class Gamepad {
             window.addEventListener('focus', this._listener.windowFocus)
         }
 
-        if (this._options.enable_gamepad) this.detectActiveGamepad()
+        if (this._options.enable_gamepad) {
+            if(this._options.physical_gamepad_id>=0)this._physicalGamepadId=this._options.physical_gamepad_id
+            else this.detectActiveGamepad()
+        }
     }
 
     detach(){
@@ -285,6 +290,7 @@ export default class Gamepad {
     }
 
     onGamepadConnected(event:GamepadEvent){
+        if(this._options.physical_gamepad_id>=0){if(event.gamepad.index===this._options.physical_gamepad_id)this._physicalGamepadId=event.gamepad.index;return}
         if(this._physicalGamepadId < 0){
             for(const gamepad in this._player?._channels.control.getGamepadHandlers()){
                 if(

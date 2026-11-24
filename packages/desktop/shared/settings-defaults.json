@@ -67,5 +67,6 @@
         "screenshot": "",
         "recording": "",
         "graphs": ""
-    }
+    },
+    "v3_multi_controller": false
 }

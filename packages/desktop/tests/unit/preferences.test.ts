@@ -116,3 +116,6 @@ test('capture library enforces byte and count limits without automatic deletion'
 
 import { validReplaySegment,replayMaxBytes } from '../../renderer/lib/instantreplay'
 test('instant replay only accepts recent complete bounded WebM segments',()=>{const blob=new Blob(['video'],{type:'video/webm'});assert.equal(validReplaySegment({blob,startedAt:1000,endedAt:31000},32000),true);assert.equal(validReplaySegment({blob,startedAt:1000,endedAt:31000},100000),false);assert.equal(validReplaySegment({blob:new Blob([],{type:'video/webm'}),startedAt:1000,endedAt:31000},32000),false);assert.equal(validReplaySegment({blob,startedAt:32000,endedAt:31000},32000),false);assert.equal(replayMaxBytes,32*1024*1024)})
+
+import { reconcileSlots } from '../../../player/src/client/lib/input/slots'
+test('controller slot assignment is unique, bounded and stable on hotplug',()=>{const first=reconcileSlots([],[7,2,4,9,12]);assert.deepEqual(first.map(s=>s.physicalId),[2,4,7,9]);const second=reconcileSlots(first,[4,7,9,12]);assert.deepEqual(second.map(s=>s.physicalId),[12,4,7,9]);assert.deepEqual(reconcileSlots([],[],true),[{slot:0,physicalId:null}]);assert.deepEqual(reconcileSlots([],[2,2,-1,NaN]),[{slot:0,physicalId:2}])})

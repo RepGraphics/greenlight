@@ -110,6 +110,10 @@ export default class ControlChannel extends Channel {
     }
 
     getGamepadHandler(index):Gamepad|undefined{
+        const handler=this._gamepadHandlers[index]
+        if(handler instanceof Gamepad)return handler
+        return undefined
+        /* Legacy physical-index lookup (Xbox reports remote slot, not browser index).
         for(const gamepad in this.getPlayer()._channels.control.getGamepadHandlers()){
             if(
                 this.getPlayer()._channels.control.getGamepadHandlers()[gamepad] instanceof Gamepad &&
@@ -119,6 +123,6 @@ export default class ControlChannel extends Channel {
             }
         }
 
-        return undefined
+        return undefined */
     }
 }

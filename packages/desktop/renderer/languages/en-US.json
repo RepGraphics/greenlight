@@ -508,7 +508,9 @@
       "replayReady": "REPLAY · 30s segments",
       "replayBuffering": "REPLAY · buffering",
       "replayFailed": "Replay unavailable or no recent segment could be saved.",
-      "replaySaved": "Replay ready. Download or save to library."
+      "replaySaved": "Replay ready. Download or save to library.",
+      "multiController": "Multiple client controllers (experimental)",
+      "multiControllerDescription": "Allow up to four controllers connected to this device, each with its own remote slot. Game and service support may vary. Disabled while using the controller paired directly to Xbox. Changes apply to the next stream."
     }
   }
 }

@@ -9,6 +9,8 @@ import { statsExpired } from './lib/statsfreshness';
 
 // Proxy inputs
 import Gamepad from './lib/input/gamepad';
+import { reconcileSlots } from './lib/input/slots';
+import type { ControllerSlot } from './lib/input/slots';
 import MouseKeyboard from './lib/input/mousekeyboard';
 import Touch from './lib/input/touch';
 
@@ -21,6 +23,7 @@ export interface StreamPlayerProps {
     communicationHandler: communicationHandler;
     useWebGpu?: boolean;
     autoGamepad?: boolean;
+    multiController?: boolean;
     consoleController?: boolean;
     vibration?: boolean;
     videoBitrate?: number;
@@ -64,7 +67,7 @@ export interface communicationHandler {
 export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
     ({
         onStatusChanged,
-        communicationHandler, useWebGpu = true, autoGamepad = false, consoleController = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false, codecProfiles = [], touchControls = false, keyboardMapping, microphone = false, onMicrophoneStatus, nativeMouseKeyboard = false, deadzone = 0.08, invertY = false, swapSticks = false, mouseSensitivity = 1, buttonMapping, onMetrics, keyframeRequest = 0, onFailureReason
+        communicationHandler, useWebGpu = true, autoGamepad = false, multiController = false, consoleController = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false, codecProfiles = [], touchControls = false, keyboardMapping, microphone = false, onMicrophoneStatus, nativeMouseKeyboard = false, deadzone = 0.08, invertY = false, swapSticks = false, mouseSensitivity = 1, buttonMapping, onMetrics, keyframeRequest = 0, onFailureReason
     }, ref): ReactElement => {
         const handler = useRef(communicationHandler);
         handler.current = communicationHandler;
@@ -93,7 +96,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
         useEffect(()=>{if(player)player.consoleController=consoleController},[player,consoleController]);
         // Register a remote controller only when the client actually needs one.
         useEffect(() => {
-            if (!player || playerState !== 'Connected' || !autoGamepad || consoleController) return;
+            if (!player || playerState !== 'Connected' || !autoGamepad || consoleController || multiController) return;
             let attached: Gamepad | undefined;
             const sync = () => {
                 const hasPhysical = Array.from(navigator.getGamepads?.() || []).some(pad => pad?.connected);
@@ -108,7 +111,22 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             };
             sync(); const timer=setInterval(sync,500);
             return () => { clearInterval(timer); if(attached){releaseTouch();attached.detach()} controller.current=undefined };
-        }, [player,playerState,autoGamepad,consoleController,touchControls,keyboardMapping,vibration,deadzone,invertY,swapSticks,buttonMapping]);
+        }, [player,playerState,autoGamepad,consoleController,multiController,touchControls,keyboardMapping,vibration,deadzone,invertY,swapSticks,buttonMapping]);
+        useEffect(()=>{
+            if(!player||playerState!=='Connected'||!autoGamepad||consoleController||!multiController)return;
+            let slots:ControllerSlot[]=[];
+            const attached=new Map<number,Gamepad>();
+            const mapping=keyboardMapping?Object.fromEntries(Object.entries(keyboardMapping).map(([key,button])=>[button,key])):undefined;
+            const sync=()=>{
+                const ids=Array.from(navigator.getGamepads?.()||[]).filter(pad=>pad?.connected).map(pad=>pad!.index);
+                const next=reconcileSlots(slots,ids,touchControls||Boolean(mapping));
+                for(const old of slots){if(!next.some(item=>item.slot===old.slot&&item.physicalId===old.physicalId)){if(old.slot===0){releaseTouch();controller.current=undefined}attached.get(old.slot)?.detach();attached.delete(old.slot)}}
+                for(const entry of next){if(attached.has(entry.slot))continue;const primary=entry.slot===0;const input=new Gamepad(entry.slot,{enable_gamepad:entry.physicalId!==null,physical_gamepad_id:entry.physicalId??-1,enable_keyboard:primary&&Boolean(mapping),...(primary&&mapping?{keyboard_mapping:mapping}:{}),enable_vibration:vibration,gamepad_deadzone:deadzone,gamepad_invert_y:invertY,gamepad_swap_sticks:swapSticks,gamepad_mapping:buttonMapping});input.attach(player);attached.set(entry.slot,input);if(primary)controller.current=input}
+                slots=next;
+            };
+            sync();const timer=setInterval(sync,500);
+            return()=>{clearInterval(timer);releaseTouch();attached.forEach(input=>input.detach());controller.current=undefined};
+        },[player,playerState,autoGamepad,multiController,consoleController,touchControls,keyboardMapping,vibration,deadzone,invertY,swapSticks,buttonMapping]);
         const micCallback = useRef(onMicrophoneStatus);
         micCallback.current = onMicrophoneStatus;
         useEffect(() => {
