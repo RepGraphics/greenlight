@@ -18,7 +18,7 @@ function LegacyStream() {
     const target = typeof router.query.serverid === 'string' ? router.query.serverid : ''
     const profile = target.startsWith('xcloud_') ? readGameProfiles(globalSettings.v3_game_profiles).find(item => item.titleId === target.slice(7)) : undefined
     const consoleProfile = !target.startsWith('xcloud_') ? readConsoleProfiles(globalSettings.console_profiles).find(item => item.consoleId === target) : undefined
-    const settings = {...globalSettings, xcloud_bitrate:profile?.bitrate ?? globalSettings.xcloud_bitrate, xhome_bitrate:consoleProfile?.bitrate ?? globalSettings.xhome_bitrate}
+    const settings = {...globalSettings, xhome_resolution:consoleProfile?.resolution ?? globalSettings.xhome_resolution, xcloud_resolution:profile?.resolution ?? globalSettings.xcloud_resolution, xcloud_bitrate:profile?.bitrate ?? globalSettings.xcloud_bitrate, xhome_bitrate:consoleProfile?.bitrate ?? globalSettings.xhome_bitrate}
     const { t } = useTranslation()
 
     const streamStateInterval = React.useRef<ReturnType<typeof setInterval> | undefined>(undefined)

@@ -97,3 +97,13 @@ test('media stalls require established inbound traffic and sustained inactivity'
 
 import { statsExpired } from '../../../player/src/client/lib/statsfreshness'
 test('stale native reports are detected independently of packet counters',()=>{assert.equal(statsExpired(16000,1000,0),true);assert.equal(statsExpired(15999,1000,0),false);assert.equal(statsExpired(20000,1000,19000),false);assert.equal(statsExpired(15000,0,0),true)})
+
+
+test('per-title and console resolution overrides accept supported display sizes only',()=>{
+    assert.equal(readGameProfiles([{titleId:'game',resolution:720}])[0].resolution,720)
+    assert.equal(readGameProfiles([{titleId:'game',resolution:1080}])[0].resolution,1080)
+    assert.equal(readGameProfiles([{titleId:'game',resolution:1440}])[0].resolution,null)
+    assert.equal(readConsoleProfiles([{consoleId:'console',resolution:720}])[0].resolution,720)
+    assert.equal(readConsoleProfiles([{consoleId:'console',resolution:'720'}])[0].resolution,null)
+    assert.equal(readConsoleProfiles([{consoleId:'console'}])[0].resolution,null)
+})

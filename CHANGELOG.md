@@ -6,6 +6,8 @@ Changes on `main-v2` are development changes, not a new numbered release. See [c
 
 ### Added
 
+- Per-console and per-cloud-game requested resolution overrides for both streaming engines.
+
 - Xbox-inspired dashboard, console favourites, cloud library favourites, social hub and achievement views.
 - Handheld layout, keyboard/controller navigation and controller testing.
 - Opt-in V3 player with standard video and experimental WebGPU.
