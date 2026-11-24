@@ -1,4 +1,6 @@
 import React from 'react'
+import { controllerPresets, readProfiles, snapshotProfile } from '../../lib/controllerprofiles'
+import type { ControllerProfile } from '../../lib/controllerprofiles'
 import { defaultButtonMapping, validateButtonMapping } from '../../../../player/src/client/lib/input/mapping'
 import Head from 'next/head'
 
@@ -86,6 +88,16 @@ function KeySettings({keyConfigs, setKeyConfig}) {
 
 function SettingsInput() {
     const { settings, setSettings} = useSettings()
+    const [profileName, setProfileName] = React.useState('')
+    const [selectedProfile, setSelectedProfile] = React.useState('')
+    const profiles = readProfiles(settings.v3_controller_profiles)
+    const applyProfile = (profile: ControllerProfile) => { const { name, ...values } = profile; setSettings({...settings,...values}) }
+    const saveProfile = () => {
+        const name = profileName.trim().slice(0,40)
+        if (!name || (profiles.length >= 20 && !profiles.some(profile => profile.name === name))) return
+        const next = [...profiles.filter(profile => profile.name !== name), snapshotProfile(name,settings)]
+        setSettings({...settings,v3_controller_profiles:next}); setSelectedProfile(name); setProfileName('')
+    }
     const [ controllerPing, setControllerPing] = React.useState(0)
 
     const [controllerKeys, setControllerKeys] = React.useState(settings.input_mousekeyboard_config)
@@ -231,6 +243,11 @@ function SettingsInput() {
                     <p>{t('dashboard.inputNextStream')}</p>
                 </Card>
                 <Card hidden={settings.streaming_engine !== 'experimental'}>
+                    <h1>{t('dashboard.controllerProfiles')}</h1>
+                    <p>{t('dashboard.profileDescription')}</p>
+                    <div className='gl-console-toolbar'>{Object.entries(controllerPresets).map(([key,profile]) => <button type='button' key={key} className='btn' onClick={() => applyProfile(profile)}>{t('dashboard.controllerPreset_'+key)}</button>)}</div>
+                    <p><label htmlFor='controller-profile-name'>{t('dashboard.profileName')}</label><input id='controller-profile-name' className='text' maxLength={40} value={profileName} onChange={event => setProfileName(event.target.value)} /><button type='button' className='btn' disabled={!profileName.trim() || (profiles.length >= 20 && !profiles.some(profile => profile.name === profileName.trim()))} onClick={saveProfile}>{t('dashboard.saveProfile')}</button></p>
+                    <p><label htmlFor='controller-profile-select'>{t('dashboard.savedProfiles')}</label><select id='controller-profile-select' value={selectedProfile} onChange={event => setSelectedProfile(event.target.value)}><option value=''>{t('dashboard.chooseProfile')}</option>{profiles.map(profile => <option key={profile.name} value={profile.name}>{profile.name}</option>)}</select><button type='button' className='btn' disabled={!profiles.some(profile => profile.name === selectedProfile)} onClick={() => { const profile = profiles.find(item => item.name === selectedProfile); if (profile) applyProfile(profile) }}>{t('dashboard.applyProfile')}</button><button type='button' className='btn' disabled={!profiles.some(profile => profile.name === selectedProfile)} onClick={() => { setSettings({...settings,v3_controller_profiles:profiles.filter(profile => profile.name !== selectedProfile)}); setSelectedProfile('') }}>{t('dashboard.deleteProfile')}</button></p>
                     <h1>{t('dashboard.controllerRemapping')}</h1>
                     <p>{t('dashboard.remappingDescription')}</p>
                     {Object.entries(validateButtonMapping(settings.v3_button_mapping)).map(([button, value]) => <p key={button}><label htmlFor={'map-' + button}>{button}</label><select id={'map-' + button} value={value} onChange={e => setSettings({...settings, v3_button_mapping:{...validateButtonMapping(settings.v3_button_mapping),[button]:e.target.value}})}>{Array.from({length:64}, (_, index) => <option key={index} value={String(index)}>{index} {Object.keys(defaultButtonMapping).find(key => defaultButtonMapping[key] === String(index)) || ''}</option>)}</select></p>)}

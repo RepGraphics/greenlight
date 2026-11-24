@@ -1,3 +1,5 @@
+import type { ControllerProfile } from '../lib/controllerprofiles'
+
 export const defaultSettings = {
     streaming_engine: 'legacy',
     v3_renderer: 'video',
@@ -7,6 +9,7 @@ export const defaultSettings = {
     v3_swap_sticks: false,
     v3_mouse_sensitivity: 1,
     v3_button_mapping: {} as Record<string, string>,
+    v3_controller_profiles: [] as ControllerProfile[],
     xhome_bitrate: 0,
     xcloud_bitrate: 0,
     xcloud_show_non_entitled: true,

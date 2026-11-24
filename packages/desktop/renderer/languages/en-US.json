@@ -353,7 +353,29 @@
       "controllerRemapping": "Controller button remapping",
       "remappingDescription": "Map each Xbox action to a physical browser gamepad button index. Changes apply to the next V3 session.",
       "resetMapping": "Reset button mapping",
-      "exportDiagnostics": "Export diagnostics"
+      "exportDiagnostics": "Export diagnostics",
+      "controllerProfiles": "Controller profiles",
+      "profileDescription": "Save up to 20 named input configurations. Saving an existing name replaces that profile.",
+      "profileName": "Profile name",
+      "saveProfile": "Save current settings",
+      "savedProfiles": "Saved profiles",
+      "chooseProfile": "Choose a profile",
+      "applyProfile": "Apply",
+      "deleteProfile": "Delete",
+      "controllerPreset_standard": "Standard",
+      "controllerPreset_southpaw": "Southpaw",
+      "controllerPreset_inverted": "Inverted Y",
+      "controllerPreset_alternate": "Alternate face buttons",
+      "connectionQuality": "Connection quality",
+      "averageBitrate": "Average bitrate",
+      "quality_good": "Good",
+      "quality_fair": "Fair",
+      "quality_poor": "Poor",
+      "quality_insufficient": "Collecting data",
+      "qualityHint_good": "Latency and jitter are within the indicative targets.",
+      "qualityHint_fair": "Consider Ethernet or reducing the bitrate before the next session.",
+      "qualityHint_poor": "Check network congestion and consider a lower bitrate preset.",
+      "qualityHint_insufficient": "Waiting for enough video and latency samples."
     }
   }
 }
