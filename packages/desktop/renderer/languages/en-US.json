@@ -299,7 +299,17 @@
       "preset_dataSaver": "Data saver",
       "preset_balanced": "Balanced",
       "preset_highQuality": "High quality",
-      "customQuality": "Custom bitrate settings"
+      "customQuality": "Custom bitrate settings",
+      "social": "Friends",
+      "friendsOnline_one": "{{count}} online",
+      "friendsOnline_other": "{{count}} online",
+      "totalFriends_one": "{{count}} friend",
+      "totalFriends_other": "{{count}} friends",
+      "searchFriends": "Search friends",
+      "onlineOnly": "Online only",
+      "noFriendsFound": "No friends match your filters.",
+      "pinControls": "Keep controls visible (F8)",
+      "fullscreen": "Toggle fullscreen"
     }
   }
 }

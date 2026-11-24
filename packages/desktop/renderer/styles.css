@@ -324,3 +324,16 @@ div.component_gametitle .gl-art-placeholder { width: 140px; height: 140px; displ
 .gl-quality-preset { display:flex; flex-direction:column; align-items:flex-start; gap:8px; padding:14px; background:#303030; border:1px solid #555; border-radius:6px; color:white; cursor:pointer; }
 .gl-quality-preset.selected { border-color:#9bf00b; background:#244126; }
 .gl-quality-preset span { color:#c1c1c1; font-size:12px; }
+
+.gl-social-sidebar-heading { display:block; font-weight:600; padding:12px; color:#fff; }
+.gl-friend-link { display:flex; align-items:center; gap:10px; padding:12px; color:#fff; border-radius:6px; text-decoration:none; min-width:0; }
+.gl-friend-link:hover { background:#343434; }
+.gl-friend-details { display:flex; flex-direction:column; min-width:0; gap:5px; }
+.gl-friend-details span { font-size:12px; color:#bbb; overflow-wrap:anywhere; }
+.gl-social-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); gap:12px; }
+.gl-social-grid .gl-friend-link { background:#252525; border:1px solid #444; }
+.gl-library-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:16px; align-items:start; padding:12px; }
+.gl-library-pagination { display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:12px; padding:18px; }
+.gl-stream-extra { display:flex; justify-content:flex-end; align-items:center; gap:5px; }
+.gl-stream-extra button[aria-pressed=true] { color:#9bf00b; }
+@media(max-width:800px) { .gl-library-grid { gap:10px; padding:5px; } .gl-console-page { padding:12px; } .gl-dashboard-welcome,.gl-resume-card { padding:16px; } }

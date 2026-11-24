@@ -89,6 +89,11 @@ export default class IpcApp extends IpcBase {
         })
     }
 
+    getFriends(){
+        const worker = this._application._xboxWorker
+        return Promise.resolve(worker ? Object.values(worker._friends) : [])
+    }
+
     getOnlineFriends(){
         return new Promise((resolve) => {
             if(this._application._xboxWorker === undefined){

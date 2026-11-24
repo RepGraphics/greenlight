@@ -5,7 +5,8 @@ export default class xboxWorker {
     _application:Application
     
     _friends = {}
-    _onlineFriends = {}
+    _onlineFriends = []
+    private updating = false
 
     constructor(application){
         this._application = application
@@ -20,6 +21,8 @@ export default class xboxWorker {
     intervalFriends(){
         // console.log('xbox worker loop run')
 
+        if (this.updating) return
+        this.updating = true
         this.updateFriends().then((friends:any) => {
             // Get all friends
             // console.log('xboxWorker - Updated friends successfully')
@@ -34,14 +37,15 @@ export default class xboxWorker {
 
             this._onlineFriends = onlineFriends
         }).catch((error) => {
-            console.log('xboxWorker - Error updating friends:', error)
-        })
+            console.log('xboxWorker - Error updating friends')
+        }).finally(() => { this.updating = false })
 
     }
 
     updateFriends(){
         return new Promise((resolve, reject) => {
             this._application._webApi.providers.people.getFriends().then((friends) => {
+                this._friends = {}
                 for(const friend in friends.data.people){
                     this._friends[friends.data.people[friend].xuid] = friends.data.people[friend]
                 }

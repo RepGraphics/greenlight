@@ -1,46 +1,15 @@
 import React from 'react'
-import Ipc from '../../lib/ipc'
+import Link from 'next/link'
 import SidebarFriendItem from './frienditem'
+import { useFriends } from '../../context/useFriends'
 import { useTranslation } from 'react-i18next'
 
-function SidebarFriends() {
-    const [onlineFriends, setOnlineFriends] = React.useState([])
+export default function SidebarFriends() {
     const { t } = useTranslation()
-
-    React.useEffect(() => {
-
-        const updateFriends = () => {
-            Ipc.send('app', 'getOnlineFriends').then((onlineFriends) => {
-                setOnlineFriends(Array.isArray(onlineFriends) ? onlineFriends : [])
-            })
-        }
-        setTimeout(() => {
-            updateFriends()
-        }, 1000)
-        setTimeout(() => {
-            updateFriends()
-        }, 2000)
-        setTimeout(() => {
-            updateFriends()
-        }, 3000)
-        const friendsInterval = setInterval(updateFriends, 1000*15)
-
-        return () => {
-            clearInterval(friendsInterval)
-        }
-    }, [])
-
-    return (
-        <React.Fragment>
-            <div id="components_sidebarfriends" key="components_sidebarfriends">
-                {(onlineFriends.length > 0) ? onlineFriends.map((item:any) => {
-                    return (
-                        <SidebarFriendItem key={ item.xuid } userinfo={ item }></SidebarFriendItem>
-                    )
-                }) : <div className='components_sidebarfrienditem'><div className='components_sidebarfrienditem_userdetails'><p>{t('friends.allFriendsOffline')}</p></div></div> }
-            </div>
-        </React.Fragment>
-    )
+    const friends = useFriends()
+    const online = (friends.data || []).filter(friend => friend.presenceState && friend.presenceState !== 'Offline')
+    return <div id="components_sidebarfriends">
+        <Link href="/social" className="gl-social-sidebar-heading">{t('dashboard.social')} · {online.length}</Link>
+        {friends.isLoading ? <p>{t('dashboard.refreshing')}</p> : friends.isError ? <p>{t('dashboard.requestFailed')}</p> : online.length ? online.map(friend => <SidebarFriendItem key={friend.xuid} userinfo={friend} />) : <p>{t('friends.allFriendsOffline')}</p>}
+    </div>
 }
-
-export default SidebarFriends

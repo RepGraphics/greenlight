@@ -1,55 +1,12 @@
 import React from 'react'
-import Image from 'next/image'
-
-interface SidebarFriendItemProps {
-  userinfo;
+import Link from 'next/link'
+import { XboxFriend, friendPresence } from '../../context/useFriends'
+export default function SidebarFriendItem({ userinfo }: { userinfo: XboxFriend }) {
+    return <Link className="components_sidebarfrienditem gl-friend-link" href={'/profile/' + encodeURIComponent(userinfo.xuid)}>
+        <span className="gl-avatar gl-avatar-small">
+            {userinfo.displayPicRaw && <img src={userinfo.displayPicRaw} alt="" loading="lazy" onError={e => { e.currentTarget.style.display = 'none' }} />}
+            <i className="fa-solid fa-user" aria-hidden="true" />
+        </span>
+        <span className="gl-friend-details"><strong>{userinfo.displayName || userinfo.gamertag || userinfo.xuid}</strong><span>{friendPresence(userinfo)}</span></span>
+    </Link>
 }
-
-function SidebarFriendItem({
-    userinfo,
-}: SidebarFriendItemProps) {
-
-    function drawPresence(){
-
-        for(const app in userinfo.presenceDetails){
-            if(userinfo.presenceDetails[app].IsGame && userinfo.presenceDetails[app].IsPrimary){
-                return userinfo.presenceDetails[app].PresenceText
-                // return userinfo.presenceDetails[app].RichPresenceText || userinfo.presenceDetails[app].PresenceText
-            }
-        }
-    
-        return userinfo.presenceText
-    }
-
-    return (
-        <React.Fragment>
-            <div className='components_sidebarfrienditem' key={userinfo.xuid}>
-                <div style={ { display: 'flex' }}>
-                    <div className="components_sidebarfrienditem_gamerpic" style={ {
-                        borderColor: '#' + userinfo.preferredColor.primaryColor,
-                    }}>
-                        <Image alt="Gamerpic" className='components_sidebarfrienditem_gamerpic_img' width='45' height='45' loading='lazy' src={userinfo.displayPicRaw.replace('&mode=Padding', '')} />
-                    </div>
-          
-                    <div className='components_sidebarfrienditem_userdetails'>
-                        <div>
-                            <h1>{userinfo.displayName}</h1>
-                            <p>{drawPresence()}</p>
-                        </div>
-                        {/* <div className='components_sidebarfrienditem_useroptions'>
-              <Link href={ '/profile/'+userinfo.xuid }>
-                <Button label="profile" className='btn-small'></Button>
-              </Link>
-            </div> */}
-                        {/* <p style={ { color: '#'+userinfo.preferredColor.primaryColor }}>{userinfo.preferredColor.primaryColor}</p>
-            <p style={ { color: '#'+userinfo.preferredColor.secondaryColor }}>{userinfo.preferredColor.secondaryColor}</p>
-            <p style={ { color: '#'+userinfo.preferredColor.tertiaryColor }}>{userinfo.preferredColor.tertiaryColor}</p> */}
-                    </div>
-                </div>
-        
-            </div>
-        </React.Fragment>
-    )
-}
-
-export default SidebarFriendItem

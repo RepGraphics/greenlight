@@ -17,6 +17,7 @@ export default function Header({ hidden = false, gamertag, gamerpic, level = 0 }
     const links = [
         { name: t('header.myConsoles'), url: '/home', icon: 'fa-gamepad' },
         ...(level > 1 ? [{ name: t('header.xCloudLibrary'), url: '/xcloud/home', icon: 'fa-cloud' }] : []),
+        { name: t('dashboard.social'), url: '/social', icon: 'fa-users' },
         { name: t('header.settings'), url: '/settings/home', icon: 'fa-gear' },
     ]
     const isActive = (url: string) => router.pathname === url || (url.startsWith('/xcloud') && router.pathname.startsWith('/xcloud/')) || (url.startsWith('/settings') && router.pathname.startsWith('/settings/'))

@@ -25,7 +25,13 @@ function StreamComponent({
         return performance.now() / 1000.0
     }
 
-    let lastMovement = 0
+    let lastMovement = Date.now()
+    const pinned = React.useRef(false)
+    const [controlsPinned, setControlsPinned] = React.useState(false)
+    const [fullscreen, setFullscreen] = React.useState(false)
+    const togglePin = () => { pinned.current = !pinned.current; setControlsPinned(pinned.current) }
+    const toggleFullscreen = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen() } catch { /* unavailable */ } }
+    React.useEffect(() => { const sync = () => setFullscreen(Boolean(document.fullscreenElement)); document.addEventListener('fullscreenchange', sync); return () => document.removeEventListener('fullscreenchange', sync) }, [])
     // let gamebarElement = document.getElementById('component_streamcomponent_gamebar')
     let debugElement = document.getElementById('component_streamcomponent_debug')
     let webRtcStatsInterval
@@ -231,7 +237,7 @@ function StreamComponent({
                 return
             }
 
-            if ((Date.now() - lastMovement) >= 2000) {
+            if (!pinned.current && !gamebarElement.contains(document.activeElement) && (Date.now() - lastMovement) >= 2000) {
                 if (!gamebarElement.className.includes('hidden')) {
                     gamebarElement.className = 'hidden'
                 }
@@ -245,13 +251,14 @@ function StreamComponent({
 
         // Keyboard events
         const keyboardPressEvent = (e) => {
+            if (e.key === 'F8') { e.preventDefault(); pinned.current = !pinned.current; setControlsPinned(pinned.current); return }
             switch (e.keyCode) {
                 case 126:
                     toggleDebug()
                     break
             }
         }
-        window.addEventListener('keypress', keyboardPressEvent)
+        window.addEventListener('keydown', keyboardPressEvent)
 
         // cleanup this component
         return () => {
@@ -261,7 +268,7 @@ function StreamComponent({
             droppedUplot.destroy()
             window.removeEventListener('mousemove', mouseEvent)
             window.removeEventListener('mousedown', mouseEvent)
-            window.removeEventListener('keypress', keyboardPressEvent)
+            window.removeEventListener('keydown', keyboardPressEvent)
             clearInterval(mouseInterval)
 
             // ipcRenderer.removeAllListeners('xcloud');
@@ -399,11 +406,13 @@ function StreamComponent({
                             svg={volumeIcon}
                         />
 
-                        <div style={{
+                        <div className='gl-stream-extra' style={{
                             marginRight: 20,
                             width: '25%',
                             textAlign: 'right',
                         }}>
+                            <button type='button' className='btn' aria-pressed={controlsPinned} title={t('dashboard.pinControls')} onClick={togglePin}><i className='fa-solid fa-thumbtack' aria-hidden='true' /></button>
+                            <button type='button' className='btn' aria-label={t('dashboard.fullscreen')} aria-pressed={fullscreen} onClick={() => { void toggleFullscreen() }}><i className={'fa-solid ' + (fullscreen ? 'fa-compress' : 'fa-expand')} aria-hidden='true' /></button>
                             <Button label={<i className="fa-solid fa-bug"></i>} title={t("streamWindow.debugTitle")} onClick={(e) => {
                                 e.target.blur(); toggleDebug()
                             }}></Button>

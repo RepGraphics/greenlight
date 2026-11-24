@@ -8,7 +8,7 @@ interface EventArgs {
 }
 
 const allowed: Record<string, string[]> = {
-    app: ['loadCachedUser', 'getAuthState', 'login', 'quit', 'restart', 'clearData', 'getOnlineFriends', 'onUiShown', 'setForceRegionIp', 'setPreferredGameLanguage', 'debug'],
+    app: ['loadCachedUser', 'getAuthState', 'login', 'quit', 'restart', 'clearData', 'getOnlineFriends', 'getFriends', 'onUiShown', 'setForceRegionIp', 'setPreferredGameLanguage', 'debug'],
     settings: ['setSettings', 'getSettings', 'getWebUIStatus', 'getWebUIAccessToken', 'startWebUI', 'stopWebUI', 'setLowResolution'],
     consoles: ['get'],
     xCloud: ['getRecentTitles', 'getTitles', 'filterTitles', 'getNewTitles', 'getTitle'],
