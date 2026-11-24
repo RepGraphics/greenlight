@@ -18,13 +18,16 @@ const resources = importAllLanguages();
 
 // Function to initialize i18n with language from settings
 export function initI18nWithLanguage(settings) {
-    console.log("[i18n] Initializing i18n with settings:", settings);
   const initialLanguage = settings?.language || "en-US";
   console.log("[i18n] Initializing i18n with language:", initialLanguage);
+  if (i18n.isInitialized) {
+    if (i18n.language !== initialLanguage) void i18n.changeLanguage(initialLanguage);
+    return;
+  }
   i18n.use(initReactI18next).init({
     resources,
     lng: initialLanguage,
-    fallbackLng: initialLanguage,
+    fallbackLng: 'en-US',
     interpolation: {
       escapeValue: false,
     },

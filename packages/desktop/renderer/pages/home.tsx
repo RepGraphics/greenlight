@@ -24,11 +24,11 @@ function Home() {
             <section className='gl-console-page'>
                 <div className='gl-console-hero'>
                     <h1>{t('page.myConsoles.pageTitle')}</h1>
-                    <Button label={consoles.isFetching ? 'Refreshing…' : 'Refresh'} disabled={consoles.isFetching} onClick={() => { void consoles.refetch() }} />
+                    <Button label={consoles.isFetching ? t('dashboard.refreshing') : t('dashboard.refresh')} disabled={consoles.isFetching} onClick={() => { void consoles.refetch() }} />
                 </div>
                 <div className='gl-console-grid' aria-busy={consoles.isFetching}>
                 { (consoles.isLoading === true) ? <Loader></Loader> :
-                    consoles.isError && !Array.isArray(consoles.data) ? <div className='gl-console-feedback' role='alert'>Unable to load consoles. Use Refresh to try again.</div> :
+                    consoles.isError && !Array.isArray(consoles.data) ? <div className='gl-console-feedback' role='alert'>{t('dashboard.consoleError')}</div> :
                     (Array.isArray(consoles.data) && consoles.data.length > 0) ? consoles.data.map((item) => {
                         return (
                             <Card className='padbottom' key={item.id}>

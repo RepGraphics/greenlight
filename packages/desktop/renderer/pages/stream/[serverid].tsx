@@ -204,7 +204,7 @@ function Stream() {
                             // @TODO: Show queue position
                             if(queueTime === 0){
                                 setQueueTime((session.waitingTimes?.estimatedTotalWaitTimeInSeconds || 0))
-                                console.log('Setting queue to:', session.waitingTimes.estimatedTotalWaitTimeInSeconds)
+                                console.log('Setting queue to:', session.waitingTimes?.estimatedTotalWaitTimeInSeconds)
 
 
                             }
@@ -231,7 +231,7 @@ function Stream() {
                 clearInterval(streamStateInterval)
             }
         }
-    })
+    }, [router.isReady, router.query.serverid, sessionId, xPlayer])
 
     function gamepadSend(button){
         console.log('Pressed button:', button)

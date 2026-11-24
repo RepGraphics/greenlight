@@ -24,11 +24,11 @@ export default class Authentication {
     constructor(application:Application){
         this._application = application
         this._tokenStore = new AuthTokenStore()
-        this._tokenStore.load()
         this._msal = new Msal(this._tokenStore)
     }
 
     checkAuthentication(){
+        this._tokenStore.load()
         this._application.log('authenticationV2', '[checkAuthentication()] Starting token check...')
         if(this._tokenStore.hasValidAuthTokens()){
 
@@ -38,7 +38,7 @@ export default class Authentication {
                 return false
             }
 
-            this._application.log('authenticationV2', '[checkAuthentication()] Tokens are valid:', this._tokenStore.getUserToken())
+            this._application.log('authenticationV2', '[checkAuthentication()] Tokens are valid')
             this.startSilentFlow()
 
             return true
@@ -75,7 +75,7 @@ export default class Authentication {
 
     getTokens(){
         this.getStreamingToken().then((streamingTokens) => {
-            this._application.log('authenticationV2', '[getTokens()] Retrieved streaming tokens:', streamingTokens)
+            this._application.log('authenticationV2', '[getTokens()] Retrieved streaming tokens')
 
             if(streamingTokens.xCloudToken !== undefined){
                 this._application.log('authenticationV2', '[getTokens()] Retrieved both xHome and xCloud tokens')
@@ -120,7 +120,7 @@ export default class Authentication {
         }
 
         this._msal.doDeviceCodeAuth().then((data) => {
-            this._application.log('authenticationV2', '[startAuthflow()] Starting devicecode auth:', data)
+            this._application.log('authenticationV2', '[startAuthflow()] Starting devicecode auth')
 
             dialog.showMessageBox({
                 message: data.message+' Click OK to continue after entering code.',
@@ -129,8 +129,8 @@ export default class Authentication {
 
             this._isAuthenticating = true
 
-            this._msal.doPollForDeviceCodeAuth(data.device_code).then((token) => {
-                this._application.log('authenticationV2', '[startAuthflow()] Devicecode authentication successful:', token)
+            this._msal.doPollForDeviceCodeAuth(data.device_code).then(() => {
+                this._application.log('authenticationV2', '[startAuthflow()] Devicecode authentication successful')
 
                 this.getTokens()
 
@@ -168,10 +168,10 @@ export default class Authentication {
         if(userToken === undefined)
             throw new Error( this.t('errors.sisuTokenIsMissing') )
 
-        this._application.log('authenticationV2', '[getStreamingToken()] Found local token:', userToken)
+        this._application.log('authenticationV2', '[getStreamingToken()] Found local token')
 
         const streamingTokens = await this._msal.getStreamingTokens()
-        this._application.log('authenticationV2', '[getStreamingToken()] Retrieved streaming tokens:', streamingTokens)
+        this._application.log('authenticationV2', '[getStreamingToken()] Retrieved streaming tokens')
 
         return { xHomeToken: streamingTokens.xHomeToken, xCloudToken: streamingTokens.xCloudToken }
         // return { xHomeToken: streamingTokens.xHomeToken, xCloudToken: undefined }

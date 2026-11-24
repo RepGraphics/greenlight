@@ -14,8 +14,8 @@ export default function Profile({ account }: ProfileProps) {
     return (
         <section className="gl-profile-page">
             <Head><title>Greenlight - My Profile</title></Head>
-            <h1>My profile</h1>
-            {!account?.gamertag ? <p className="gl-console-feedback" role="status">Profile information is not available yet.</p> : (
+            <h1>{t('dashboard.profile')}</h1>
+            {!account?.gamertag ? <p className="gl-console-feedback" role="status">{t('dashboard.profileUnavailable')}</p> : (
                 <>
                     <div className="gl-profile-hero">
                         <div className="gl-avatar gl-avatar-large">
@@ -23,16 +23,16 @@ export default function Profile({ account }: ProfileProps) {
                             <i className="fa-solid fa-user" aria-hidden="true" />
                         </div>
                         <div>
-                            <p className="gl-eyebrow">Xbox profile</p>
+                            <p className="gl-eyebrow">{t('dashboard.xboxProfile')}</p>
                             <h2>{account.gamertag}</h2>
-                            <p className="gl-profile-status"><span />{account.signedIn ? 'Signed in' : 'Account'}</p>
+                            <p className="gl-profile-status"><span />{account.signedIn ? t('dashboard.signedIn') : t('dashboard.account')}</p>
                         </div>
                     </div>
                     <div className="gl-profile-stats">
                         <article><i className="fa-solid fa-trophy" aria-hidden="true" /><p>{t('auth.gamerscore')}</p><strong>{account.gamerscore === '' || account.gamerscore == null ? '—' : account.gamerscore}</strong></article>
-                        <article><i className="fa-brands fa-xbox" aria-hidden="true" /><p>Platform</p><strong>Xbox</strong></article>
+                        <article><i className="fa-brands fa-xbox" aria-hidden="true" /><p>{t('dashboard.platform')}</p><strong>Xbox</strong></article>
                     </div>
-                    <h2 className="gl-section-heading">Quick access</h2>
+                    <h2 className="gl-section-heading">{t('dashboard.quickAccess')}</h2>
                     <div className="gl-profile-links">
                         <Link href="/home"><i className="fa-solid fa-gamepad" aria-hidden="true" />{t('header.myConsoles')}</Link>
                         <Link href="/settings/home"><i className="fa-solid fa-gear" aria-hidden="true" />{t('header.settings')}</Link>

@@ -9,7 +9,7 @@ import { useSettings } from "../../context/userContext";
 const LanguageSelector: React.FC = () => {
   const { setLanguage } = useLanguage();
   const { t } = useTranslation();
-  const { settings, setSettings } = useSettings();
+  const { settings } = useSettings();
 
   // Get the list of available languages and their names from i18n resources
   const resources = i18n.options.resources || {};
@@ -25,8 +25,6 @@ const LanguageSelector: React.FC = () => {
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const lang = e.target.value;
     setLanguage(lang);
-    i18n.changeLanguage(lang); // Apply language instantly
-    setSettings({ ...settings, language: lang });
   };
 
   return (
