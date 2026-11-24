@@ -53,6 +53,8 @@ Open a successful workflow run and download the artifact for your platform. GitH
 | Linux | AppImage or Debian package (.deb) |
 | macOS | Universal DMG |
 
+Maintainers can manually run the installer workflow with **draft_release** enabled to prepare an unpublished development prerelease containing all three platform artifacts, SHA-256 checksums and recent commit notes. Review the draft before publishing.
+
 Development installers are not guaranteed to be signed or notarized. Verify the source before running them. Artifacts expire according to GitHub retention settings.
 
 The original [Flathub package](https://flathub.org/apps/details/io.github.unknownskl.greenlight) belongs to upstream Greenlight and does not include this fork's changes.
