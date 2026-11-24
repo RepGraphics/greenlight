@@ -502,7 +502,13 @@
       "captureLibraryEmpty": "No saved captures in this view.",
       "capturePreview": "Preview",
       "captureDownload": "Download",
-      "captureDelete": "Delete"
+      "captureDelete": "Delete",
+      "instantReplay": "Instant replay (experimental)",
+      "saveReplay": "Save recent segment",
+      "replayReady": "REPLAY · 30s segments",
+      "replayBuffering": "REPLAY · buffering",
+      "replayFailed": "Replay unavailable or no recent segment could be saved.",
+      "replaySaved": "Replay ready. Download or save to library."
     }
   }
 }

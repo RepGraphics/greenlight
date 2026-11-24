@@ -6,6 +6,8 @@ Changes on `main-v2` are development changes, not a new numbered release. See [c
 
 ### Added
 
+- Experimental opt-in instant replay with rotating standalone WebM segments, capture-library integration and bounded memory.
+
 - Opt-in draft development releases with platform installers, recent commit notes and SHA-256 checksums after successful builds.
 
 - Persistent local V3 capture library with preview, download, deletion and bounded storage.

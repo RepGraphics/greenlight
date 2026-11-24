@@ -34,7 +34,7 @@ export function startStreamRecording(video: HTMLVideoElement, onFinished:(blob:B
         chunks.push(event.data);bytes+=event.data.size
         if(bytes>=recordingLimitBytes)stop()
     }
-    recorder.onerror=()=>{failed=true;stop();if(recorder.state==='inactive')finish()}
+    recorder.onerror=()=>{failed=true;stop()}
     recorder.onstop=finish
     try{recorder.start(1000)}catch(error){tracks.forEach(track=>track.stop());throw error}
     timer=setTimeout(stop,recordingLimitMs)

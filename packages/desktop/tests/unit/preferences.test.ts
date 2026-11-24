@@ -113,3 +113,6 @@ test('stream shortcuts reject unsafe keys and resolve duplicates',()=>{assert.eq
 
 import { canStoreCapture,captureLimitBytes,captureLimitCount } from '../../renderer/lib/capturelibrary'
 test('capture library enforces byte and count limits without automatic deletion',()=>{assert.equal(canStoreCapture(1,0,0),true);assert.equal(canStoreCapture(1,captureLimitCount,0),false);assert.equal(canStoreCapture(1,0,captureLimitBytes),false);assert.equal(canStoreCapture(captureLimitBytes,0,0),true);assert.equal(canStoreCapture(-1,0,0),false);assert.equal(canStoreCapture(1,0,NaN),false)})
+
+import { validReplaySegment,replayMaxBytes } from '../../renderer/lib/instantreplay'
+test('instant replay only accepts recent complete bounded WebM segments',()=>{const blob=new Blob(['video'],{type:'video/webm'});assert.equal(validReplaySegment({blob,startedAt:1000,endedAt:31000},32000),true);assert.equal(validReplaySegment({blob,startedAt:1000,endedAt:31000},100000),false);assert.equal(validReplaySegment({blob:new Blob([],{type:'video/webm'}),startedAt:1000,endedAt:31000},32000),false);assert.equal(validReplaySegment({blob,startedAt:32000,endedAt:31000},32000),false);assert.equal(replayMaxBytes,32*1024*1024)})
