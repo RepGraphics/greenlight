@@ -82,3 +82,6 @@ test('sharpening is opt-in, bounded and preserves constant image brightness',()=
 
 import { screenshotFilename } from '../../renderer/lib/streamcapture'
 test('screenshot filenames use portable UTC timestamps',()=>{assert.equal(screenshotFilename(new Date('2026-11-24T14:00:01.123Z')),'greenlight-2026-11-24T14-00-01-123Z.png')})
+
+import { recordingFilename, recordingLimitBytes, recordingLimitMs } from '../../renderer/lib/streamrecording'
+test('recording uses bounded clip targets and portable filenames',()=>{assert.equal(recordingFilename(new Date('2026-11-24T14:00:01.123Z')),'greenlight-clip-2026-11-24T14-00-01-123Z.webm');assert.equal(recordingLimitBytes,134217728);assert.equal(recordingLimitMs,300000)})

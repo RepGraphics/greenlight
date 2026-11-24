@@ -461,7 +461,15 @@
       "captureStandardVideoHint": "Requires standard video rendering and a decoded frame. Screenshots and floating video exclude visual filters and overlays.",
       "screenshotReady": "Screenshot prepared for download.",
       "screenshotFailed": "Unable to capture a video frame.",
-      "pipFailed": "Picture-in-picture is unavailable for this stream."
+      "pipFailed": "Picture-in-picture is unavailable for this stream.",
+      "startRecording": "Record clip (up to 5 min)",
+      "stopRecording": "Stop recording",
+      "recordingFailed": "Recording interrupted or unavailable.",
+      "recordingStopped": "Recording stopped.",
+      "clipReady": "Recorded clip ready",
+      "saveClip": "Save WebM",
+      "discardClip": "Discard clip",
+      "saveClipBeforeExit": "Save or discard your recorded clip before ending the stream."
     }
   }
 }
