@@ -473,7 +473,9 @@
       "requestedResolution": "Requested resolution",
       "resolutionHint": "Advertise a 720p or 1080p client display when starting a new session. Xbox determines the actual encoded resolution; this preference is not a guarantee.",
       "homeResolution": "Remote Play display resolution",
-      "cloudResolution": "Cloud Gaming display resolution"
+      "cloudResolution": "Cloud Gaming display resolution",
+      "autoRecovery": "Auto-reconnect (Remote Play)",
+      "recoveryPending": "Attempting to restart the Remote Play session shortly. This may interrupt gameplay."
     }
   }
 }

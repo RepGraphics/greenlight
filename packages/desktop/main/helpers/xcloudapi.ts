@@ -144,6 +144,7 @@ export default class xCloudApi {
                 reject(error)
             })
 
+            req.setTimeout(15000, () => req.destroy(new Error('Xbox API request timed out')))
             req.write(JSON.stringify(postData))
 
             req.end()

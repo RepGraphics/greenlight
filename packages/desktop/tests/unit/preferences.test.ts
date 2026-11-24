@@ -88,3 +88,6 @@ test('recording uses bounded clip targets and portable filenames',()=>{assert.eq
 
 import { requestedDisplay } from '../../main/helpers/streamresolution'
 test('requested display sizes accept only supported presets',()=>{assert.deepEqual(requestedDisplay(720),{widthInPixels:1280,heightInPixels:720});assert.deepEqual(requestedDisplay(1080),{widthInPixels:1920,heightInPixels:1080});assert.deepEqual(requestedDisplay(2160),requestedDisplay(1080));assert.deepEqual(requestedDisplay('720'),requestedDisplay(1080))})
+
+import { recoveryDelay } from '../../renderer/lib/sessionrecovery'
+test('automatic recovery is opt-in, limited to established Remote Play and bounded',()=>{assert.equal(recoveryDelay(true,false,true,0),3000);assert.equal(recoveryDelay(true,false,true,1),8000);assert.equal(recoveryDelay(true,false,true,2),null);assert.equal(recoveryDelay(true,true,true,0),null);assert.equal(recoveryDelay(false,false,true,0),null);assert.equal(recoveryDelay(true,false,false,0),null)})
