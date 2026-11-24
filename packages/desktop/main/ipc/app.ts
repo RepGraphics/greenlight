@@ -94,6 +94,33 @@ export default class IpcApp extends IpcBase {
         return Promise.resolve(worker ? Object.values(worker._friends) : [])
     }
 
+    private async achievementUser() {
+        if (!this._application._authentication._isAuthenticated || !this._application._webApi) throw new Error('Sign in to Xbox first')
+        let xuid = String(this._application._store.get('user.xuid') || '')
+        if (!/^\d{1,20}$/.test(xuid)) {
+            const response = await this._application._webApi.providers.profile.getCurrentUser()
+            xuid = String(response.data.profileUsers?.[0]?.id || '')
+            if (!/^\d{1,20}$/.test(xuid)) throw new Error('Xbox profile unavailable')
+            this._application._store.set('user.xuid', xuid)
+        }
+        return xuid
+    }
+
+    async getAchievementGames(args: { continuationToken?: string } = {}) {
+        const xuid = await this.achievementUser()
+        const token = typeof args.continuationToken === 'string' ? args.continuationToken : undefined
+        const response = await this._application._webApi.providers.achievements.getAchievements(xuid, token, 50)
+        return { items: response.data.titles || [], next: response.data.pagingInfo?.continuationToken || null }
+    }
+
+    async getGameAchievements(args: { titleId: string; continuationToken?: string }) {
+        if (typeof args.titleId !== 'string' || !/^\d{1,10}$/.test(args.titleId)) throw new Error('Invalid Xbox title ID')
+        const xuid = await this.achievementUser()
+        const token = typeof args.continuationToken === 'string' ? args.continuationToken : undefined
+        const response = await this._application._webApi.providers.achievements.getTitleId(xuid, args.titleId, token, 50)
+        return { items: response.data.achievements || [], next: response.data.pagingInfo?.continuationToken || null }
+    }
+
     getOnlineFriends(){
         return new Promise((resolve) => {
             if(this._application._xboxWorker === undefined){

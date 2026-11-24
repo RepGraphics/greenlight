@@ -34,6 +34,7 @@ export default function Profile({ account }: ProfileProps) {
                     </div>
                     <h2 className="gl-section-heading">{t('dashboard.quickAccess')}</h2>
                     <div className="gl-profile-links">
+                        <Link href="/achievements"><i className="fa-solid fa-trophy" aria-hidden="true" />{t('dashboard.achievements')}</Link>
                         <Link href="/home"><i className="fa-solid fa-gamepad" aria-hidden="true" />{t('header.myConsoles')}</Link>
                         <Link href="/settings/home"><i className="fa-solid fa-gear" aria-hidden="true" />{t('header.settings')}</Link>
                     </div>

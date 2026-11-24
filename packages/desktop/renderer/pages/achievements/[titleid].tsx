@@ -1,71 +1,30 @@
 import React from 'react'
 import Head from 'next/head'
-import Card from '../../components/ui/card'
-import AchievementRow from '../../components/achievement/row'
-import Loader from '../../components/ui/loader'
-
-function AchievmentTitle() {
-    // const router = useRouter()
-    // const [achievements, setAchievements] = React.useState([])
-    const achievements = []
-    // let loadingAchievements = []
-
-    React.useEffect(() => {
-
-        // if(achievements.length === 0){
-        //     // ipcRenderer.send('xboxweb', {
-        //     //   type: 'get_recent_achievements_titleid',
-        //     //   titleid: router.query.titleid,
-        //     // })
-        //     loadingAchievements = []
-        // }
-
-        // ipcRenderer.on('xboxweb', (event, args) => {
-        //   if(args.type === 'error'){
-        //     alert((args.data !== undefined) ? args.message+': '+JSON.stringify(args.data) : args.message)
-
-        //   } else if(args.type == 'get_recent_achievements_titleid') {
-        //     console.log('Received achievements:', args)
-
-        //     loadingAchievements = [...loadingAchievements, ...args.data.achievements]
-
-        //     if(args.data.pagingInfo.continuationToken !== null){
-        //       ipcRenderer.send('xboxweb', {
-        //         type: 'get_recent_achievements_titleid',
-        //         titleid: router.query.titleid,
-        //         continuationToken: args.data.pagingInfo.continuationToken,
-        //       })
-        //     } else {
-        //       setAchievements(loadingAchievements)
-        //     }
-
-        //   } else {
-        //     console.log('got unknown response:', args)
-        //   }
-        // })
-
-        return () => {
-            // ipcRenderer.removeAllListeners('xboxweb')
-        }
-    })
-
-    return (
-        <React.Fragment>
-            <Head>
-                <title>Greenlight - View achievements</title>
-            </Head>
-
-            <div style={{ paddingTop: '20px' }}>
-                <Card>
-                    {achievements.map((item) => {
-                        return <AchievementRow achievement={ item }></AchievementRow>
-                    })}
-
-                    {achievements.length === 0 ? <Loader></Loader> : ''}
-                </Card>
-            </div>
-        </React.Fragment>
-    )
+import Link from 'next/link'
+import { useRouter } from 'next/router'
+import { useTranslation } from 'react-i18next'
+import { useGameAchievements } from '../../context/useAchievements'
+export default function AchievementTitle() {
+    const { t } = useTranslation()
+    const router = useRouter()
+    const id = typeof router.query.titleid === 'string' ? router.query.titleid : ''
+    const query = useGameAchievements(id)
+    const [filter, setFilter] = React.useState('all')
+    const items = (query.data?.pages || []).flatMap(page => page.items)
+    const unlocked = items.filter(item => item.progressState === 'Achieved').length
+    const visible = items.filter(item => filter === 'all' || (item.progressState === 'Achieved') === (filter === 'unlocked'))
+    return <section className="gl-console-page">
+        <Head><title>Greenlight - {t('dashboard.achievements')}</title></Head>
+        <Link href="/achievements" className="btn">{t('dashboard.achievements')}</Link>
+        <h1>{items[0]?.titleAssociations?.[0]?.name || t('dashboard.achievements')}</h1>
+        <p>{unlocked} / {items.length} {t('dashboard.unlocked')} ({t('dashboard.loadedItems')})</p>
+        <div className="gl-console-toolbar">{['all','unlocked','locked'].map(value => <button key={value} className={'btn ' + (value === filter ? 'btn-primary' : '')} aria-pressed={value === filter} onClick={() => setFilter(value)}>{t('dashboard.' + value)}</button>)}</div>
+        {!router.isReady || query.isLoading ? <p>{t('dashboard.refreshing')}</p> : query.isError && !items.length ? <p role="alert">{t('dashboard.requestFailed')}</p> : <div className="gl-achievement-list">{visible.map(item => {
+            const achieved = item.progressState === 'Achieved'
+            const secret = item.isSecret && !achieved
+            const reward = item.rewards?.find(reward => reward.type === 'Gamerscore')?.value
+            return <article key={(item.serviceConfigId || '') + ':' + item.id} className="gl-achievement-card"><i className={'fa-solid ' + (achieved ? 'fa-trophy' : 'fa-lock')} aria-hidden="true" /><div><h2>{secret ? t('dashboard.secretAchievement') : item.name}</h2><p>{secret ? t('dashboard.secretDescription') : achieved ? item.description : item.lockedDescription}</p><p>{t(achieved ? 'dashboard.unlocked' : 'dashboard.locked')}{reward && !secret ? ' · ' + reward + ' G' : ''}</p></div></article>
+        })}{!visible.length && <p>{t('dashboard.noAchievements')}</p>}</div>}
+        {query.hasNextPage && <button className="btn" disabled={query.isFetchingNextPage} onClick={() => { void query.fetchNextPage() }}>{t('dashboard.loadMore')}</button>}
+    </section>
 }
-
-export default AchievmentTitle

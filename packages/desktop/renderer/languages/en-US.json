@@ -317,7 +317,17 @@
       "navigateHint": "Navigate",
       "performanceHud": "Performance HUD",
       "jitter": "jitter",
-      "packetsLost": "packets lost"
+      "packetsLost": "packets lost",
+      "achievements": "Achievements",
+      "searchGames": "Search games",
+      "unlocked": "Unlocked",
+      "locked": "Locked",
+      "all": "All",
+      "loadMore": "Load more",
+      "loadedItems": "Loaded achievements",
+      "secretAchievement": "Secret achievement",
+      "secretDescription": "Unlock this achievement to reveal its details.",
+      "noAchievements": "No achievements match this filter."
     }
   }
 }

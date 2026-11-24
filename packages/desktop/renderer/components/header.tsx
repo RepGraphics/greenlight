@@ -17,10 +17,11 @@ export default function Header({ hidden = false, gamertag, gamerpic, level = 0 }
     const links = [
         { name: t('header.myConsoles'), url: '/home', icon: 'fa-gamepad' },
         ...(level > 1 ? [{ name: t('header.xCloudLibrary'), url: '/xcloud/home', icon: 'fa-cloud' }] : []),
+        { name: t('dashboard.achievements'), url: '/achievements', icon: 'fa-trophy' },
         { name: t('dashboard.social'), url: '/social', icon: 'fa-users' },
         { name: t('header.settings'), url: '/settings/home', icon: 'fa-gear' },
     ]
-    const isActive = (url: string) => router.pathname === url || (url.startsWith('/xcloud') && router.pathname.startsWith('/xcloud/')) || (url.startsWith('/settings') && router.pathname.startsWith('/settings/'))
+    const isActive = (url: string) => router.pathname === url || (url === '/achievements' && router.pathname.startsWith('/achievements/')) || (url.startsWith('/xcloud') && router.pathname.startsWith('/xcloud/')) || (url.startsWith('/settings') && router.pathname.startsWith('/settings/'))
     return (
         <nav id="component_header" className={hidden ? 'disabled' : ''} aria-label="Main navigation">
             <Link href="/home" className="gl-brand" aria-label="Greenlight home">

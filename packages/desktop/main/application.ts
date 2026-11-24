@@ -179,6 +179,8 @@ export default class Application {
 
         this._webApi.providers.profile.get('/users/me/profile/settings?settings=GameDisplayName,GameDisplayPicRaw,Gamerscore,Gamertag').then((result) => {
             if(result.data.profileUsers.length > 0) {
+                const xuid = String(result.data.profileUsers[0].id || '')
+                if (/^\d{1,20}$/.test(xuid)) this._store.set('user.xuid', xuid)
                 for(const setting in result.data.profileUsers[0].settings){
 
                     if(result.data.profileUsers[0].settings[setting].id === 'Gamertag'){
