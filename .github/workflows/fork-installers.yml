@@ -50,6 +50,9 @@ jobs:
         run: yarn desktop test
       - name: Build renderer and main process
         run: yarn desktop build --no-pack
+      - name: Verify compiled Electron entry points
+        working-directory: packages/desktop
+        run: node -e "for (const f of [require('./package.json').main, 'app/preload.js']) { if (!require('node:fs').existsSync(f)) throw new Error('Missing compiled entry: ' + f) }"
       - name: Package installer without publishing
         working-directory: packages/desktop
         run: yarn exec electron-builder --publish never
