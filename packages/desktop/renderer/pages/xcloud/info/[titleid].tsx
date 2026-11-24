@@ -1,4 +1,8 @@
 import React from 'react'
+import { useSettings } from '../../../context/userContext'
+import { readGameProfiles } from '../../../lib/gameprofiles'
+import type { GameProfile } from '../../../lib/gameprofiles'
+import { readProfiles } from '../../../lib/controllerprofiles'
 import Head from 'next/head'
 import Ipc from '../../../lib/ipc'
 import Link from 'next/link'
@@ -14,13 +18,17 @@ import { useTranslation } from 'react-i18next'
 
 function xCloudInfo() {
     const router = useRouter()
-    const productDetails = useQuery('xcloudinfo_titleId_'+router.query.titleid, () => Ipc.send('xCloud', 'getTitle', { titleId: router.query.titleid}), { staleTime: 10*1000 })
-    const [productName, setProductName] = React.useState('...')
+    const { settings, setSettings } = useSettings()
+    const titleId = typeof router.query.titleid === 'string' ? router.query.titleid : ''
+    const productDetails = useQuery('xcloudinfo_titleId_'+titleId, () => Ipc.send('xCloud', 'getTitle', { titleId }), { staleTime: 10*1000, enabled: router.isReady && Boolean(titleId) })
+    const productName = productDetails.data?.catalogDetails?.ProductTitle || titleId || '...'
+    const profiles = readGameProfiles(settings.v3_game_profiles)
+    const stored = profiles.find(profile => profile.titleId === titleId)
+    const profile: GameProfile = stored || { titleId, title: productName, bitrate: null, renderer:'default', controllerProfile:'' }
+    const updateProfile = (patch: Partial<GameProfile>) => { if (!titleId || (!stored && profiles.length >= 100)) return; setSettings({...settings,v3_game_profiles:readGameProfiles([...profiles.filter(item => item.titleId !== titleId), {...profile,...patch,titleId,title:productName}])}) }
     const { t } = useTranslation()
     const hasEntitlement = productDetails.data?.hasEntitlement !== false
 
-    if(productDetails.isFetched === true && productName === '...')
-        setProductName(productDetails.data.catalogDetails.ProductTitle)
 
     return (
         <React.Fragment>
@@ -34,7 +42,7 @@ function xCloudInfo() {
                 <Link href={ '/xcloud/info/'+router.query.titleid }>{productName}</Link>
             </BreadcrumbBar>
 
-            {(productDetails.isFetched !== true) ? <React.Fragment><Loader></Loader></React.Fragment> : <React.Fragment>
+            {productDetails.isError ? <p role='alert'>{t('dashboard.gameDetailsFailed')} <button className='btn' onClick={() => productDetails.refetch()}>{t('dashboard.retryStream')}</button></p> : !productDetails.data?.catalogDetails ? <React.Fragment><Loader></Loader></React.Fragment> : <React.Fragment>
                 <div id="page_info_background" style={{
                     background: 'linear-gradient(0deg, rgba(26,27,30,0.7) 0%, rgba(26,27,30,0.7) 90%, rgba(26,27,30,0.7) 100%), url(https:'+ productDetails.data.catalogDetails.Image_Hero?.URL +')',
                     backgroundPosition: 'center',
@@ -59,6 +67,12 @@ function xCloudInfo() {
                     </div>
 
                     <div id="page_info_titleid_content">
+                        <h3>{t('dashboard.gameStreamProfile')}</h3>
+                        <p>{t('dashboard.gameProfileDescription')}</p>
+                        <p><label htmlFor='game-bitrate'>{t('dashboard.qualityPresets')}</label><select id='game-bitrate' value={profile.bitrate === null ? 'default' : String(profile.bitrate)} onChange={event => updateProfile({bitrate:event.target.value === 'default' ? null : Number(event.target.value)})}><option value='default'>{t('dashboard.useGlobalSettings')}</option>{[0,4096,10240,20480,40960].map(value => <option key={value} value={value}>{value === 0 ? t('settings.streaming.unlimitedLabel') : Math.round(value/1024)+' Mbps'}</option>)}</select></p>
+                        <p><label htmlFor='game-renderer'>{t('dashboard.v3Renderer')}</label><select id='game-renderer' value={profile.renderer} onChange={event => updateProfile({renderer:event.target.value as GameProfile['renderer']})}><option value='default'>{t('dashboard.useGlobalSettings')}</option><option value='video'>{t('dashboard.standardVideo')}</option><option value='webgpu'>WebGPU</option></select></p>
+                        <p><label htmlFor='game-controller'>{t('dashboard.controllerProfiles')}</label><select id='game-controller' value={profile.controllerProfile} onChange={event => updateProfile({controllerProfile:event.target.value})}><option value=''>{t('dashboard.useGlobalSettings')}</option>{readProfiles(settings.v3_controller_profiles).map(item => <option key={item.name} value={item.name}>{item.name}</option>)}</select></p>
+                        {stored && <button className='btn' onClick={() => setSettings({...settings,v3_game_profiles:profiles.filter(item => item.titleId !== titleId)})}>{t('dashboard.resetGameProfile')}</button>}
                         <h3>{t('page.titleInfo.descriptionTitle')}</h3>
 
                         <p>
@@ -68,7 +82,7 @@ function xCloudInfo() {
                         <h3>{t('page.titleInfo.capabilitiesTitle')}</h3>
 
                         <div>
-                            {productDetails.data.catalogDetails.Attributes.map((item) => {
+                            {(productDetails.data.catalogDetails.Attributes || []).map((item) => {
                                 if(item.LocalizedName === '')
                                     return
 

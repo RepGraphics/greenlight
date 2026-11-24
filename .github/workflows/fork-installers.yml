@@ -6,6 +6,7 @@ on:
     branches: [main-v2]
     paths:
       - 'packages/desktop/**'
+      - 'packages/player/**'
       - 'package.json'
       - 'yarn.lock'
       - '.github/workflows/fork-installers.yml'
@@ -15,7 +16,7 @@ permissions:
 
 concurrency:
   group: fork-installers-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:

@@ -375,7 +375,12 @@
       "qualityHint_good": "Latency and jitter are within the indicative targets.",
       "qualityHint_fair": "Consider Ethernet or reducing the bitrate before the next session.",
       "qualityHint_poor": "Check network congestion and consider a lower bitrate preset.",
-      "qualityHint_insufficient": "Waiting for enough video and latency samples."
+      "qualityHint_insufficient": "Waiting for enough video and latency samples.",
+      "gameStreamProfile": "Game streaming profile",
+      "gameProfileDescription": "Override global bitrate for this cloud game. Renderer and controller profile overrides apply only to V3.",
+      "useGlobalSettings": "Use global settings",
+      "resetGameProfile": "Reset game preferences",
+      "gameDetailsFailed": "Could not load game details."
     }
   }
 }

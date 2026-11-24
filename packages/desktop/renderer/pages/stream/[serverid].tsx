@@ -1,4 +1,5 @@
 import React from 'react'
+import { readGameProfiles } from '../../lib/gameprofiles'
 import ExperimentalStream from '../../components/ui/experimentalstream'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
@@ -12,7 +13,10 @@ import { useTranslation } from 'react-i18next'
 
 function LegacyStream() {
     const router = useRouter()
-    const { settings } = useSettings()
+    const { settings: globalSettings } = useSettings()
+    const target = typeof router.query.serverid === 'string' ? router.query.serverid : ''
+    const profile = target.startsWith('xcloud_') ? readGameProfiles(globalSettings.v3_game_profiles).find(item => item.titleId === target.slice(7)) : undefined
+    const settings = {...globalSettings, xcloud_bitrate:profile?.bitrate ?? globalSettings.xcloud_bitrate}
     const { t } = useTranslation()
 
     const streamStateInterval = React.useRef<ReturnType<typeof setInterval> | undefined>(undefined)

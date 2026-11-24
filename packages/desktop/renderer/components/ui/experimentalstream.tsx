@@ -1,4 +1,6 @@
 import React from 'react'
+import { readGameProfiles } from '../../lib/gameprofiles'
+import { readProfiles } from '../../lib/controllerprofiles'
 import { downloadDiagnostics, sanitizeSample, summarizeDiagnostics } from '../../lib/streamdiagnostics'
 import type { DiagnosticSample } from '../../lib/streamdiagnostics'
 import type { StreamMetrics } from '../../../../player/src/client/index'
@@ -10,7 +12,12 @@ import { useTranslation } from 'react-i18next'
 const SharedPlayer = dynamic(() => import('../../../../player/src/client/index').then(module => module.StreamPlayer), { ssr: false })
 
 export default function ExperimentalStream({ target, onExit }: { target: string; onExit: () => void }) {
-    const { settings } = useSettings()
+    const { settings: globalSettings } = useSettings()
+    const [settings] = React.useState(() => {
+        const game = target.startsWith('xcloud_') ? readGameProfiles(globalSettings.v3_game_profiles).find(item => item.titleId === target.slice(7)) : undefined
+        const profile = game?.controllerProfile ? readProfiles(globalSettings.v3_controller_profiles).find(item => item.name === game.controllerProfile) : undefined
+        return {...globalSettings, ...(profile || {}), xcloud_bitrate:game?.bitrate ?? globalSettings.xcloud_bitrate, v3_renderer:game && game.renderer !== 'default' ? game.renderer : globalSettings.v3_renderer}
+    })
     const { t } = useTranslation()
     const [summary, setSummary] = React.useState<ReturnType<typeof summarizeDiagnostics> | null>(null)
     const [showSummary, setShowSummary] = React.useState(false)
