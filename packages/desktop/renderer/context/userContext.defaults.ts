@@ -6,6 +6,7 @@ export const defaultSettings = {
     v3_invert_y: false,
     v3_swap_sticks: false,
     v3_mouse_sensitivity: 1,
+    v3_button_mapping: {} as Record<string, string>,
     xhome_bitrate: 0,
     xcloud_bitrate: 0,
     xcloud_show_non_entitled: true,

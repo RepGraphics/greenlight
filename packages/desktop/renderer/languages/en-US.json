@@ -349,7 +349,11 @@
       "mouseSensitivity": "Native mouse sensitivity",
       "resetInput": "Reset input settings",
       "inputNextStream": "Changes apply to the next V3 streaming session.",
-      "retryStream": "Retry connection"
+      "retryStream": "Retry connection",
+      "controllerRemapping": "Controller button remapping",
+      "remappingDescription": "Map each Xbox action to a physical browser gamepad button index. Changes apply to the next V3 session.",
+      "resetMapping": "Reset button mapping",
+      "exportDiagnostics": "Export diagnostics"
     }
   }
 }

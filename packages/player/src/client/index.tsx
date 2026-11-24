@@ -13,6 +13,8 @@ import Touch from './lib/input/touch';
 
 // export { Gamepad, MouseKeyboard, Touch };
 
+export interface StreamMetrics { width: number; height: number; fps: number; bitrate: number; jitter: number; loss: number; rtt: number }
+
 export interface StreamPlayerProps {
     onStatusChanged: (newStatus: string) => void;
     communicationHandler: communicationHandler;
@@ -32,6 +34,8 @@ export interface StreamPlayerProps {
     invertY?: boolean;
     swapSticks?: boolean;
     mouseSensitivity?: number;
+    buttonMapping?: Record<string, string>;
+    onMetrics?: (metrics: StreamMetrics) => void;
     onMicrophoneStatus?: (active: boolean, error?: boolean) => void;
 }
 export interface StreamPlayerHandle {
@@ -56,7 +60,7 @@ export interface communicationHandler {
 export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
     ({
         onStatusChanged,
-        communicationHandler, useWebGpu = true, autoGamepad = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false, codecProfiles = [], touchControls = false, keyboardMapping, microphone = false, onMicrophoneStatus, nativeMouseKeyboard = false, deadzone = 0.08, invertY = false, swapSticks = false, mouseSensitivity = 1
+        communicationHandler, useWebGpu = true, autoGamepad = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false, codecProfiles = [], touchControls = false, keyboardMapping, microphone = false, onMicrophoneStatus, nativeMouseKeyboard = false, deadzone = 0.08, invertY = false, swapSticks = false, mouseSensitivity = 1, buttonMapping, onMetrics
     }, ref): ReactElement => {
         const handler = useRef(communicationHandler);
         handler.current = communicationHandler;
@@ -94,15 +98,19 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             sync(); const timer = setInterval(sync, 500);
             return () => { clearInterval(timer); input?.detach() };
         }, [player, nativeMouseKeyboard, playerState, mouseSensitivity]);
-        const [metrics, setMetrics] = useState({ width: 0, height: 0, fps: 0, bitrate: 0, jitter: 0, loss: 0 });
+        const metricsCallback = useRef(onMetrics);
+        metricsCallback.current = onMetrics;
+        const [metrics, setMetrics] = useState<StreamMetrics>({ width: 0, height: 0, fps: 0, bitrate: 0, jitter: 0, loss: 0, rtt: 0 });
         useEffect(() => {
             if (!player) return;
             const update = () => {
                 const audio = player.getAudioElement();
                 if (audio) { audio.volume = Math.max(0, Math.min(1, volume)); audio.muted = muted }
-                if (showStats) {
+                if (showStats || metricsCallback.current) {
                     const stats = player.getStats();
-                    setMetrics({ width: stats._videoWidth, height: stats._videoHeight, fps: stats._videoFps, bitrate: stats._bitrate, jitter: stats._jitter, loss: stats._packetsLost });
+                    const next = { width: stats._videoWidth, height: stats._videoHeight, fps: stats._videoFps, bitrate: stats._bitrate, jitter: stats._jitter, loss: stats._packetsLost, rtt: stats._rtt * 1000 };
+                    if (showStats) setMetrics(next);
+                    metricsCallback.current?.(next);
                 }
             };
             update();
@@ -191,7 +199,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 peer.addEventListener('connectionstatechange', onConnection);
                 if (autoGamepad) {
                     const mapping = keyboardMapping ? Object.fromEntries(Object.entries(keyboardMapping).map(([key, button]) => [button, key])) : undefined;
-                    const gamepad = new Gamepad(0, { enable_keyboard: Boolean(mapping), ...(mapping ? { keyboard_mapping: mapping } : {}), enable_vibration: vibration, gamepad_deadzone: deadzone, gamepad_invert_y: invertY, gamepad_swap_sticks: swapSticks });
+                    const gamepad = new Gamepad(0, { enable_keyboard: Boolean(mapping), ...(mapping ? { keyboard_mapping: mapping } : {}), enable_vibration: vibration, gamepad_deadzone: deadzone, gamepad_invert_y: invertY, gamepad_swap_sticks: swapSticks, gamepad_mapping: buttonMapping });
                     const attach = () => { if (!disposed) { gamepad.attach(instance!); controller.current = gamepad; inputs.current.push(gamepad); } };
                     const ready = () => { if (peer.connectionState === 'connected') { peer.removeEventListener('connectionstatechange', ready); attach(); } };
                     peer.addEventListener('connectionstatechange', ready); ready();

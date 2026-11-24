@@ -1,4 +1,5 @@
 import React from 'react'
+import { defaultButtonMapping, validateButtonMapping } from '../../../../player/src/client/lib/input/mapping'
 import Head from 'next/head'
 
 import SettingsSidebar from '../../components/settings/sidebar'
@@ -228,6 +229,12 @@ function SettingsInput() {
                     <p><label htmlFor='v3-sensitivity'>{t('dashboard.mouseSensitivity')}</label><input id='v3-sensitivity' type='range' min='0.25' max='4' step='0.25' value={settings.v3_mouse_sensitivity} onChange={e => setSettings({...settings,v3_mouse_sensitivity:Number(e.target.value)})} /> {settings.v3_mouse_sensitivity}×</p>
                     <button type='button' className='btn' onClick={() => setSettings({...settings,v3_deadzone:0.08,v3_invert_y:false,v3_swap_sticks:false,v3_mouse_sensitivity:1})}>{t('dashboard.resetInput')}</button>
                     <p>{t('dashboard.inputNextStream')}</p>
+                </Card>
+                <Card hidden={settings.streaming_engine !== 'experimental'}>
+                    <h1>{t('dashboard.controllerRemapping')}</h1>
+                    <p>{t('dashboard.remappingDescription')}</p>
+                    {Object.entries(validateButtonMapping(settings.v3_button_mapping)).map(([button, value]) => <p key={button}><label htmlFor={'map-' + button}>{button}</label><select id={'map-' + button} value={value} onChange={e => setSettings({...settings, v3_button_mapping:{...validateButtonMapping(settings.v3_button_mapping),[button]:e.target.value}})}>{Array.from({length:64}, (_, index) => <option key={index} value={String(index)}>{index} {Object.keys(defaultButtonMapping).find(key => defaultButtonMapping[key] === String(index)) || ''}</option>)}</select></p>)}
+                    <button type='button' className='btn' onClick={() => setSettings({...settings,v3_button_mapping:{}})}>{t('dashboard.resetMapping')}</button>
                 </Card>
                 <Card hidden={ settings.input_newgamepad && settings.streaming_engine !== 'experimental' }>
                     <h1>{t('settings.input.keyboardMappingsTitle')}</h1>

@@ -1,4 +1,5 @@
 import xCloudPlayer from '../player'
+import { validateButtonMapping } from './mapping'
 import { VibrationFrame } from '../channel/input'
 
 export interface GamepadOptions {
@@ -103,6 +104,7 @@ export default class Gamepad {
         this._options = {
             ...this._options,
             ...options,
+            gamepad_mapping: validateButtonMapping(options.gamepad_mapping),
         }
     }
 
