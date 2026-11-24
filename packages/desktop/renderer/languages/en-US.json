@@ -442,7 +442,11 @@
       "streamState_Negotiated": "Establishing media connection",
       "streamState_Reconnecting": "Reconnecting",
       "streamState_Connected": "Connected",
-      "streamState_Error": "Connection failed"
+      "streamState_Error": "Connection failed",
+      "currentBitrateCap": "Requested bitrate cap",
+      "lowerBitrateSuggestion": "Try a lower cap ({{bitrate}} Mbps)",
+      "restartQuality": "Restart with lower bitrate?",
+      "restartQualityWarning": "This starts a new streaming session with a requested {{bitrate}} Mbps cap. Cloud Gaming may require joining the queue again and unsaved progress could be lost. Global settings will not change."
     }
   }
 }

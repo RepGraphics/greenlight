@@ -74,3 +74,6 @@ test('calibration recommends a bounded deadzone and rejects movement',()=>{asser
 
 import { validateVideoFilters,videoFilterCss } from '../../renderer/lib/videofilters'
 test('video filters clamp imported preferences and generate safe CSS',()=>{assert.deepEqual(validateVideoFilters({brightness:999,contrast:-1,saturation:NaN}),{brightness:150,contrast:50,saturation:100});assert.equal(videoFilterCss({saturation:0}),'brightness(100%) contrast(100%) saturate(0%)')})
+
+import { recommendLowerBitrate } from '../../renderer/lib/bitrateadvisor'
+test('bitrate advice requires sustained poor quality and reduces the existing cap',()=>{const samples=Array.from({length:20},(_,i)=>sanitizeSample({width:1920,height:1080,fps:60,bitrate:16,jitter:35,loss:i,rtt:200},i));assert.equal(recommendLowerBitrate(samples,20480),10240);assert.equal(recommendLowerBitrate(samples,4096),2048);assert.equal(recommendLowerBitrate(samples.slice(0,5),20480),null);assert.equal(recommendLowerBitrate(samples.map(s=>({...s,rtt:30,jitter:5})),20480),null)})
