@@ -1,0 +1,63 @@
+name: Fork desktop installers
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main-v2]
+    paths:
+      - 'packages/desktop/**'
+      - 'package.json'
+      - 'yarn.lock'
+      - '.github/workflows/fork-installers.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-installers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: github.repository == 'RepGraphics/greenlight'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+          - os: ubuntu-latest
+            platform: linux
+          - os: macos-latest
+            platform: macos
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install Yarn
+        run: npm install --global yarn@1.22.22
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+      - name: Build renderer and main process
+        run: yarn desktop build --no-pack
+      - name: Package installer without publishing
+        working-directory: packages/desktop
+        run: yarn exec electron-builder --publish never
+      - name: Upload installers
+        uses: actions/upload-artifact@v7
+        with:
+          name: greenlight-fork-${{ matrix.platform }}
+          path: |
+            packages/desktop/dist/*.exe
+            packages/desktop/dist/*.zip
+            packages/desktop/dist/*.AppImage
+            packages/desktop/dist/*.deb
+            packages/desktop/dist/*.dmg
+          if-no-files-found: error
