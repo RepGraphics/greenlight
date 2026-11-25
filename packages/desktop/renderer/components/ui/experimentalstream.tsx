@@ -80,6 +80,7 @@ export default function ExperimentalStream({ target, onExit }: { target: string;
         lastState.current = value
         if (value === 'Connected') { recoveredConnection.current=true; if(!connectedAt.current) connectedAt.current=Date.now() }
         if (value === 'Error') outcome.current = 'failed'
+        if(value!=='Connected'){setMic(false);setMicActive(false);setMicBusy(false)}
         setState(value)
     }, [])
     React.useEffect(()=>{

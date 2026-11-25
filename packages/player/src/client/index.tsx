@@ -165,10 +165,13 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
         const micCallback = useRef(onMicrophoneStatus);
         micCallback.current = onMicrophoneStatus;
         useEffect(() => {
-            if (!player || playerState !== 'Connected') return;
-            let disposed = false;
-            player._channels.chat.setMicrophone(microphone, handler.current.sendChatSDP).then(active => { if (!disposed) micCallback.current?.(active) }).catch(() => { if (!disposed) micCallback.current?.(false, true) });
-            return () => { disposed = true };
+            if(!player)return;
+            let disposed=false;
+            const enabled=playerState==='Connected'&&microphone;
+            player._channels.chat.setMicrophone(enabled,handler.current.sendChatSDP,()=>{
+                if(!disposed)micCallback.current?.(false,true);
+            }).then(active=>{if(!disposed)micCallback.current?.(active)}).catch(()=>{if(!disposed)micCallback.current?.(false,true)});
+            return()=>{disposed=true;void player._channels.chat.setMicrophone(false).catch(()=>{})};
         }, [player, playerState, microphone]);
         useEffect(() => {
             if (!player || consoleController || !nativeMouseKeyboard || playerState !== 'Connected') return;
