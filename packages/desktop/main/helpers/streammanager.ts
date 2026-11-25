@@ -1,5 +1,6 @@
-import Application from '../application'
-import xCloudApi, { playResult } from './xcloudapi'
+import type Application from '../application'
+import type xCloudApi from './xcloudapi'
+import type { playResult } from './xcloudapi'
 
 interface streamSession {
     id: string;
@@ -19,7 +20,7 @@ export default class StreamManager {
 
     _application:Application
 
-    _sessions = {}
+    _sessions:Record<string,streamSession> = Object.create(null)
     private monitorFailures = new Map<string, number>()
     
     constructor(application){
@@ -35,7 +36,7 @@ export default class StreamManager {
     }
 
     getSession(sessionId:string):streamSession {
-        return this._sessions[sessionId]
+        return typeof sessionId==='string'&&Object.prototype.hasOwnProperty.call(this._sessions,sessionId)?this._sessions[sessionId]:undefined
     }
 
     startStream(type:string|'home'|'cloud', target, resolution: 720 | 1080 = 1080){
@@ -47,7 +48,7 @@ export default class StreamManager {
                 console.log('Streammanager - startStream:', playResult)
 
                 const sessionId = playResult?.sessionPath?.split('/')[3]
-                if (!sessionId) throw new Error('Invalid streaming session response')
+                if (!sessionId || ['__proto__','constructor','prototype'].includes(sessionId)) throw new Error('Invalid streaming session response')
 
                 const streamSession:streamSession = {
                     id: sessionId,

@@ -6,6 +6,8 @@ Changes on `main-v2` are development changes, not a new numbered release. See [c
 
 ### Added
 
+- Rename saved captures with portable filename validation; mocked session API and recording lifecycle tests.
+
 - Opt-in desktop Remote Play keep-awake leases for Classic and V3, without simulated controller input.
 
 - Local diagnostics viewer for V3 exports with validated import, per-attempt summaries and network graphs.

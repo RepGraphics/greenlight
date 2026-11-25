@@ -26,11 +26,20 @@ export function startStreamRecording(video: HTMLVideoElement, onFinished:(blob:B
     let bytes=0
     let failed=false
     let finished=false
-    let timer:ReturnType<typeof setTimeout>
-    const stop=()=>{clearTimeout(timer);if(recorder.state!=='inactive')recorder.stop()}
-    const finish=()=>{if(finished)return;finished=true;clearTimeout(timer);tracks.forEach(track=>track.stop());const blob=chunks.length?new Blob(chunks,{type:mimeType}):null;chunks.length=0;onFinished(blob,failed)}
+    let timer:ReturnType<typeof setTimeout>|undefined
+    let deadline:ReturnType<typeof setTimeout>|undefined
+    let stopping=false
+    let overflow=false
+    const finish=()=>{if(finished)return;finished=true;clearTimeout(timer);clearTimeout(deadline);recorder.ondataavailable=null;recorder.onerror=null;recorder.onstop=null;tracks.forEach(track=>track.stop());const blob=chunks.length?new Blob(chunks,{type:mimeType}):null;chunks.length=0;onFinished(blob,failed)}
+    const stop=()=>{
+        if(stopping||finished)return
+        stopping=true;clearTimeout(timer)
+        deadline=setTimeout(()=>{failed=true;finish()},5000)
+        try{if(recorder.state!=='inactive')recorder.stop()}catch{failed=true;finish()}
+    }
     recorder.ondataavailable=event=>{
-        if(event.data.size===0)return
+        if(finished||overflow||event.data.size===0)return
+        if(bytes+event.data.size>recordingLimitBytes){failed=true;overflow=true;chunks.length=0;stop();return}
         chunks.push(event.data);bytes+=event.data.size
         if(bytes>=recordingLimitBytes)stop()
     }

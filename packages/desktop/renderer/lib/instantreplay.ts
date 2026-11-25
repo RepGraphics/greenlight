@@ -34,7 +34,7 @@ export function startInstantReplay(video:HTMLVideoElement,onReady:(ready:boolean
         if(recorder&&recorder.state!=='inactive'){try{recorder.stop()}catch{}}
         tracks.forEach(track=>track.stop())
     }
-    const fail=()=>{dispose();onError()}
+    const fail=()=>{if(disposed)return;dispose();onError()}
     const begin=()=>{
         if(disposed)return
         if(source.readyState!=='live'){fail();return}
@@ -47,14 +47,14 @@ export function startInstantReplay(video:HTMLVideoElement,onReady:(ready:boolean
         startedAt=Date.now()
         const segmentStart=startedAt
         current.ondataavailable=event=>{
-            if(disposed||overflow||!event.data.size)return
+            if(disposed||recorder!==current||overflow||!event.data.size)return
             if(bytes+event.data.size>replayMaxBytes){overflow=true;chunks.length=0;fail();return}
             bytes+=event.data.size;chunks.push(event.data)
         }
         current.onerror=fail
         current.onstop=()=>{
+            if(disposed||recorder!==current||overflow)return
             clearTimeout(timer)
-            if(disposed||overflow)return
             const segment={blob:new Blob(chunks,{type:mime}),startedAt:segmentStart,endedAt:Date.now()}
             chunks.length=0
             if(validReplaySegment(segment,Date.now(),seconds))latest=segment

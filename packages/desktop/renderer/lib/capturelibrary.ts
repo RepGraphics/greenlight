@@ -45,6 +45,18 @@ export async function storeCapture(kind:CaptureKind,blob:Blob){
 export async function getCapture(id:string){
     return transaction<Capture|undefined>('readonly',(tx,done)=>{const req=tx.objectStore('captures').get(id);req.onsuccess=()=>done(req.result)})
 }
+export function captureName(value:unknown,kind:CaptureKind):string|null{
+    if(typeof value!=='string')return null
+    const base=value.trim().replace(/\.(png|webm)$/i,'').trim()
+    if(!base||base.length>80||/[\\/:*?"<>|\x00-\x1f]/.test(base)||/^\.+$/.test(base)||/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(base))return null
+    return base+(kind==='clip'?'.webm':'.png')
+}
+export async function renameCapture(id:string,value:unknown){
+    return transaction<void>('readwrite',(tx,done,fail)=>{
+        const req=tx.objectStore('captures').get(id)
+        req.onsuccess=()=>{const capture=req.result as Capture|undefined;const name=capture?captureName(value,capture.kind):null;if(!capture||!name){fail(new Error('Invalid capture name'));return}const updated={...capture,name};tx.objectStore('captures').put(updated);const {blob,...info}=updated;tx.objectStore('index').put(info);done(undefined)}
+    })
+}
 export async function deleteCapture(id:string){
     return transaction<void>('readwrite',(tx,done)=>{tx.objectStore('captures').delete(id);tx.objectStore('index').delete(id);done(undefined)})
 }
