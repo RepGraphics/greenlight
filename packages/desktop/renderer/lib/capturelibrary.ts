@@ -62,9 +62,25 @@ export async function renameCapture(id:string,value:unknown){
         req.onsuccess=()=>{const capture=req.result as Capture|undefined;const name=capture?captureName(value,capture.kind):null;if(!capture||!name){fail(new Error('Invalid capture name'));return}const updated={...capture,name};tx.objectStore('captures').put(updated);const {blob,...info}=updated;tx.objectStore('index').put(info);done(undefined)}
     })
 }
-export async function deleteCapture(id:string){
-    return transaction<void>('readwrite',(tx,done)=>{tx.objectStore('captures').delete(id);tx.objectStore('index').delete(id);done(undefined)})
+export function validatedCaptureIds(value:unknown):string[]{
+    if(!Array.isArray(value)||value.length>captureLimitCount||value.some(id=>typeof id!=='string'||!id.trim()||id.length>128))throw Error('Invalid capture selection')
+    return [...new Set<string>(value)]
 }
+export function visibleCaptureSelection(entries:CaptureInfo[],selected:ReadonlySet<string>){
+    return entries.filter(item=>selected.has(item.id))
+}
+// Keep binary data and the metadata index in a single transaction so failed
+// batches cannot leave orphaned recordings or partially deleted selections.
+export async function deleteCaptures(value:unknown){
+    const ids=validatedCaptureIds(value)
+    if(!ids.length)return
+    return transaction<void>('readwrite',(tx,done)=>{
+        const captures=tx.objectStore('captures'),index=tx.objectStore('index')
+        for(const id of ids){captures.delete(id);index.delete(id)}
+        done(undefined)
+    })
+}
+export async function deleteCapture(id:string){return deleteCaptures([id])}
 export function downloadCapture(blob:Blob,name:string){
     const url=URL.createObjectURL(blob)
     const link=document.createElement('a');link.href=url;link.download=name;document.body.appendChild(link);link.click();link.remove()
