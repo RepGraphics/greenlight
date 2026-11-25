@@ -1,4 +1,5 @@
 import React from 'react'
+import { classicShortcutAction } from '../../lib/streamshortcuts'
 import { recordingMimeType,startStreamRecording,downloadRecording } from '../../lib/streamrecording'
 import { startInstantReplay,replayDuration } from '../../lib/instantreplay'
 import { canCapture, captureScreenshotBlob, saveStreamScreenshot, toggleStreamPictureInPicture } from '../../lib/streamcapture'
@@ -41,6 +42,7 @@ function StreamComponent({
     const [captureReady,setCaptureReady]=React.useState(false)
     const [captureBusy,setCaptureBusy]=React.useState(false)
     const [captureMessage,setCaptureMessage]=React.useState('')
+    const [muted,setMuted]=React.useState(!settings.audio_enabled)
     const [pipActive,setPipActive]=React.useState(false)
     const captureLock=React.useRef(false)
     const currentClassicVideo=()=>document.querySelector<HTMLVideoElement>('#streamComponentHolder video')
@@ -165,7 +167,7 @@ function StreamComponent({
     const [volume, setVolume] = React.useState(1.0) //without any controls, the volume has been maxed by default, let's follow this assumption and start at full for our slider
     const handleVolumeChange = (newVolume: number) => {
 
-        const audioElement = document.getElementsByTagName('audio')[0]
+        const audioElement = currentClassicAudio()
 
         if(audioElement) {
             setVolume(newVolume)
@@ -369,16 +371,6 @@ function StreamComponent({
             }
         }, 100)
 
-        // Keyboard events
-        const keyboardPressEvent = (e) => {
-            if (e.key === 'F8') { e.preventDefault(); pinned.current = !pinned.current; setControlsPinned(pinned.current); return }
-            switch (e.keyCode) {
-                case 126:
-                    toggleDebug()
-                    break
-            }
-        }
-        window.addEventListener('keydown', keyboardPressEvent)
 
         // cleanup this component
         return () => {
@@ -388,7 +380,6 @@ function StreamComponent({
             droppedUplot.destroy()
             window.removeEventListener('mousemove', mouseEvent)
             window.removeEventListener('mousedown', mouseEvent)
-            window.removeEventListener('keydown', keyboardPressEvent)
             clearInterval(mouseInterval)
 
             // ipcRenderer.removeAllListeners('xcloud');
@@ -402,6 +393,25 @@ function StreamComponent({
     }, [])
 
 
+
+    const toggleMute=()=>{const audio=currentClassicAudio();if(!audio)return;audio.muted=!audio.muted;setMuted(audio.muted)}
+    const shortcutHandler=React.useRef<(event:KeyboardEvent)=>void>(()=>{})
+    shortcutHandler.current=(event)=>{
+        const element=event.target instanceof Element?event.target:null
+        const editable=Boolean(element?.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"])'))
+        const action=classicShortcutAction(settings.v3_stream_shortcuts,{key:event.key,repeat:event.repeat,altKey:event.altKey,ctrlKey:event.ctrlKey,metaKey:event.metaKey,shiftKey:event.shiftKey,editable},Boolean(document.pointerLockElement),settings.input_mousekeyboard_config,event.defaultPrevented)
+        if(!action)return
+        event.preventDefault();event.stopImmediatePropagation()
+        if(action==='controls')togglePin()
+        else if(action==='fullscreen')void toggleFullscreen()
+        else if(action==='mute')toggleMute()
+        else if(action==='hud')setHud(value=>!value)
+        else if(action==='graphs')toggleDebug()
+        else if(action==='screenshot'&&captureReady)void capture('download')
+        else if(action==='recording')toggleRecording()
+        else if(action==='replay')void saveReplay()
+    }
+    React.useEffect(()=>{const handler=(event:KeyboardEvent)=>shortcutHandler.current(event);window.addEventListener('keydown',handler,true);return()=>window.removeEventListener('keydown',handler,true)},[])
 
     function toggleMic() {
         if (xPlayer.getChannelProcessor('chat').isPaused === true) {
@@ -435,6 +445,7 @@ function StreamComponent({
             debugElement = document.getElementById('component_streamcomponent_debug')
         }
 
+        if (!debugElement)return
         if (debugElement.className.includes('hidden')) {
             debugElement.className = ''
         } else {
@@ -478,10 +489,10 @@ function StreamComponent({
         <React.Fragment>
             <div>
                 {hud && <div className='gl-performance-hud' aria-label={t('dashboard.performanceHud')}><span>{metrics.width && metrics.height ? metrics.width + '×' + metrics.height : '—'}</span><span>{metrics.fps != null ? Math.round(metrics.fps) : '—'} FPS</span><span>{metrics.bitrate != null ? metrics.bitrate.toFixed(1) : '—'} Mbps</span><span>{metrics.jitter != null ? metrics.jitter.toFixed(1) : '—'} ms {t('dashboard.jitter')}</span><span>{metrics.loss ?? '—'} {t('dashboard.packetsLost')}</span></div>}
-                {captureMessage&&<div className='gl-recording-result' role='status'>{t('dashboard.'+captureMessage)} <button type='button' className='btn' onClick={()=>setCaptureMessage('')}>{t('dashboard.dismiss')}</button></div>}
+                {captureMessage&&!clip&&<div className='gl-recording-result' role='status'>{t('dashboard.'+captureMessage)} <button type='button' className='btn' onClick={()=>setCaptureMessage('')}>{t('dashboard.dismiss')}</button></div>}
                 {recordingActive&&<div className='gl-recording-indicator' role='status'><span/>REC</div>}
                 {replayActive&&<div className='gl-replay-indicator' role='status'>{t(replayReady?'dashboard.replayReady':'dashboard.replayBuffering',{seconds:replayDuration(settings.v3_replay_seconds)})}</div>}
-                {clip&&<div className='gl-recording-result'><strong>{t('dashboard.clipReady')}</strong> · {(clip.size/1048576).toFixed(2)} MiB <button type='button' className='btn' disabled={clipBusy} onClick={()=>{downloadRecording(clip);setClip(null)}}>{t('dashboard.saveClip')}</button><button type='button' className='btn' disabled={clipBusy} onClick={()=>void saveClip()}>{t('dashboard.saveToLibrary')}</button><button type='button' className='btn' disabled={clipBusy} onClick={()=>setClip(null)}>{t('dashboard.discardClip')}</button></div>}
+                {clip&&<div className='gl-recording-result'>{captureMessage&&<p role='status'>{t('dashboard.'+captureMessage)}</p>}<strong>{t('dashboard.clipReady')}</strong> · {(clip.size/1048576).toFixed(2)} MiB <button type='button' className='btn' disabled={clipBusy} onClick={()=>{downloadRecording(clip);setClip(null)}}>{t('dashboard.saveClip')}</button><button type='button' className='btn' disabled={clipBusy} onClick={()=>void saveClip()}>{t('dashboard.saveToLibrary')}</button><button type='button' className='btn' disabled={clipBusy} onClick={()=>setClip(null)}>{t('dashboard.discardClip')}</button></div>}
                 <div id="streamComponentHolder">
                 </div>
 
@@ -546,6 +557,7 @@ function StreamComponent({
                             <button type='button' className='btn' disabled={!recordingActive&&(!connected||!captureReady||replayActive||Boolean(clip)||clipBusy)} aria-pressed={recordingActive} title={t(recordingActive?'dashboard.stopRecording':'dashboard.startRecording')} aria-label={t(recordingActive?'dashboard.stopRecording':'dashboard.startRecording')} onClick={toggleRecording}><i className={'fa-solid '+(recordingActive?'fa-stop':'fa-circle')} aria-hidden='true'/></button>
                             <button type='button' className='btn' disabled={clipBusy||(!replayActive&&(!connected||!captureReady||recordingActive||Boolean(clip)))} aria-pressed={replayActive} title={t('dashboard.instantReplay')} aria-label={t('dashboard.instantReplay')} onClick={toggleReplay}><i className='fa-solid fa-clock-rotate-left' aria-hidden='true'/></button>
                             {replayActive&&<button type='button' className='btn' disabled={clipBusy||Boolean(clip)} title={t('dashboard.saveReplay')} aria-label={t('dashboard.saveReplay')} onClick={()=>void saveReplay()}><i className='fa-solid fa-film' aria-hidden='true'/></button>}
+                            <button type='button' className='btn' aria-pressed={muted} title={t('dashboard.shortcut_mute')} aria-label={t('dashboard.shortcut_mute')} onClick={toggleMute}><i className={'fa-solid '+(muted?'fa-volume-xmark':'fa-volume-high')} aria-hidden='true'/></button>
                             <button type='button' className='btn' aria-pressed={controlsPinned} title={t('dashboard.pinControls')} onClick={togglePin}><i className='fa-solid fa-thumbtack' aria-hidden='true' /></button>
                             <button type='button' className='btn' aria-label={t('dashboard.fullscreen')} aria-pressed={fullscreen} onClick={() => { void toggleFullscreen() }}><i className={'fa-solid ' + (fullscreen ? 'fa-compress' : 'fa-expand')} aria-hidden='true' /></button>
                             <Button label={<i className="fa-solid fa-bug"></i>} title={t("streamWindow.debugTitle")} onClick={(e) => {

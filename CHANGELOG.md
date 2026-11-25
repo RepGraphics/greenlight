@@ -6,6 +6,8 @@ Changes on `main-v2` are development changes, not a new numbered release. See [c
 
 ### Added
 
+- Classic configurable streaming shortcuts, mute control and wrapped capture toolbar; mapped gameplay keys and editable controls are protected.
+
 - Classic gameplay recording and instant replay with explicit remote-audio capture, local clip saving and unsaved-capture exit protection.
 
 - Explicit Classic reconnect action after a connection failure, with serialized old-session termination and duplicate-retry protection.

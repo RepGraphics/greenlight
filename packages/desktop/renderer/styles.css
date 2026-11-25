@@ -334,7 +334,7 @@ div.component_gametitle .gl-art-placeholder { width: 140px; height: 140px; displ
 .gl-social-grid .gl-friend-link { background:#252525; border:1px solid #444; }
 .gl-library-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:16px; align-items:start; padding:12px; }
 .gl-library-pagination { display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:12px; padding:18px; }
-.gl-stream-extra { display:flex; justify-content:flex-end; align-items:center; gap:5px; }
+.gl-stream-extra { display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:5px; min-width:0; }
 .gl-stream-extra button[aria-pressed=true] { color:#9bf00b; }
 @media(max-width:800px) { .gl-library-grid { gap:10px; padding:5px; } .gl-console-page { padding:12px; } .gl-dashboard-welcome,.gl-resume-card { padding:16px; } }
 

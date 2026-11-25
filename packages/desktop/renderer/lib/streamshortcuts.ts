@@ -25,3 +25,8 @@ export function shortcutAction(value:unknown,event:{key:string;repeat:boolean;al
     const shortcuts=validateShortcuts(value)
     return (Object.keys(shortcuts) as StreamAction[]).find(action=>Boolean(shortcuts[action])&&shortcuts[action]===event.key)
 }
+
+export function classicShortcutAction(value:unknown,event:Parameters<typeof shortcutAction>[1],pointerLocked:boolean,mapping:unknown,defaultPrevented=false){
+    if(defaultPrevented||pointerLocked||mapping&&typeof mapping==='object'&&Object.prototype.hasOwnProperty.call(mapping,event.key))return undefined
+    return shortcutAction(value,event)
+}

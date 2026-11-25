@@ -483,7 +483,7 @@
       "autoRecoveryPreference": "Remember automatic recovery across V3 Remote Play sessions. Recovery is limited to two attempts and may interrupt gameplay.",
       "failure_server": "Xbox requested that the streaming session disconnect.",
       "streamShortcuts": "V3 streaming shortcuts",
-      "streamShortcutsHint": "Choose F6–F10 or disable each action. Assigning an existing key clears its previous shortcut. Shortcuts are ignored while editing text, using native pointer lock or when mapped to gamepad emulation.",
+      "streamShortcutsHint": "Choose F6–F10 or disable each action for either streaming engine. Assigning an existing key clears its previous shortcut. Shortcuts are ignored while editing text, using native pointer lock or when mapped to gamepad emulation.",
       "shortcut_controls": "Pin streaming controls",
       "shortcut_fullscreen": "Toggle fullscreen",
       "shortcut_mute": "Toggle mute",

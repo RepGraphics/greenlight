@@ -73,7 +73,7 @@ Select V3 under **Settings → Streaming → Streaming engine**. Begin with stan
 
 If your controller is paired directly to the Xbox, enable **Controller connected to Xbox** under **Settings → Input** before opening the stream. This prevents either player from registering a virtual controller or forwarding local input during Remote Play. The setting is saved between sessions.
 
-Press **F8** (default) to pin the streaming toolbar. Configure additional V3 shortcuts under Settings → Input. Use it to access network graphs, video adjustments, screenshots, clips and recovery controls.
+Press **F8** (default) to pin the streaming toolbar. Configure additional streaming shortcuts under Settings → Input. Use it to access network graphs, video adjustments, screenshots, clips and recovery controls.
 
 Recording is opt-in, local WebM capture (up to five minutes, with a 128 MiB stop threshold). Screenshots and clips do not include visual filters or interface overlays. Save recordings before leaving the session; temporary clips are held in memory. Explicitly save screenshots and clips to the local Capture library under Settings for preview, rename, download or deletion. The library is limited to 512 MiB or 200 items and does not automatically delete existing captures.
 
