@@ -68,6 +68,13 @@ function StreamComponent({
     const mounted=React.useRef(false)
     const saving=React.useRef(false)
     const [recordingActive,setRecordingActive]=React.useState(false)
+    const [recordingElapsed,setRecordingElapsed]=React.useState(0)
+    React.useEffect(()=>{
+        if(!recordingActive)return
+        const update=()=>setRecordingElapsed(Math.max(0,Math.floor((Date.now()-(recording.current?.startedAt??Date.now()))/1000)))
+        update();const timer=setInterval(update,1000)
+        return()=>clearInterval(timer)
+    },[recordingActive])
     const [replayActive,setReplayActive]=React.useState(false)
     const [replayReady,setReplayReady]=React.useState(false)
     const [clip,setClip]=React.useState<Blob|null>(null)
@@ -82,7 +89,7 @@ function StreamComponent({
         if(recording.current){recording.current.stop();return}
         if(replay.current||saving.current||clip||!connected)return
         const video=currentClassicVideo();if(!settings.video_enabled||!canCapture(video)||!recordingMimeType())return
-        try{recording.current=startStreamRecording(video,(blob,error)=>{recording.current=null;if(!mounted.current)return;setRecordingActive(false);setClip(blob);setCaptureMessage(error?'recordingFailed':'recordingStopped')},currentClassicAudio());setRecordingActive(true)}catch{setCaptureMessage('recordingFailed')}
+        try{recording.current=startStreamRecording(video,(blob,error)=>{recording.current=null;if(!mounted.current)return;setRecordingActive(false);setClip(blob);setCaptureMessage(error?'recordingFailed':'recordingStopped')},currentClassicAudio(),{seconds:settings.recording_seconds,videoBitsPerSecond:settings.recording_bitrate});setRecordingElapsed(0);setRecordingActive(true)}catch{setCaptureMessage('recordingFailed')}
     }
     const toggleReplay=()=>{
         if(saving.current)return
@@ -485,7 +492,7 @@ function StreamComponent({
             <div>
                 {hud && <div className='gl-performance-hud' aria-label={t('dashboard.performanceHud')}><span>{metrics.width && metrics.height ? metrics.width + '×' + metrics.height : '—'}</span><span>{metrics.fps != null ? Math.round(metrics.fps) : '—'} FPS</span><span>{metrics.bitrate != null ? metrics.bitrate.toFixed(1) : '—'} Mbps</span><span>{metrics.jitter != null ? metrics.jitter.toFixed(1) : '—'} ms {t('dashboard.jitter')}</span><span>{metrics.loss ?? '—'} {t('dashboard.packetsLost')}</span></div>}
                 {captureMessage&&!clip&&<div className='gl-recording-result' role='status'>{t('dashboard.'+captureMessage)} <button type='button' className='btn' onClick={()=>setCaptureMessage('')}>{t('dashboard.dismiss')}</button></div>}
-                {recordingActive&&<div className='gl-recording-indicator' role='status'><span/>REC</div>}
+                {recordingActive&&<div className='gl-recording-indicator' role='status'><span/>REC {Math.floor(recordingElapsed/60)}:{String(recordingElapsed%60).padStart(2,'0')}</div>}
                 {replayActive&&<div className='gl-replay-indicator' role='status'>{t(replayReady?'dashboard.replayReady':'dashboard.replayBuffering',{seconds:replayDuration(settings.v3_replay_seconds)})}</div>}
                 {clip&&<div className='gl-recording-result'>{captureMessage&&<p role='status'>{t('dashboard.'+captureMessage)}</p>}<strong>{t('dashboard.clipReady')}</strong> · {(clip.size/1048576).toFixed(2)} MiB <button type='button' className='btn' disabled={clipBusy} onClick={()=>{downloadRecording(clip);setClip(null)}}>{t('dashboard.saveClip')}</button><button type='button' className='btn' disabled={clipBusy} onClick={()=>void saveClip()}>{t('dashboard.saveToLibrary')}</button><button type='button' className='btn' disabled={clipBusy} onClick={()=>setClip(null)}>{t('dashboard.discardClip')}</button></div>}
                 <div id="streamComponentHolder">

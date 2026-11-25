@@ -1,4 +1,5 @@
 import { validateShortcuts } from './streamshortcuts'
+import { recordingDurations,recordingBitrates } from './streamrecording'
 import { validateVideoFilters } from './videofilters'
 import type { defaultSettings } from '../context/userContext.defaults'
 import { readProfiles, snapshotProfile } from './controllerprofiles'
@@ -26,6 +27,10 @@ export function portableSettings(value: unknown): Partial<Settings> {
     if (raw.handheld_mode === 'auto' || raw.handheld_mode === 'on' || raw.handheld_mode === 'off') result.handheld_mode = raw.handheld_mode
     for (const key of ['language','preferred_game_language'] as const) if (typeof raw[key] === 'string' && /^[a-z]{2,3}(?:-[A-Z]{2})?$/.test(raw[key])) result[key] = raw[key]
     if (Array.isArray(raw.video_profiles)) result.video_profiles = raw.video_profiles.filter(item => item === '4d' || item === '42e' || item === '420').slice(0,3)
+    const duration=recordingDurations.find(value=>value===raw.recording_seconds)
+    const bitrate=recordingBitrates.find(value=>value===raw.recording_bitrate)
+    if(duration!==undefined)result.recording_seconds=duration
+    if(bitrate!==undefined)result.recording_bitrate=bitrate
     if(raw.v3_replay_seconds===15||raw.v3_replay_seconds===30||raw.v3_replay_seconds===60)result.v3_replay_seconds=raw.v3_replay_seconds
     if (raw.v3_stream_shortcuts && typeof raw.v3_stream_shortcuts==='object') result.v3_stream_shortcuts=validateShortcuts(raw.v3_stream_shortcuts)
     if (raw.v3_button_mapping && typeof raw.v3_button_mapping === 'object') result.v3_button_mapping = snapshotProfile('',{v3_button_mapping:object(raw.v3_button_mapping) as Record<string,string>}).v3_button_mapping

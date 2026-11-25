@@ -1,6 +1,6 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {cloneRemoteMedia,startStreamRecording,recordingLimitBytes} from '../../renderer/lib/streamrecording'
+import {cloneRemoteMedia,startStreamRecording,recordingLimitBytes,recordingStopThresholdBytes,recordingOptions} from '../../renderer/lib/streamrecording'
 import {startInstantReplay} from '../../renderer/lib/instantreplay'
 class Track {readyState='live';stopped=false;copies:Track[]=[];clone(){const track=new Track();this.copies.push(track);return track}stop(){this.stopped=true;this.readyState='ended'}}
 class Stream {constructor(private tracks:Track[]){}getVideoTracks(){return this.tracks}getAudioTracks():Track[]{return []}}
@@ -11,7 +11,7 @@ class Recorder {
     ondataavailable:((event:{data:Blob})=>void)|null=null
     onstop:(()=>void)|null=null
     onerror:(()=>void)|null=null
-    constructor(){Recorder.all.push(this)}
+    constructor(_stream?:unknown,public options?:MediaRecorderOptions){Recorder.all.push(this)}
     start(){this.state='recording'}
     stop(){this.state='inactive'}
     data(blob:Blob){this.ondataavailable?.({data:blob})}
@@ -114,4 +114,33 @@ test('replay disposal detaches recorder events and releases pending save',async(
         assert.equal(recorder.onstop,null)
         assert.equal(source.copies[0].stopped,true)
     }finally{restore()}
+})
+
+test('recording settings accept only supported quality and duration presets',()=>{
+    assert.deepEqual(recordingOptions(600,1500000),{seconds:600,videoBitsPerSecond:1500000})
+    assert.deepEqual(recordingOptions(60,6000000),{seconds:60,videoBitsPerSecond:6000000})
+    assert.deepEqual(recordingOptions(99999,Infinity),{seconds:300,videoBitsPerSecond:3000000})
+    assert.deepEqual(recordingOptions('60','6000000'),{seconds:300,videoBitsPerSecond:3000000})
+})
+test('recording applies selected encoding quality and stops before its hard memory cap',()=>{
+    const {video,restore}=setup()
+    try{
+        const results:any[]=[]
+        startStreamRecording(video,(blob,error)=>results.push({blob,error}),null,{seconds:600,videoBitsPerSecond:1500000})
+        const recorder=Recorder.all[0]
+        assert.equal(recorder.options?.videoBitsPerSecond,1500000)
+        recorder.data(new Blob([new Uint8Array(recordingStopThresholdBytes)]))
+        assert.equal(recorder.state,'inactive')
+        recorder.data(new Blob(['final']))
+        recorder.finish()
+        assert.equal(results[0].error,false)
+        assert.equal(results[0].blob.size,recordingStopThresholdBytes+5)
+        assert.ok(results[0].blob.size<=recordingLimitBytes)
+    }finally{restore()}
+})
+test('recording preferences survive portable settings but invalid inputs are ignored',async()=>{
+    const {portableSettings}=await import('../../renderer/lib/settingsbackup')
+    assert.equal(portableSettings({recording_seconds:600,recording_bitrate:1500000}).recording_seconds,600)
+    assert.equal(portableSettings({recording_seconds:600,recording_bitrate:1500000}).recording_bitrate,1500000)
+    assert.deepEqual(portableSettings({recording_seconds:-1,recording_bitrate:1}),{})
 })
