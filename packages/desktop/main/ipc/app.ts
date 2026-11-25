@@ -1,6 +1,8 @@
 import IpcBase from './base'
 import { session } from 'electron'
 import electron from 'electron'
+import { exportCaptureFile,validateCaptureExport } from '../helpers/captureexport'
+import { isAbsolute } from 'node:path'
 import { checkForkUpdates } from '../helpers/updater'
 
 interface setForceRegionIpArgs {
@@ -13,6 +15,42 @@ interface setPreferredGameLanguageArgs {
 
 export default class IpcApp extends IpcBase {
     // _streamingSessions:any = {}
+
+    private captureExportBusy=false
+
+    getCaptureDirectory(){
+        const value=this._application._store.get('captureExport.directory')
+        return typeof value==='string'&&isAbsolute(value)?value:null
+    }
+
+    async chooseCaptureDirectory(){
+        if(this.captureExportBusy)throw Error('Capture export busy')
+        this.captureExportBusy=true
+        try{
+            const result=await electron.dialog.showOpenDialog(this._application._mainWindow,{properties:['openDirectory','createDirectory'],defaultPath:this.getCaptureDirectory()??electron.app.getPath('videos')})
+            if(result.canceled||!result.filePaths[0])return this.getCaptureDirectory()
+            const directory=result.filePaths[0]
+            if(!isAbsolute(directory))throw Error('Invalid capture directory')
+            this._application._store.set('captureExport.directory',directory)
+            return directory
+        }finally{this.captureExportBusy=false}
+    }
+
+    clearCaptureDirectory(){
+        if(this.captureExportBusy)throw Error('Capture export busy')
+        this._application._store.delete('captureExport.directory')
+        return null
+    }
+
+    async exportCapture(args:unknown){
+        if(this.captureExportBusy)throw Error('Capture export busy')
+        const directory=this.getCaptureDirectory()
+        if(!directory)throw Error('Choose a capture folder first')
+        const capture=validateCaptureExport(args)
+        this.captureExportBusy=true
+        try{return {name:await exportCaptureFile(directory,capture)}}
+        finally{this.captureExportBusy=false}
+    }
 
     checkForUpdates(args:{includePrereleases?:boolean}={}){
         return checkForkUpdates(args?.includePrereleases===true)

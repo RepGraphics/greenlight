@@ -36,7 +36,7 @@ export class ClassicRecoveryBudget {
         else{this.attempts=0;this.connected=false}
     }
     delay(enabled:boolean,cloud:boolean,state:{error:string;active:boolean;blocked:boolean}){
-        if(!state.active||state.blocked||!['closed','keepalive','provisioning','unavailable'].includes(state.error))return null
+        if(!state.active||state.blocked||!['closed','keepalive','provisioning','unavailable','stats'].includes(state.error))return null
         return recoveryDelay(enabled,cloud,this.connected,this.attempts)
     }
 }

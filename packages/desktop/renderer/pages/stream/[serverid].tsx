@@ -7,6 +7,7 @@ import { ManualReconnect, ClassicRecoveryBudget } from '../../lib/sessionrecover
 import { ClassicSessionExit } from '../../lib/classicsessionexit'
 import { startHeartbeat } from '../../lib/keepalive'
 import { watchClassicConnection } from '../../lib/classicconnection'
+import { ClassicStatsWatchdog } from '../../lib/classicstatswatchdog'
 import { useStreamAwake } from '../../lib/useStreamAwake'
 import { useDiscordPresence } from '../../lib/useDiscordPresence'
 import { configureClassicConsoleController } from '../../lib/classicconsolecontroller'
@@ -56,10 +57,20 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
     const mounted=React.useRef(true)
     const [exiting,setExiting]=React.useState(false)
     const startupFailed=React.useRef(false)
+    const statsWatchdog=React.useRef(new ClassicStatsWatchdog())
+    const failStats=React.useRef<(()=>void)|undefined>(undefined)
     const history=React.useRef({startedAt:Date.now(),connectedAt:0,saved:false,samples:[] as DiagnosticSample[]})
     const historyEnabled=React.useRef(Boolean(settings.v3_session_history))
     const recordHistory=React.useCallback((outcome:'ended'|'failed'|'interrupted')=>{const value=history.current;if(!historyEnabled.current||value.saved||(!value.connectedAt&&outcome!=='failed'))return;value.saved=true;addSession(makeSessionRecord(value.startedAt,value.connectedAt,Date.now(),target.startsWith('xcloud_')?'cloud':'home',outcome,value.samples,'classic'))},[target])
-    const recordClassicSample=React.useCallback((sample:DiagnosticSample)=>{const value=history.current;if(value.saved||!value.connectedAt)return;value.samples.push({...sample,elapsedSeconds:(Date.now()-value.startedAt)/1000});if(value.samples.length>300)value.samples.shift()},[])
+    const recordClassicSample=React.useCallback((sample:DiagnosticSample)=>{
+        const value=history.current
+        if(value.saved||!value.connectedAt||intentionalExit.current||reconnect.current.busy)return
+        value.samples.push({...sample,elapsedSeconds:Math.max(0,(Date.now()-value.startedAt)/1000)})
+        if(value.samples.length>300)value.samples.shift()
+        // Monitor advancing samples independently of the opt-in history setting.
+        // Background windows and intentionally disabled video are not evidence of a stall.
+        if(statsWatchdog.current.observe(sample.elapsedSeconds,sample.statsFresh,document.visibilityState==='visible'&&globalSettings.video_enabled!==false))failStats.current?.()
+    },[globalSettings.video_enabled])
     const exportClassicDiagnostics=()=>downloadDiagnostics(history.current.samples,target.startsWith('xcloud_')?'cloud':'home',connectionError?'Error':connected?'Connected':'Initializing','video',recovery.previousAttempts,connectionError,'classic')
     useStreamAwake(sessionId,connected&&!connectionError&&!target.startsWith('xcloud_')&&Boolean(settings.stream_keep_awake))
     useDiscordPresence(sessionId,connected&&!connectionError&&settings.discord_presence_enabled===true,settings.discord_application_id)
@@ -106,17 +117,20 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
 
             // Stream is ready so we start the player
             xPlayer.setControllerRumble(settings.controller_vibration)
+            let failureReason='closed'
             const failConnection=()=>{
                 if(cancelled||intentionalExit.current||reconnect.current.busy)return
                 setConnected(false)
                 recordHistory('failed')
                 stopHeartbeat.current?.();stopHeartbeat.current=undefined
-                setConnectionError('closed')
+                setConnectionError(failureReason)
             }
             const watcher=watchClassicConnection(failConnection)
-            disposeConnection=watcher.dispose
+            statsWatchdog.current.reset()
+            disposeConnection=()=>{failStats.current=undefined;statsWatchdog.current.reset();watcher.dispose()}
             watcher.begin()
             const canSignal=()=>!cancelled&&!intentionalExit.current&&!reconnect.current.busy&&!watcher.failed
+            failStats.current=()=>{if(canSignal()){failureReason='stats';watcher.update('failed')}}
             xPlayer.setSdpHandler((client, offer) => {
                 if(!canSignal())return
                 Ipc.send('streaming', 'sendChatSdp', {
