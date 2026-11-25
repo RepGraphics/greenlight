@@ -2,6 +2,7 @@ import xCloudPlayer from '../player'
 import { validateButtonMapping } from './mapping'
 import { selectPhysicalGamepad } from './slots'
 import { VibrationFrame } from '../channel/input'
+import { KeyboardGamepadState, isEditableGamepadTarget } from './keyboardstate'
 
 export interface GamepadOptions {
     physical_gamepad_id?: number;
@@ -31,6 +32,9 @@ export default class Gamepad {
     private _physicalGamepadId = -1
     private neutralPending = false
     private virtualAxes: Record<string, number> = {}
+    private keyboardState=new KeyboardGamepadState()
+    private get observesFocus(){return !this._options.gamepad_force_capture}
+    private onVisibility=()=>{if(document.hidden)this.onWindowBlur();else if(document.hasFocus())this.onWindowFocus()}
     private _rumbleInterval
     private _isFocused = true
     private _gamepadOverride = {
@@ -113,6 +117,7 @@ export default class Gamepad {
 
     attach(xCloudPlayer:xCloudPlayer){
         this._player = xCloudPlayer
+        this._isFocused=!this.observesFocus||(!document.hidden&&document.hasFocus())
 
         this._player._channels.control.sendGamepadState(this._index, true, this)
 
@@ -126,9 +131,10 @@ export default class Gamepad {
             window.addEventListener('gamepaddisconnected', this._listener.gamepadDisconnected)
         }
 
-        if(this._options.enable_gamepad === true && this._options.gamepad_force_capture === false){
+        if(this.observesFocus){
             window.addEventListener('blur', this._listener.windowBlur)
             window.addEventListener('focus', this._listener.windowFocus)
+            document.addEventListener('visibilitychange',this.onVisibility)
         }
 
         if (this._options.enable_gamepad) {
@@ -145,6 +151,7 @@ export default class Gamepad {
         this._physicalGamepadId = -1
         this._gamepadOverride.buttons = {}
         this.virtualAxes = {}
+        this.keyboardState.clear()
         this._player = undefined
 
         this.stopRumble()
@@ -160,9 +167,10 @@ export default class Gamepad {
             window.removeEventListener('gamepaddisconnected', this._listener.gamepadDisconnected)
         }
 
-        if(this._options.enable_gamepad === true && this._options.gamepad_force_capture === false){
+        if(this.observesFocus){
             window.removeEventListener('blur', this._listener.windowBlur)
             window.removeEventListener('focus', this._listener.windowFocus)
+            document.removeEventListener('visibilitychange',this.onVisibility)
         }
     }
 
@@ -194,29 +202,12 @@ export default class Gamepad {
     }
 
     onKeyDown(event:KeyboardEvent){
-        if(this._isFocused === false){
-            return
-        }
-
-        for(const button in this._options.keyboard_mapping){
-            if(this._options.keyboard_mapping[button] === event.key){
-                this._gamepadOverride.buttons[button] = 1
-                event.preventDefault()
-            }
-        }
+        if(!this._isFocused)return
+        if(this.keyboardState.press(event,this._options.keyboard_mapping,isEditableGamepadTarget(event.target)))event.preventDefault()
     }
 
     onKeyUp(event:KeyboardEvent){
-        if(this._isFocused === false){
-            return
-        }
-
-        for(const button in this._options.keyboard_mapping){
-            if(this._options.keyboard_mapping[button] === event.key){
-                this._gamepadOverride.buttons[button] = 0
-                event.preventDefault()
-            }
-        }
+        if(this.keyboardState.release(event))event.preventDefault()
     }
 
     onWindowFocus(){
@@ -227,6 +218,7 @@ export default class Gamepad {
         this._isFocused = false
         this._gamepadOverride.buttons = {}
         this.virtualAxes = {}
+        this.keyboardState.clear()
         this.neutralPending = true
     }
 
@@ -288,7 +280,7 @@ export default class Gamepad {
     }
 
     hasOverrideButtons(){
-        return Object.keys(this._gamepadOverride.buttons).length > 0 || Object.keys(this.virtualAxes).length > 0
+        return Object.keys(this._gamepadOverride.buttons).length > 0 || Object.keys(this.virtualAxes).length > 0 || this.keyboardState.pending
     }
 
     getGamepadState(){
@@ -341,6 +333,9 @@ export default class Gamepad {
             frame[button] = this._gamepadOverride.buttons[button]
         }
 
+        // Keyboard and touch are separate input sources. A keyboard release
+        // must not erase a held physical or touch button.
+        for(const button of this.keyboardState.read())frame[button]=1
         for (const axis of Object.keys(this.virtualAxes)) frame[axis] = this.virtualAxes[axis]
 
         // Clean up released buttons in a separate pass
