@@ -1,5 +1,6 @@
 import React from 'react'
 import { classicShortcutAction } from '../../lib/streamshortcuts'
+import { classicControlsVisible } from '../../lib/classiccontrols'
 import { normalizeClassicVolume, observeClassicAudio } from '../../lib/classicaudio'
 import { classicVideoPresentation, validateVideoFilters, sharpeningKernel } from '../../lib/videofilters'
 import VideoFilterControls from './videofiltercontrols'
@@ -175,11 +176,34 @@ function StreamComponent({
         return performance.now() / 1000.0
     }
 
-    let lastMovement = Date.now()
-    const pinned = React.useRef(false)
-    const [controlsPinned, setControlsPinned] = React.useState(false)
+    const lastMovement=React.useRef(performance.now())
+    const toolbar=React.useRef<HTMLDivElement>(null)
+    const pinButton=React.useRef<HTMLButtonElement>(null)
+    const focusPin=React.useRef(false)
+    const hovered=React.useRef(false)
+    const [controlsPinned,setControlsPinned]=React.useState(false)
+    const [controlsVisible,setControlsVisible]=React.useState(true)
     const [fullscreen, setFullscreen] = React.useState(false)
-    const togglePin = () => { pinned.current = !pinned.current; setControlsPinned(pinned.current) }
+    const revealControls=()=>{lastMovement.current=performance.now();setControlsVisible(true)}
+    const togglePin=()=>{revealControls();setControlsPinned(value=>!value)}
+    const revealAndPin=()=>{focusPin.current=true;revealControls();setControlsPinned(true)}
+    React.useEffect(()=>{
+        if(controlsVisible&&focusPin.current){focusPin.current=false;pinButton.current?.focus()}
+    },[controlsVisible])
+    React.useEffect(()=>{
+        const activity=()=>{lastMovement.current=performance.now();setControlsVisible(true)}
+        const update=()=>setControlsVisible(classicControlsVisible({
+            connected,pinned:controlsPinned,hovered:hovered.current,
+            focused:Boolean(toolbar.current?.contains(document.activeElement)),
+            dialog:showFilters||qualityCap!==null,
+            idleMs:performance.now()-lastMovement.current,
+        }))
+        window.addEventListener('pointermove',activity)
+        window.addEventListener('pointerdown',activity)
+        const timer=setInterval(update,100)
+        update()
+        return()=>{window.removeEventListener('pointermove',activity);window.removeEventListener('pointerdown',activity);clearInterval(timer)}
+    },[connected,controlsPinned,showFilters,qualityCap])
     const toggleFullscreen = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen() } catch { /* unavailable */ } }
     React.useEffect(() => { const sync = () => setFullscreen(Boolean(document.fullscreenElement)); document.addEventListener('fullscreenchange', sync); return () => document.removeEventListener('fullscreenchange', sync) }, [])
     // let gamebarElement = document.getElementById('component_streamcomponent_gamebar')
@@ -379,41 +403,12 @@ function StreamComponent({
             }
         }, 250)
 
-        // Gamebar menu mouse events
-        const mouseEvent = () => {
-            lastMovement = Date.now()
-        }
-        window.addEventListener('mousemove', mouseEvent)
-        window.addEventListener('mousedown', mouseEvent)
-
-        const mouseInterval = setInterval(() => {
-            const gamebarElement = document.getElementById('component_streamcomponent_gamebar')
-            if (gamebarElement === null) {
-                return
-            }
-
-            if (!pinned.current && !gamebarElement.contains(document.activeElement) && (Date.now() - lastMovement) >= 2000) {
-                if (!gamebarElement.className.includes('hidden')) {
-                    gamebarElement.className = 'hidden'
-                }
-
-            } else {
-                if (gamebarElement.className.includes('hidden')) {
-                    gamebarElement.className = ''
-                }
-            }
-        }, 100)
-
-
         // cleanup this component
         return () => {
             disposed = true
             if (queueListener) Ipc.removeListener('streaming', queueListener)
             jitterUplot.destroy()
             droppedUplot.destroy()
-            window.removeEventListener('mousemove', mouseEvent)
-            window.removeEventListener('mousedown', mouseEvent)
-            clearInterval(mouseInterval)
 
             // ipcRenderer.removeAllListeners('xcloud');
 
@@ -559,7 +554,8 @@ function StreamComponent({
                     </Card>
                 </div>
 
-                <div id="component_streamcomponent_gamebar">
+                {!controlsVisible&&<button type='button' className='gl-stream-reveal btn' aria-controls='component_streamcomponent_gamebar' onClick={revealAndPin}>{t('dashboard.showStreamControls')}</button>}
+                <div id="component_streamcomponent_gamebar" ref={toolbar} className={controlsVisible?'':'hidden'} onPointerEnter={event=>{if(event.pointerType!=='touch'){hovered.current=true;revealControls()}}} onPointerLeave={()=>{hovered.current=false;lastMovement.current=performance.now()}} onFocusCapture={revealControls}>
                     <div id="component_streamcomponent_gamebar_menu">
                         <div style={{
                             width: '25%',
@@ -610,7 +606,7 @@ function StreamComponent({
                             <button type='button' className='btn' disabled={clipBusy||(!replayActive&&(!connected||!captureReady||recordingActive||Boolean(clip)))} aria-pressed={replayActive} title={t('dashboard.instantReplay')} aria-label={t('dashboard.instantReplay')} onClick={toggleReplay}><i className='fa-solid fa-clock-rotate-left' aria-hidden='true'/></button>
                             {replayActive&&<button type='button' className='btn' disabled={clipBusy||Boolean(clip)} title={t('dashboard.saveReplay')} aria-label={t('dashboard.saveReplay')} onClick={()=>void saveReplay()}><i className='fa-solid fa-film' aria-hidden='true'/></button>}
                             <button type='button' className='btn' aria-pressed={muted} title={t('dashboard.shortcut_mute')} aria-label={t('dashboard.shortcut_mute')} onClick={toggleMute}><i className={'fa-solid '+(muted?'fa-volume-xmark':'fa-volume-high')} aria-hidden='true'/></button>
-                            <button type='button' className='btn' aria-pressed={controlsPinned} title={t('dashboard.pinControls')} onClick={togglePin}><i className='fa-solid fa-thumbtack' aria-hidden='true' /></button>
+                            <button ref={pinButton} type='button' className='btn' aria-pressed={controlsPinned} aria-label={t('dashboard.pinControls')} title={t('dashboard.pinControls')} onClick={togglePin}><i className='fa-solid fa-thumbtack' aria-hidden='true' /></button>
                             <button type='button' className='btn' aria-label={t('dashboard.fullscreen')} aria-pressed={fullscreen} onClick={() => { void toggleFullscreen() }}><i className={'fa-solid ' + (fullscreen ? 'fa-compress' : 'fa-expand')} aria-hidden='true' /></button>
                             <Button label={<i className="fa-solid fa-bug"></i>} title={t("streamWindow.debugTitle")} onClick={(e) => {
                                 e.target.blur(); toggleDebug()
