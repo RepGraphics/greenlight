@@ -6,6 +6,7 @@ export type { xStreamToken, startStreamResponse, xCloudStreamConfig };
 
 import xCloudPlayer from './lib/player';
 import { statsExpired } from './lib/statsfreshness';
+import { StreamConnectionWatchdog } from './lib/connectionwatchdog';
 
 // Proxy inputs
 import Gamepad from './lib/input/gamepad';
@@ -207,17 +208,23 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             let disposed = false;
             let timer: ReturnType<typeof setTimeout>;
             let keepalive: ReturnType<typeof setTimeout>;
-            let connectionDeadline: ReturnType<typeof setTimeout>;
-            let disconnectDeadline: ReturnType<typeof setTimeout>;
             let instance: xCloudPlayer | undefined;
             let authSent = false;
             let mediaWatchdog:ReturnType<typeof setInterval>;
             let terminal=false;
             let failures = 0;
-            const provisioningStarted = Date.now();
             const current = handler.current;
-            const status = (value: string) => { if (!disposed && !terminal) { if(value==='Error')terminal=true; setPlayerState(value) } };
-            const fail=(reason:string)=>{if(!disposed&&!terminal){failureCallback.current?.(reason);status('Error')}};
+            const active=()=>!disposed&&!terminal;
+            const status=(value:string)=>{if(active())setPlayerState(value)};
+            let removeConnectionListener:(()=>void)|undefined;
+            const clearTimers=()=>{clearTimeout(timer);clearTimeout(keepalive);clearInterval(mediaWatchdog);watchdog.dispose();removeConnectionListener?.();removeConnectionListener=undefined};
+            const fail=(reason:string)=>{
+                if(!active())return;
+                terminal=true;clearTimers();
+                failureCallback.current?.(reason);setPlayerState('Error');
+            };
+            const watchdog=new StreamConnectionWatchdog(fail);
+            watchdog.beginProvisioning();
             const heartbeat = async () => {
                 if (disposed || terminal) return;
                 try { await current.sendKeepalive(); failures = 0 }
@@ -225,66 +232,65 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 if (!disposed && !terminal) keepalive = setTimeout(heartbeat, failures ? 5000 : 20000);
             };
             const connect = async () => {
+                if(!active())return;
+                watchdog.beginHandshake();
                 instance = new xCloudPlayer('playerContainer', useWebGpu, videoBitrate, codecProfiles, consoleController);
                 instance.init();
                 setPlayer(instance);
                 status('Connecting');
                 const offer = await instance.createOffer();
-                if (disposed) return;
+                if (!active()) return;
                 const answer = await current.sendSDPOffer(offer);
-                if (disposed) return;
+                if (!active()) return;
                 const remote = JSON.parse(answer.exchangeResponse);
                 if (typeof remote?.sdp !== 'string') throw new Error('Invalid SDP answer');
                 await instance.setRemoteSDP(remote.sdp);
+                if(!active())return;
                 const localIce = await instance.getICECandidates();
-                if (disposed) return;
+                if (!active()) return;
                 const candidates = localIce.map(candidate => JSON.stringify({ candidate: candidate.candidate, sdpMid: candidate.sdpMid, sdpMLineIndex: candidate.sdpMLineIndex, usernameFragment: candidate.usernameFragment }));
                 const response = await current.sendICECandidates(candidates);
-                if (disposed) return;
+                if (!active()) return;
                 const ice = JSON.parse(response.exchangeResponse);
                 if (!Array.isArray(ice)) throw new Error('Invalid ICE response');
                 await instance.setRemoteIceCandidates(ice);
-                if (disposed) return;
+                if (!active()) return;
                 const peer = instance._peerConnection;
                 const onConnection = () => {
-                    if (disposed) return;
-                    if (peer.connectionState === 'connected') { clearTimeout(connectionDeadline); clearTimeout(disconnectDeadline); status('Connected'); instance?._channels.control.requestKeyframeRequest(true) }
-                    else if (peer.connectionState === 'disconnected') { clearTimeout(disconnectDeadline); status('Reconnecting'); disconnectDeadline = setTimeout(() => { if (peer.connectionState !== 'connected') fail('transport') }, 15000) }
-                    else if (peer.connectionState === 'failed' || peer.connectionState === 'closed') fail('transport');
+                    if (!active()) return;
+                    watchdog.update(peer.connectionState);
+                    if(!active())return;
+                    if (peer.connectionState === 'connected') { status('Connected'); instance?._channels.control.requestKeyframeRequest(true) }
+                    else if (peer.connectionState === 'disconnected') status('Reconnecting');
                 };
                 peer.addEventListener('connectionstatechange', onConnection);
-                connectionDeadline = setTimeout(() => { if (peer.connectionState !== 'connected') status('Error') }, 30000);
+                removeConnectionListener=()=>peer.removeEventListener('connectionstatechange',onConnection);
                 status('Negotiated'); onConnection();
+                if(!active())return;
                 void heartbeat();
                 let visibleConnectedAt=performance.now();
                 mediaWatchdog=setInterval(()=>{const now=performance.now();if(disposed||terminal)return;if(peer.connectionState==='new'||peer.connectionState==='connecting' && !instance?.getStats().lastStatsAt){visibleConnectedAt=now;return}if(instance?.serverDisconnected){fail('server');return}const stats=instance?.getStats();if(!stats)return;if(statsExpired(now,stats.lastStatsAt,visibleConnectedAt))fail('stats');else if(stats.mediaStalled)fail('media')},1000);
             };
             const poll = async () => {
-                if (disposed) return;
-                // Bound provisioning stalls while allowing cloud queue time.
-                if (Date.now() - provisioningStarted > 30 * 60 * 1000) { status('Error'); return }
+                if (!active()) return;
                 try {
                     const state = await current.getStreamStatus();
-                    if (disposed) return;
-                    if (!state || state.error || state.state === 'Failed') { status('Error'); return }
+                    if (!active()) return;
+                    if (!state || state.error || state.state === 'Failed') { fail('server'); return }
                     if (state.state === 'Provisioned') { await connect(); return }
-                    if (state.state === 'ReadyToConnect' && !authSent) { await current.sendMSALToken(); authSent = true }
+                    if (state.state === 'ReadyToConnect' && !authSent) { await current.sendMSALToken(); if(!active())return; authSent = true }
                     failures = 0;
-                    if (!disposed) timer = setTimeout(poll, 1000);
+                    if (active()) timer = setTimeout(poll, 1000);
                 } catch {
-                    if (disposed) return;
-                    if (instance || ++failures >= 5) { status('Error'); return }
+                    if (!active()) return;
+                    if (instance || ++failures >= 5) { fail(instance?'transport':'server'); return }
                     timer = setTimeout(poll, 1500);
                 }
             };
             void poll();
             return () => {
                 disposed = true;
-                clearTimeout(timer);
-                clearTimeout(keepalive);
-                clearInterval(mediaWatchdog);
-                clearTimeout(connectionDeadline);
-                clearTimeout(disconnectDeadline);
+                clearTimers();
                 releaseTouch(); controller.current = undefined;
                 inputs.current.forEach(input => { try { input.detach() } catch { /* continue cleanup */ } });
                 inputs.current = [];
