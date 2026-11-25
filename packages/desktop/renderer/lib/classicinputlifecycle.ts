@@ -36,31 +36,38 @@ export function installClassicInputLifecycle(value:unknown,schedule:typeof setTi
     const request=driver.requestStates
     const stop=driver.stop
     let running=false
+    let generation=0
     let timer:ReturnType<typeof setTimeout>|undefined
     driver.requestStates=()=>primary.read(request.call(driver))
-    const halt=()=>{running=false;if(timer!==undefined)cancel(timer);timer=undefined;primary.reset()}
+    const halt=()=>{generation++;running=false;if(timer!==undefined)cancel(timer);timer=undefined;primary.reset()}
     driver.stop=function(){halt();return stop.call(this)}
     // Upstream run() recursively schedules itself but never cancels the
     // timeout in stop(). Own one cancellable polling loop instead.
-    const tick=()=>{
+    const tick=(epoch:number)=>{
+        const current=()=>running&&generation===epoch
+        // A cancelled callback can already be queued when a new run starts.
+        // Do not let it send input or clear the newer run's timer.
+        if(!current())return
         timer=undefined
-        if(!running)return
         try{
             const channel=driver._application?.getChannelProcessor('input')
+            if(!current())return
             if(!channel||channel._state==='closed'||channel._state==='closing'){halt();return}
             // Keep the queue bounded when the transport is slow. Do not
             // consume a pending neutral frame until there is room for it.
             if(channel.getGamepadQueueLength()<4){
+                if(!current())return
                 const frames=driver.requestStates()
+                if(!current())return
                 if(frames.length){
                     if(driver._nexusOverrideN===true)frames[0].Nexus=1
                     channel.queueGamepadStates(frames)
                 }
-                channel._inputFps?.count()
+                if(current())channel._inputFps?.count()
             }
-        }catch{halt();return}
-        if(running)timer=schedule(tick,1000/60)
+        }catch{if(current())halt();return}
+        if(current())timer=schedule(()=>tick(epoch),1000/60)
     }
-    driver.run=()=>{if(running)return;running=true;tick()}
+    driver.run=()=>{if(running)return;running=true;tick(++generation)}
     return true
 }
