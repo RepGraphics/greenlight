@@ -18,6 +18,7 @@ function xCloudLibrary() {
     const [searchTerm, setSearchTerm] = React.useState('')
     const [debouncedSearch, setDebouncedSearch] = React.useState('')
     const [gamePassOnly, setGamePassOnly] = React.useState(true)
+    const [sort,setSort]=React.useState<'default'|'az'|'za'>('default')
 
     // Debounce search input by 250ms to prevent query churn
     React.useEffect(() => {
@@ -31,12 +32,12 @@ function xCloudLibrary() {
 
     const trimmedSearch = debouncedSearch.trim()
     const titlesQuery = useQuery(
-        ['xCloudTitles', trimmedSearch, gamePassOnly],
-        () => Ipc.send('xCloud', 'filterTitles', { name: trimmedSearch, onlyEntitled: gamePassOnly }),
+        ['xCloudTitles', trimmedSearch, gamePassOnly,sort],
+        () => Ipc.send('xCloud', 'filterTitles', { name: trimmedSearch, onlyEntitled: gamePassOnly,sort }),
         { staleTime: 60 * 1000, keepPreviousData: true }
     )
 
-    const titles: string[] = (Array.isArray(titlesQuery.data) ? titlesQuery.data : []).filter(id => !favouritesOnly || favourites.includes(id))
+    const titles: string[] = Array.from(new Set<string>((Array.isArray(titlesQuery.data) ? titlesQuery.data : []).filter(id => typeof id==='string'&&(!favouritesOnly || favourites.includes(id)))))
 
     const renderContent = () => {
         if (titlesQuery.isLoading && !titlesQuery.data) {
@@ -54,7 +55,7 @@ function xCloudLibrary() {
         }
 
         return (
-            <ViewportGrid key={`library_${trimmedSearch}_${gamePassOnly}_${favouritesOnly}`} drawPagination={true}>
+            <ViewportGrid key={`library_${trimmedSearch}_${gamePassOnly}_${favouritesOnly}_${sort}`} drawPagination={true}>
                 { titles.map((item) => (
                     <GameTitleDynamic
                         titleId={ item }
@@ -91,8 +92,12 @@ function xCloudLibrary() {
                         <span>{t('page.xCloudLibrary.gamePassOnly')}</span>
                     </label>
 
+                    <label htmlFor='cloud-library-sort' style={{minWidth:0}}>{t('dashboard.librarySort')}</label><select id='cloud-library-sort' value={sort} onChange={event=>setSort(event.target.value as typeof sort)}>
+                        {(['default','az','za'] as const).map(value=><option key={value} value={value}>{t('dashboard.librarySort_'+value)}</option>)}
+                    </select>
                     <input
-                        type="text"
+                        type="search"
+                        maxLength={100}
                         className="text h2-search"
                         style={{ float: 'none', margin: 0 }}
                         aria-label={t('page.xCloudLibrary.searchPlaceholder')}
@@ -103,7 +108,8 @@ function xCloudLibrary() {
                 </div>
             </div>
 
-            { renderContent() }
+            <p role='status' aria-live='polite'>{titlesQuery.isFetching?t('dashboard.refreshing'):t('dashboard.libraryResultCount',{count:titles.length})}</p>
+            <div aria-busy={titlesQuery.isFetching}>{ renderContent() }</div>
 
         </React.Fragment>
     )

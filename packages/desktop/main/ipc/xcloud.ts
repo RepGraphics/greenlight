@@ -140,7 +140,7 @@ export default class IpcxCloud extends IpcBase {
         return titles.filter((titleId) => !this._nonEntitledTitles.includes(titleId))
     }
 
-    filterTitles(filter: { name: string; onlyEntitled?: boolean }){
+    filterTitles(filter: { name: string; onlyEntitled?: boolean; sort?: 'default'|'az'|'za' }){
         return new Promise((resolve) => {
             const titles = this._titleManager.filterTitles(filter)
 
