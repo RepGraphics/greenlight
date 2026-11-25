@@ -76,5 +76,7 @@
     "recording_bitrate": 3000000,
     "discord_presence_enabled": false,
     "discord_application_id": "",
+    "appearance_theme": "graphite",
+    "appearance_accent": "green",
     "stream_keep_awake": false
 }

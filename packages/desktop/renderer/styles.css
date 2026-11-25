@@ -274,6 +274,32 @@ div.component_card { border-radius: 8px; }
     div#app_sidebar { display: none !important; }
 }
 
+/* User-selected shell themes; all values are fixed, validated presets. */
+:root {
+    --gl-shell: #121212; --gl-nav: #171717; --gl-hero: #1e4b23;
+    --gl-shell-glow: #17351b; --gl-primary: #107c10; --gl-primary-hover: #168817;
+}
+html[data-gl-theme=midnight]{--gl-shell:#101522;--gl-nav:#141c2b;--gl-surface:#1a2435;--gl-raised:#28364c;--gl-border:#40516a;--gl-text:#f4f7ff;--gl-muted:#bcc8dc;--gl-hero:#233c60;--gl-shell-glow:#20344c}
+html[data-gl-theme=oled]{--gl-shell:#000;--gl-nav:#080808;--gl-surface:#111;--gl-raised:#1c1c1c;--gl-border:#3d3d3d;--gl-text:#fff;--gl-muted:#c5c5c5;--gl-hero:#151515;--gl-shell-glow:#090909}
+html[data-gl-theme=contrast]{--gl-shell:#070707;--gl-nav:#101010;--gl-surface:#181818;--gl-raised:#282828;--gl-border:#969696;--gl-text:#fff;--gl-muted:#e1e1e1;--gl-hero:#242424;--gl-shell-glow:#131313}
+html[data-gl-accent=blue]{--gl-accent:#7ebdff;--gl-primary:#2456aa;--gl-primary-hover:#3169c7}
+html[data-gl-accent=violet]{--gl-accent:#c9a8ff;--gl-primary:#6842a4;--gl-primary-hover:#7852b6}
+html[data-gl-accent=amber]{--gl-accent:#ffc66e;--gl-primary:#80500e;--gl-primary-hover:#965e13}
+html[data-gl-accent=rose]{--gl-accent:#ff9fbd;--gl-primary:#94395b;--gl-primary-hover:#ab456b}
+.gl-app-shell{width:100vw;height:100vh;background:radial-gradient(ellipse at top left,var(--gl-shell-glow) 0%,var(--gl-nav) 32%,var(--gl-shell) 72%)}
+html[data-gl-theme] body{background:var(--gl-shell);color:var(--gl-text)}
+html[data-gl-theme] #component_header,html[data-gl-theme] #app_sidebar,html[data-gl-theme] #component_footer{background:var(--gl-nav);border-color:var(--gl-border)}
+html[data-gl-theme] #component_header ul.gl-nav li a.active,html[data-gl-theme] #component_header .gl-account.active,html[data-gl-theme] #component_settings_sidebar_menu ul li.active a{background:var(--gl-raised)}
+html[data-gl-theme] .gl-console-grid .component_card,html[data-gl-theme] .gl-dashboard-welcome,html[data-gl-theme] .gl-resume-card,html[data-gl-theme] .gl-profile-hero{background:linear-gradient(125deg,var(--gl-hero),var(--gl-surface) 78%);border-color:var(--gl-border)}
+html[data-gl-theme] .gl-console-grid .component_card:hover{border-color:var(--gl-accent)}
+html[data-gl-theme] .btn-primary{background:var(--gl-primary);border-color:var(--gl-primary);color:#fff}
+html[data-gl-theme] .btn-primary:not(:disabled):hover{background:var(--gl-primary-hover)}
+html[data-gl-theme] .gl-quality-preset{background:var(--gl-raised);border-color:var(--gl-border)}
+html[data-gl-theme] .gl-quality-preset.selected{border-color:var(--gl-accent);background:var(--gl-hero)}
+html[data-gl-theme] .gl-favourite[aria-pressed=true],html[data-gl-theme] .gl-stream-extra button[aria-pressed=true]{color:var(--gl-accent)}
+html[data-gl-theme] input[type=range],html[data-gl-theme] progress{accent-color:var(--gl-accent)}
+html[data-gl-theme=contrast] :focus-visible{outline-width:3px}
+
 /* Directional navigation and notifications */
 .gl-gamepad-focus :focus { outline: 3px solid var(--gl-accent) !important; outline-offset: 3px; }
 .gl-notifications { position: fixed; right: 20px; bottom: 56px; z-index: 110; display: grid; gap: 10px; width: min(380px, calc(100vw - 40px)); pointer-events: none; }
