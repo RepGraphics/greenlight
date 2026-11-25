@@ -33,6 +33,7 @@
     "electron-store": "^12.0.0",
     "express": "^5.2.1",
     "express-http-proxy": "^2.1.1",
+    "express-rate-limit": "8.7.5",
     "express-ws": "^5.0.2",
     "github-url-to-object": "^4.0.6",
     "i18next": "^26.4.2",
