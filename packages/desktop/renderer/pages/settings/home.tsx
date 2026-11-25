@@ -10,7 +10,8 @@ import Ipc from '../../lib/ipc'
 
 import SettingsSidebar from '../../components/settings/sidebar'
 import Image from 'next/image'
-import GreenlightLogo from '../../public/images/logo.png'
+import BrandMark from '../../components/ui/brandmark'
+import { brandName, brandRepository } from '../../lib/brand'
 import Card from '../../components/ui/card'
 import Button from '../../components/ui/button'
 
@@ -45,7 +46,7 @@ function SettingsHome() {
     return (
         <React.Fragment>
             <Head>
-                <title>Greenlight - {t('settings.about.title')}</title>
+                <title>{brandName} - {t('settings.about.title')}</title>
             </Head>
 
             <SettingsSidebar>
@@ -81,13 +82,14 @@ function SettingsHome() {
 
                 <Card>
                     <div style={{ textAlign: 'center' }}>
-                        <Image src={ GreenlightLogo } width="100" height="100" alt="Greenlight" />
+                        <BrandMark size={100} decorative/>
 
-                        <h2>Greenlight</h2>
+                        <h2>{brandName}</h2>
+                        <p><small>Based on Greenlight by UnknownSKL and contributors.</small></p>
                         <p>
                             {t('settings.about.version')}: { typeof window !== 'undefined' ? window.Greenlight?.getVersion() : '' }<br /><br />
                             <small>{t('settings.about.website')}: <Link href="#" title={t('settings.about.websiteLinkTitle')} onClick={ () => {
-                                window.Greenlight.openExternal('https://github.com/RepGraphics/greenlight')
+                                window.Greenlight.openExternal(brandRepository)
                             }}>github.com/RepGraphics/greenlight</Link></small><br />
                             <small>{t('authorOfLocalization')}</small>
                         </p>

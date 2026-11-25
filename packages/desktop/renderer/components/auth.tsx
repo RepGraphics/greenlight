@@ -5,6 +5,8 @@ import Image from 'next/image'
 import Card from '../components/ui/card'
 import Button from './ui/button'
 import Loader from './ui/loader'
+import BrandMark from './ui/brandmark'
+import { brandName } from '../lib/brand'
 
 import { useTranslation } from 'react-i18next'
 
@@ -73,6 +75,8 @@ function Auth({
                                 textAlign: 'center',
                                 paddingBottom: '20px',
                             }}>
+                                <BrandMark size={72} decorative/>
+                                <p><strong>{brandName}</strong></p>
                                 <h1>{t('auth.loginWithXbox')}</h1>
                                 <p>
                                     {t('auth.pleaseAuthenticate')}
