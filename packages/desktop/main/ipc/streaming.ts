@@ -34,6 +34,11 @@ export default class IpcStreaming extends IpcBase {
 
     _streamManager:StreamManager
     private awake=new StreamAwake(powerSaveBlocker)
+    private startingHome=new Set<string>()
+
+    hasHomeStream(target:string){
+        return this.startingHome.has(target)||Object.values(this._streamManager._sessions).some(session=>session.type==='home'&&session.target===target&&session.playerState!=='failed')
+    }
 
     constructor(application:Application){
         super(application)
@@ -48,7 +53,11 @@ export default class IpcStreaming extends IpcBase {
         }
 
         if(args.type === 'home'){
-            this._application._ipc._channels.consoles._consolesLastUpdate = 0
+            const consoles=this._application._ipc._channels.consoles
+            if(consoles.isPowerPending(args.target)||this.startingHome.has(args.target))return Promise.reject(new Error('Console operation already pending'))
+            consoles._consolesLastUpdate = 0
+            this.startingHome.add(args.target)
+            return Promise.resolve().then(()=>this._streamManager.startStream(args.type,args.target,args.resolution===720?720:1080)).finally(()=>this.startingHome.delete(args.target))
         } else {
             const title = this._application._ipc._channels.xCloud._titleManager.findTitle(args.target)
             if(title?.hasEntitlement === false){
