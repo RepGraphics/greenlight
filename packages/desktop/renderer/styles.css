@@ -411,3 +411,7 @@ div.component_gametitle .gl-art-placeholder { width: 140px; height: 140px; displ
 
 /* Classic's player is fixed at z-index 95; the error panel must sit above it. */
 .gl-classic-error{position:fixed;z-index:110;top:40%;max-height:55vh;overflow:auto}
+
+/* Classic touch controls sit above the fixed video, below stream dialogs. */
+.gl-classic-touch-launch{position:fixed;top:10px;right:10px;z-index:102;touch-action:manipulation}
+.gl-classic-touch-overlay{z-index:101}

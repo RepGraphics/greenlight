@@ -1,3 +1,4 @@
+import { ClassicVirtualPad } from './classicvirtualpad'
 // Compatibility layer for the Classic xbox-xcloud-player 0.2.11 driver.
 // Classic exposes one virtual Xbox controller; keep the selected physical
 // controller stable across browser index changes, with an explicit neutral
@@ -26,20 +27,22 @@ type Driver={
     _application?:{getChannelProcessor:(name:string)=>InputChannel|undefined}
 }
 type InputChannel={_state?:string;getGamepadQueueLength:()=>number;queueGamepadStates:(frames:Frame[])=>void;_inputFps?:{count:()=>void}}
-const installed=new WeakSet<object>()
+const installed=new WeakMap<object,ClassicVirtualPad>()
+export function classicVirtualPad(driver:unknown){return driver&&typeof driver==='object'?installed.get(driver):undefined}
 export function installClassicInputLifecycle(value:unknown,schedule:typeof setTimeout=setTimeout,cancel:typeof clearTimeout=clearTimeout){
     if(!value||typeof value!=='object'||installed.has(value))return false
     const driver=value as Driver
     if(typeof driver.requestStates!=='function'||typeof driver.run!=='function'||typeof driver.stop!=='function')return false
-    installed.add(value)
+    const virtual=new ClassicVirtualPad()
+    installed.set(value,virtual)
     const primary=new ClassicPrimaryInput()
     const request=driver.requestStates
     const stop=driver.stop
     let running=false
     let generation=0
     let timer:ReturnType<typeof setTimeout>|undefined
-    driver.requestStates=()=>primary.read(request.call(driver))
-    const halt=()=>{generation++;running=false;if(timer!==undefined)cancel(timer);timer=undefined;primary.reset()}
+    driver.requestStates=()=>virtual.merge(primary.read(request.call(driver)),neutral)
+    const halt=()=>{generation++;running=false;if(timer!==undefined)cancel(timer);timer=undefined;primary.reset();virtual.reset()}
     driver.stop=function(){halt();return stop.call(this)}
     // Upstream run() recursively schedules itself but never cancels the
     // timeout in stop(). Own one cancellable polling loop instead.

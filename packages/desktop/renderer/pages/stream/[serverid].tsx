@@ -20,6 +20,8 @@ import xCloudPlayer from 'xbox-xcloud-player'
 
 import { useSettings } from '../../context/userContext'
 import StreamComponent from '../../components/ui/streamcomponent'
+import ClassicTouchControls from '../../components/ui/classictouchcontrols'
+import { classicVirtualPad } from '../../lib/classicinputlifecycle'
 import StreamPreload from '../../components/ui/streampreload'
 import Ipc from '../../lib/ipc'
 import { useTranslation } from 'react-i18next'
@@ -389,6 +391,7 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
             }} waitingTime={ queueTime }></StreamPreload> : <StreamPreload onDisconnect={ () => {
                 onDisconnect()
             }}></StreamPreload> }
+            {connected&&!connectionError&&!consoleController&&settings.input_touch&&xPlayer&&classicVirtualPad(xPlayer._inputDriver)&&<ClassicTouchControls pad={classicVirtualPad(xPlayer._inputDriver)!}/>}
         </React.Fragment>
     )
 }
