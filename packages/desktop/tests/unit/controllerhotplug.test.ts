@@ -71,3 +71,45 @@ test('keyboard-only controller releases held input on visibility loss and focus 
         if(doc)Object.defineProperty(globalThis,'document',doc);else Reflect.deleteProperty(globalThis,'document')
     }
 })
+
+test('virtual releases preserve held physical inputs and other virtual sources',()=>{
+    const saved=['navigator','window','document'].map(name=>[name,Object.getOwnPropertyDescriptor(globalThis,name)] as const)
+    const buttons=Array.from({length:17},(_,i)=>({value:i===0?1:0}))
+    const pads=[{index:0,connected:true,buttons,axes:[0.6,0,0,0]}]
+    Object.defineProperty(globalThis,'navigator',{configurable:true,value:{getGamepads:()=>pads}})
+    Object.defineProperty(globalThis,'window',{configurable:true,value:{addEventListener(){},removeEventListener(){}}})
+    Object.defineProperty(globalThis,'document',{configurable:true,value:{hidden:false,hasFocus:()=>true,addEventListener(){},removeEventListener(){}}})
+    const controller=new Gamepad(0)
+    try{
+        controller.attach({_channels:{control:{sendGamepadState(){},getGamepadHandlers:()=>({})}}} as any)
+        controller.sendButtonState('A',0.5);assert.equal(controller.getGamepadState()?.A,1)
+        controller.sendButtonState('A',0);assert.equal(controller.getGamepadState()?.A,1)
+        controller.sendButtonState('B',1);controller.setVirtualStick('Left',-1,1)
+        assert.equal(controller.getGamepadState()?.LeftThumbXAxis,-1)
+        controller.releaseVirtualStick('Left')
+        const frame=controller.getGamepadState()!
+        assert.equal(frame.A,1);assert.equal(frame.B,1);assert.ok(frame.LeftThumbXAxis>0)
+        controller.sendButtonState('B',0);assert.equal(controller.getGamepadState()?.B,0)
+    }finally{controller.detach();for(const [name,descriptor] of saved){if(descriptor)Object.defineProperty(globalThis,name,descriptor);else Reflect.deleteProperty(globalThis,name)}}
+})
+test('virtual-only releases send one final frame without cancelling another held control',()=>{
+    const saved=['navigator','window','document'].map(name=>[name,Object.getOwnPropertyDescriptor(globalThis,name)] as const)
+    Object.defineProperty(globalThis,'navigator',{configurable:true,value:{getGamepads:()=>[]}})
+    Object.defineProperty(globalThis,'window',{configurable:true,value:{addEventListener(){},removeEventListener(){}}})
+    Object.defineProperty(globalThis,'document',{configurable:true,value:{hidden:false,hasFocus:()=>true,addEventListener(){},removeEventListener(){}}})
+    const controller=new Gamepad(0,{enable_gamepad:false})
+    try{
+        controller.attach({_channels:{control:{sendGamepadState(){},getGamepadHandlers:()=>({})}}} as any)
+        controller.sendButtonState('A',1);controller.setVirtualStick('Right',0.5,NaN)
+        assert.equal(controller.getGamepadState()?.RightThumbYAxis,0)
+        controller.releaseVirtualStick('Right')
+        assert.equal(controller.getGamepadState()?.A,1)
+        controller.sendButtonState('A',0)
+        assert.equal(controller.getGamepadState()?.A,0);assert.equal(controller.getGamepadState(),undefined)
+        controller.sendButtonState('GamepadIndex',1);controller.sendButtonState('A',NaN);controller.sendButtonState('__proto__',1)
+        assert.equal(controller.getGamepadState(),undefined)
+        controller.onWindowBlur();controller.sendButtonState('A',1);controller.setVirtualStick('Left',1,1)
+        assert.equal(controller.getGamepadState()?.A,0)
+        controller.onWindowFocus();assert.equal(controller.getGamepadState(),undefined)
+    }finally{controller.detach();for(const [name,descriptor] of saved){if(descriptor)Object.defineProperty(globalThis,name,descriptor);else Reflect.deleteProperty(globalThis,name)}}
+})
