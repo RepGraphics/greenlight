@@ -24,7 +24,7 @@ export function graphData(samples:DiagnosticSample[],metric:GraphMetric,seconds:
 export function appendGraphSample(samples:DiagnosticSample[],sample:DiagnosticSample){
     if(!Number.isFinite(sample.elapsedSeconds)||sample.elapsedSeconds<0)return samples
     const last=samples.at(-1)
-    if(last&&sample.elapsedSeconds<last.elapsedSeconds)return [sample]
+    if(last&&sample.elapsedSeconds<last.elapsedSeconds)return [{...sample}]
     const next=last&&last.elapsedSeconds===sample.elapsedSeconds?samples.slice(0,-1):samples
-    return [...next.filter(item=>item.elapsedSeconds>=sample.elapsedSeconds-300).slice(-299),sample]
+    return [...next.filter(item=>item.elapsedSeconds>=sample.elapsedSeconds-300).slice(-299),{...sample}]
 }

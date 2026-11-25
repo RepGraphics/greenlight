@@ -26,3 +26,12 @@ test('unavailable samples remain visible as graph gaps rather than fabricated ze
     assert.equal(graph.last,30)
     assert.equal(graphData(appendGraphSample(samples,sample(4,false)),'rtt',30).last,undefined)
 })
+
+test('graph snapshots isolate producer mutation and break lines across missing intervals',()=>{
+    const source=sample(1)
+    let history=appendGraphSample([],source)
+    source.rtt=999
+    history=appendGraphSample(history,sample(7))
+    assert.equal(history[0].rtt,30)
+    assert.equal(graphData(history,'rtt',30).segments.length,2)
+})
