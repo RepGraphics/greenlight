@@ -37,3 +37,18 @@ test('stale final stats cannot produce live quality advice',()=>{
     samples[19].statsFresh=false
     assert.equal(recommendLowerBitrate(samples,20480),null)
 })
+
+test('Classic stats recovery is opt-in, bounded, and limited to established console sessions',()=>{
+    const recovery=new ClassicRecoveryBudget()
+    const state={error:'stats',active:true,blocked:false}
+    assert.equal(recovery.delay(true,false,state),null)
+    recovery.markConnected()
+    assert.equal(recovery.delay(false,false,state),null)
+    assert.equal(recovery.delay(true,true,state),null)
+    assert.equal(recovery.delay(true,false,{...state,blocked:true}),null)
+    assert.equal(recovery.delay(true,false,state),3000)
+    recovery.recordRetry(true)
+    assert.equal(recovery.delay(true,false,state),8000)
+    recovery.recordRetry(true)
+    assert.equal(recovery.delay(true,false,state),null)
+})
