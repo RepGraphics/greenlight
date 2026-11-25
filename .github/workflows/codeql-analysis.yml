@@ -17,6 +17,7 @@ on:
   pull_request:
     # The branches below must be a subset of the branches above
     branches: [ main-v2 ]
+  workflow_dispatch:
   schedule:
     - cron: '45 21 * * 3'
 
@@ -40,6 +41,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v7
+      with:
+        persist-credentials: false
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
@@ -68,4 +71,25 @@ jobs:
     #   make release
 
     - name: Perform CodeQL Analysis
+      id: analysis
       uses: github/codeql-action/analyze@v4.39.4
+      with:
+        upload: failure-only
+        output: ${{ runner.temp }}/codeql-results
+
+    # Preserve the generated report before submitting it to Code Scanning.
+    # Upload errors must still fail the workflow, not silently pass.
+    - name: Preserve CodeQL SARIF report
+      if: steps.analysis.outcome == 'success'
+      uses: actions/upload-artifact@v7
+      with:
+        name: codeql-sarif-${{ matrix.language }}
+        path: ${{ steps.analysis.outputs.sarif-output }}
+        if-no-files-found: error
+        retention-days: 7
+
+    - name: Upload results to GitHub Code Scanning
+      uses: github/codeql-action/upload-sarif@v4.39.4
+      with:
+        sarif_file: ${{ steps.analysis.outputs.sarif-output }}
+        wait-for-processing: true
