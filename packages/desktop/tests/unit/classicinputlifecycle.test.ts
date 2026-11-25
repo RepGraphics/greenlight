@@ -1,6 +1,6 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {ClassicPrimaryInput,installClassicInputLifecycle} from '../../renderer/lib/classicinputlifecycle'
+import {ClassicPrimaryInput,installClassicInputLifecycle,classicVirtualPad} from '../../renderer/lib/classicinputlifecycle'
 
 test('Classic keeps a selected physical controller and normalizes the virtual slot',()=>{
     const input=new ClassicPrimaryInput()
@@ -76,4 +76,33 @@ test('a stopped channel cannot revive an old polling generation after reopening'
     assert.equal(f.timers.size,1)
     f.driver.stop()
     assert.equal(f.timers.size,0)
+})
+
+test('Classic virtual buttons merge into one slot, retaining physical buttons after release',()=>{
+    const f=fixture(),pad=classicVirtualPad(f.driver)!
+    f.setFrames([{GamepadIndex:4,A:1}]);f.driver.run()
+    pad.press(1,'B');f.tick();assert.equal(f.sent.at(-1)?.[0].B,1);assert.equal(f.sent.at(-1)?.[0].A,1)
+    pad.release(1);f.tick();assert.equal(f.sent.at(-1)?.[0].B,0);assert.equal(f.sent.at(-1)?.[0].A,1)
+    f.driver.stop()
+})
+test('Classic touch-only input sends an explicit neutral frame after release even under backpressure',()=>{
+    const f=fixture(),pad=classicVirtualPad(f.driver)!
+    f.setFrames([]);f.driver.run();assert.equal(f.sent.length,0)
+    pad.press(1,'A');pad.press(2,'A');f.tick();assert.equal(f.sent.at(-1)?.[0].A,1)
+    pad.release(1);f.tick();assert.equal(f.sent.at(-1)?.[0].A,1)
+    pad.release(2);f.setQueue(10);f.tick();assert.equal(f.sent.at(-1)?.[0].A,1)
+    f.setQueue(0);f.tick();assert.equal(f.sent.at(-1)?.[0].A,0)
+    const count=f.sent.length;f.tick();assert.equal(f.sent.length,count)
+    f.driver.stop()
+})
+test('Classic stick ownership is independent, bounded and reset on stop',()=>{
+    const f=fixture(),pad=classicVirtualPad(f.driver)!
+    f.setFrames([]);f.driver.run()
+    assert.equal(pad.move('Left',1,1,1),true);assert.equal(pad.move('Left',2,0,0),false)
+    pad.move('Right',3,0,-1);f.tick()
+    const frame=f.sent.at(-1)![0];assert.ok(Math.abs(frame.LeftThumbXAxis-Math.SQRT1_2)<0.001);assert.ok(frame.LeftThumbYAxis<0);assert.equal(frame.RightThumbYAxis,1)
+    pad.releaseStick('Left',2);f.tick();assert.ok(f.sent.at(-1)![0].LeftThumbXAxis>0)
+    pad.releaseAll();f.tick();assert.equal(f.sent.at(-1)![0].LeftThumbXAxis,0);assert.equal(f.sent.at(-1)![0].RightThumbYAxis,0)
+    pad.press(4,'B');f.driver.stop();f.driver.run();assert.deepEqual(f.driver.requestStates(),[])
+    f.driver.stop()
 })

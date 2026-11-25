@@ -31,7 +31,8 @@ An independently maintained fork of [Greenlight](https://github.com/unknownskl/g
 | WebGPU rendering | — | Experimental |
 | Controller profiles, remapping and calibration | Yes | Yes |
 | Console-paired controller mode | Yes | Yes |
-| Touch gamepad and native mouse/keyboard | — | Experimental |
+| On-screen touch gamepad | Experimental | Experimental |
+| Native mouse/keyboard | — | Experimental |
 | Video filters and sharpening | Yes | Yes |
 | Screenshots and picture-in-picture | Yes | Standard video only |
 | Local clips | Yes | Standard video only |
@@ -92,6 +93,8 @@ Enable keyboard emulation in input settings. Default mappings include:
 | LB / RB | [ / ] |
 | LT / RT | - / = |
 | View / Menu | V / M |
+
+Classic's experimental on-screen controller is available with **Enable Touch input**; toggle the overlay with the Touch controls button. It uses the existing virtual controller slot and preserves native touchscreen input outside the overlay. Console-paired mode takes precedence. Live Xbox testing is still required.
 
 ### Multiple controllers (V3 experimental)
 
