@@ -1,4 +1,4 @@
-import { recordingMimeType } from './streamrecording'
+import { cloneRemoteMedia, recordingMimeType } from './streamrecording'
 
 export const replaySegmentMs=30000
 export const replayMaxBytes=32*1024*1024
@@ -10,18 +10,15 @@ export function validReplaySegment(segment:ReplaySegment, now:number, duration=3
 export function startInstantReplay(video:HTMLVideoElement,onReady:(ready:boolean)=>void,onError:()=>void,duration:unknown=30,audio:HTMLAudioElement|null=document.querySelector<HTMLAudioElement>('.gl-experimental-stream #playerContainer audio')){
     const seconds=replayDuration(duration)
     const mime=recordingMimeType()
-    if(!mime||!(video.srcObject instanceof MediaStream))throw Error('Replay unavailable')
-    const source=video.srcObject.getVideoTracks().find(track=>track.readyState==='live')
-    if(!source)throw Error('No live video')
-    const audioTrack=audio?.srcObject instanceof MediaStream?audio.srcObject.getAudioTracks().find(track=>track.readyState==='live'):undefined
-    const tracks=[source,...(audioTrack?[audioTrack]:[])].map(track=>track.clone())
-    const stream=new MediaStream(tracks)
+    if(!mime)throw Error('Replay unavailable')
+    const {source,tracks,stream}=cloneRemoteMedia(video,audio)
     let disposed=false
     let recorder:MediaRecorder|undefined
     let timer:ReturnType<typeof setTimeout>|undefined
     let latest:ReplaySegment|undefined
     let saving:((blob:Blob|null)=>void)|undefined
     let startedAt=0
+    let stopping=false
     let saveDeadline:ReturnType<typeof setTimeout>|undefined
     const dispose=()=>{
         if(disposed)return
@@ -30,10 +27,21 @@ export function startInstantReplay(video:HTMLVideoElement,onReady:(ready:boolean
         clearTimeout(saveDeadline)
         latest=undefined
         const resolve=saving;saving=undefined;resolve?.(null)
-        if(recorder&&recorder.state!=='inactive'){try{recorder.stop()}catch{}}
+        if(recorder){
+            recorder.ondataavailable=null;recorder.onerror=null;recorder.onstop=null
+            if(recorder.state!=='inactive'){try{recorder.stop()}catch{}}
+            recorder=undefined
+        }
         tracks.forEach(track=>track.stop())
     }
     const fail=()=>{if(disposed)return;dispose();onError()}
+    const stopCurrent=()=>{
+        if(disposed||!recorder||stopping)return
+        stopping=true
+        clearTimeout(timer)
+        saveDeadline=setTimeout(fail,5000)
+        try{if(recorder.state!=='inactive')recorder.stop()}catch{fail()}
+    }
     const begin=()=>{
         if(disposed)return
         if(source.readyState!=='live'){fail();return}
@@ -43,6 +51,7 @@ export function startInstantReplay(video:HTMLVideoElement,onReady:(ready:boolean
         let current:MediaRecorder
         try{current=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:2500000,audioBitsPerSecond:96000})}catch{fail();return}
         recorder=current
+        stopping=false
         startedAt=Date.now()
         const segmentStart=startedAt
         current.ondataavailable=event=>{
@@ -54,6 +63,7 @@ export function startInstantReplay(video:HTMLVideoElement,onReady:(ready:boolean
         current.onstop=()=>{
             if(disposed||recorder!==current||overflow)return
             clearTimeout(timer)
+            current.ondataavailable=null;current.onerror=null;current.onstop=null
             const segment={blob:new Blob(chunks,{type:mime}),startedAt:segmentStart,endedAt:Date.now()}
             chunks.length=0
             if(validReplaySegment(segment,Date.now(),seconds))latest=segment
@@ -64,7 +74,7 @@ export function startInstantReplay(video:HTMLVideoElement,onReady:(ready:boolean
             begin()
         }
         try{current.start(1000)}catch{fail();return}
-        timer=setTimeout(()=>{saveDeadline=setTimeout(fail,5000);try{if(current.state!=='inactive')current.stop()}catch{fail()}},seconds*1000)
+        timer=setTimeout(stopCurrent,seconds*1000)
     }
     begin()
     if(disposed)throw Error('Replay could not start')
@@ -73,13 +83,13 @@ export function startInstantReplay(video:HTMLVideoElement,onReady:(ready:boolean
         save:():Promise<Blob|null>=>{
             if(disposed||saving)return Promise.resolve(null)
             // Prefer a recent complete segment when the new segment has only just begun.
-            if(latest&&validReplaySegment(latest,Date.now(),seconds)&&Date.now()-startedAt<3000)return Promise.resolve(latest.blob)
-            if(!recorder||recorder.state==='inactive')return Promise.resolve(latest&&validReplaySegment(latest,Date.now(),seconds)?latest.blob:null)
+            if(!recorder)return Promise.resolve(null)
+            if(!stopping&&recorder.state!=='inactive'&&latest&&validReplaySegment(latest,Date.now(),seconds)&&Date.now()-startedAt<3000)return Promise.resolve(latest.blob)
+            // MediaRecorder becomes inactive before its final data/stop events.
+            // Join an in-flight rollover instead of returning a stale segment.
             return new Promise(resolve=>{
                 saving=resolve
-                saveDeadline=setTimeout(fail,5000)
-                clearTimeout(timer)
-                try{recorder!.stop()}catch{fail()}
+                stopCurrent()
             })
         }
     }

@@ -10,16 +10,32 @@ export function recordingMimeType() {
     return ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(type=>MediaRecorder.isTypeSupported(type))
 }
 
+// Some players expose remote audio on a separate element; others multiplex it
+// with video. Clone only these remote tracks and release any partial allocation.
+export function cloneRemoteMedia(video: HTMLVideoElement, audio: HTMLAudioElement | null) {
+    if(typeof MediaStream==='undefined'||!(video.srcObject instanceof MediaStream))throw new Error('Remote media unavailable')
+    const source=video.srcObject.getVideoTracks().find(track=>track.readyState==='live')
+    if(!source)throw new Error('No live video')
+    const audioTrack=(audio?.srcObject instanceof MediaStream
+        ? audio.srcObject.getAudioTracks().find(track=>track.readyState==='live')
+        : undefined) ?? video.srcObject.getAudioTracks().find(track=>track.readyState==='live')
+    const tracks:MediaStreamTrack[]=[]
+    try {
+        tracks.push(source.clone())
+        if(audioTrack)tracks.push(audioTrack.clone())
+        return {source,tracks,stream:new MediaStream(tracks)}
+    } catch(error) {
+        tracks.forEach(track=>track.stop())
+        throw error
+    }
+}
+
 export function startStreamRecording(video: HTMLVideoElement, onFinished:(blob:Blob|null,error:boolean)=>void, audio:HTMLAudioElement|null=document.querySelector<HTMLAudioElement>('.gl-experimental-stream #playerContainer audio')) {
     const mimeType=recordingMimeType()
-    if(!mimeType || !(video.srcObject instanceof MediaStream)) throw new Error('Recording unavailable')
-    const videoTrack=video.srcObject.getVideoTracks().find(track=>track.readyState==='live')
-    if(!videoTrack) throw new Error('No live video')
-    const audioTrack=audio?.srcObject instanceof MediaStream ? audio.srcObject.getAudioTracks().find(track=>track.readyState==='live') : undefined
-    // Only remote media tracks. Never record local microphone or desktop.
-    const tracks=[videoTrack,...(audioTrack?[audioTrack]:[])].map(track=>track.clone())
+    if(!mimeType) throw new Error('Recording unavailable')
+    const {tracks,stream}=cloneRemoteMedia(video,audio)
     let recorder:MediaRecorder
-    try {recorder=new MediaRecorder(new MediaStream(tracks),{mimeType,videoBitsPerSecond:3000000,audioBitsPerSecond:128000})}
+    try {recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:3000000,audioBitsPerSecond:128000})}
     catch(error){tracks.forEach(track=>track.stop());throw error}
     const chunks:Blob[]=[]
     let bytes=0
@@ -44,7 +60,7 @@ export function startStreamRecording(video: HTMLVideoElement, onFinished:(blob:B
     }
     recorder.onerror=()=>{failed=true;stop()}
     recorder.onstop=finish
-    try{recorder.start(1000)}catch(error){tracks.forEach(track=>track.stop());throw error}
+    try{recorder.start(1000)}catch(error){recorder.ondataavailable=null;recorder.onerror=null;recorder.onstop=null;tracks.forEach(track=>track.stop());throw error}
     timer=setTimeout(stop,recordingLimitMs)
     return {stop,startedAt:Date.now()}
 }

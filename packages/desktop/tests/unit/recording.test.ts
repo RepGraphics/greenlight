@@ -1,9 +1,9 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {startStreamRecording,recordingLimitBytes} from '../../renderer/lib/streamrecording'
+import {cloneRemoteMedia,startStreamRecording,recordingLimitBytes} from '../../renderer/lib/streamrecording'
 import {startInstantReplay} from '../../renderer/lib/instantreplay'
 class Track {readyState='live';stopped=false;copies:Track[]=[];clone(){const track=new Track();this.copies.push(track);return track}stop(){this.stopped=true;this.readyState='ended'}}
-class Stream {constructor(private tracks:Track[]){}getVideoTracks(){return this.tracks}getAudioTracks(){return []}}
+class Stream {constructor(private tracks:Track[]){}getVideoTracks(){return this.tracks}getAudioTracks():Track[]{return []}}
 class Recorder {
     static all:Recorder[]=[]
     static isTypeSupported(){return true}
@@ -31,3 +31,87 @@ test('disposing replay resolves a pending save without preserving an incomplete 
 
 test('Classic recording clones explicit remote audio rather than looking up an unrelated element',()=>{const {source,video,restore}=setup();try{const audio=new Track();const remote={srcObject:{}};remote.srcObject=new (globalThis as any).MediaStream([]);(remote.srcObject as any).getAudioTracks=()=>[audio];const results:any[]=[];const recording=startStreamRecording(video,(blob,error)=>results.push({blob,error}),remote as HTMLAudioElement);assert.equal(audio.copies.length,1);recording.stop();Recorder.all[0].finish();assert.equal(audio.stopped,false);assert.equal(audio.copies[0].stopped,true);assert.equal(source.copies[0].stopped,true)}finally{restore()}})
 test('Classic replay clones explicit remote audio and releases the clones',()=>{const {video,restore}=setup();try{const audio=new Track();const remote={srcObject:new (globalThis as any).MediaStream([])};remote.srcObject.getAudioTracks=()=>[audio];const replay=startInstantReplay(video,()=>{},()=>assert.fail('unexpected failure'),15,remote as HTMLAudioElement);assert.equal(audio.copies.length,1);replay.dispose();assert.equal(audio.stopped,false);assert.equal(audio.copies[0].stopped,true)}finally{restore()}})
+
+test('both capture modes include live audio multiplexed with video',()=>{
+    const {source,video,restore}=setup()
+    const audio=new Track()
+    ;(video.srcObject as unknown as Stream).getAudioTracks=()=>[audio]
+    try{
+        const recording=startStreamRecording(video,()=>{},null)
+        recording.stop();Recorder.all[0].finish()
+        const replay=startInstantReplay(video,()=>{},()=>assert.fail('unexpected failure'),15,null)
+        replay.dispose()
+        assert.equal(audio.copies.length,2)
+        assert.ok(audio.copies.every(track=>track.stopped))
+        assert.ok(source.copies.every(track=>track.stopped))
+        assert.equal(audio.stopped,false)
+        assert.equal(source.stopped,false)
+    }finally{restore()}
+})
+test('remote media prefers separate live audio and ignores ended tracks',()=>{
+    const {video,restore}=setup()
+    try{
+        const embedded=new Track(), separate=new Track(), ended=new Track()
+        ended.stop()
+        ;(video.srcObject as unknown as Stream).getAudioTracks=()=>[embedded]
+        const audioStream=new Stream([])
+        audioStream.getAudioTracks=()=>[ended,separate]
+        const remote={srcObject:audioStream} as unknown as HTMLAudioElement
+        const first=cloneRemoteMedia(video,remote)
+        assert.equal(separate.copies.length,1)
+        assert.equal(embedded.copies.length,0)
+        assert.equal(ended.copies.length,0)
+        first.tracks.forEach(track=>track.stop())
+        audioStream.getAudioTracks=()=>[ended]
+        const fallback=cloneRemoteMedia(video,remote)
+        assert.equal(embedded.copies.length,1)
+        fallback.tracks.forEach(track=>track.stop())
+    }finally{restore()}
+})
+test('failed audio cloning releases partially allocated video without stopping source',()=>{
+    const {source,video,restore}=setup()
+    try{
+        const audio=new Track()
+        audio.clone=()=>{throw new Error('clone failed')}
+        ;(video.srcObject as unknown as Stream).getAudioTracks=()=>[audio]
+        assert.throws(()=>startStreamRecording(video,()=>{},null),/clone failed/)
+        assert.throws(()=>startInstantReplay(video,()=>{},()=>{},15,null),/clone failed/)
+        assert.equal(source.copies.length,2)
+        assert.ok(source.copies.every(track=>track.stopped))
+        assert.equal(source.stopped,false)
+        assert.equal(audio.stopped,false)
+        assert.equal(Recorder.all.length,0)
+    }finally{restore()}
+})
+test('replay save joins a segment that is inactive but still finalizing',async()=>{
+    const {video,restore}=setup()
+    let replay:ReturnType<typeof startInstantReplay>|undefined
+    try{
+        replay=startInstantReplay(video,()=>{},()=>assert.fail('unexpected failure'))
+        const recorder=Recorder.all[0]
+        recorder.data(new Blob(['first']))
+        recorder.stop()
+        const pending=replay.save()
+        assert.equal(await replay.save(),null)
+        recorder.data(new Blob(['final']))
+        recorder.finish()
+        assert.equal(await (await pending)?.text(),'firstfinal')
+        assert.equal(Recorder.all.length,2)
+        assert.equal(recorder.onstop,null)
+        assert.equal(recorder.ondataavailable,null)
+    }finally{replay?.dispose();restore()}
+})
+test('replay disposal detaches recorder events and releases pending save',async()=>{
+    const {source,video,restore}=setup()
+    try{
+        const replay=startInstantReplay(video,()=>{},()=>assert.fail('unexpected failure'))
+        const recorder=Recorder.all[0]
+        const pending=replay.save()
+        replay.dispose()
+        assert.equal(await pending,null)
+        assert.equal(recorder.ondataavailable,null)
+        assert.equal(recorder.onerror,null)
+        assert.equal(recorder.onstop,null)
+        assert.equal(source.copies[0].stopped,true)
+    }finally{restore()}
+})
