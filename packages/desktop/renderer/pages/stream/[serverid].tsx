@@ -7,6 +7,7 @@ import { startHeartbeat } from '../../lib/keepalive'
 import { watchClassicConnection } from '../../lib/classicconnection'
 import { useStreamAwake } from '../../lib/useStreamAwake'
 import { configureClassicConsoleController } from '../../lib/classicconsolecontroller'
+import { configureClassicControllerProfile,resolveClassicControllerProfile } from '../../lib/classiccontrollerprofile'
 import { readConsoleProfiles } from '../../lib/consoleprofiles'
 import { readGameProfiles } from '../../lib/gameprofiles'
 import ExperimentalStream from '../../components/ui/experimentalstream'
@@ -85,6 +86,7 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
             holder.replaceChildren(surface)
             xPlayer.bind()
             if(consoleController && streamType==='home') configureClassicConsoleController(xPlayer)
+            else configureClassicControllerProfile(xPlayer._inputDriver,resolveClassicControllerProfile(globalSettings,profile?.controllerProfile??consoleProfile?.controllerProfile))
 
             // Set bitrates & video codec profiles
             if(((streamType === 'cloud') ? settings.xcloud_bitrate : settings.xhome_bitrate) > 0){
