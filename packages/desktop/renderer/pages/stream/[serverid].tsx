@@ -4,6 +4,7 @@ import {downloadDiagnostics} from '../../lib/streamdiagnostics'
 import type { DiagnosticSample } from '../../lib/streamdiagnostics'
 import { ManualReconnect } from '../../lib/sessionrecovery'
 import { startHeartbeat } from '../../lib/keepalive'
+import { watchClassicConnection } from '../../lib/classicconnection'
 import { useStreamAwake } from '../../lib/useStreamAwake'
 import { configureClassicConsoleController } from '../../lib/classicconsolecontroller'
 import { readConsoleProfiles } from '../../lib/consoleprofiles'
@@ -63,6 +64,7 @@ function LegacyStream({onRetry}:{onRetry:()=>void}) {
         if (!router.isReady || typeof router.query.serverid !== 'string') return
         let cancelled = false
         let polling = false
+        let disposeConnection: (()=>void)|undefined
         // Detect stream type and title / server id
         let streamType = 'home'
         let serverId = router.query.serverid
@@ -92,25 +94,38 @@ function LegacyStream({onRetry}:{onRetry:()=>void}) {
 
             // Stream is ready so we start the player
             xPlayer.setControllerRumble(settings.controller_vibration)
+            const failConnection=()=>{
+                if(cancelled||intentionalExit.current||reconnect.current.busy)return
+                setConnected(false)
+                recordHistory('failed')
+                stopHeartbeat.current?.();stopHeartbeat.current=undefined
+                setConnectionError('closed')
+            }
+            const watcher=watchClassicConnection(failConnection)
+            disposeConnection=watcher.dispose
             xPlayer.setSdpHandler((client, offer) => {
+                if(cancelled||intentionalExit.current||reconnect.current.busy)return
                 Ipc.send('streaming', 'sendChatSdp', {
                     sessionId: sessionId,
                     sdp: offer.sdp,
                 }).then((sdpResponse) => {
+                    if(cancelled||intentionalExit.current||reconnect.current.busy)return
                     xPlayer.setRemoteOffer(sdpResponse.sdp)
 
                 }).catch((error) => {
+                    if(cancelled||intentionalExit.current||reconnect.current.busy)return
                     console.log('ChatSDP Exchange error:', error)
                     alert(t('errors.chatSDPExchangeError') + ' ' + JSON.stringify(error))
                 })
             })
 
-            xPlayer.createOffer().then((offer:any) => {
-                Ipc.send('streaming', 'sendSdp', {
+            Promise.resolve().then(()=>xPlayer.createOffer()).then((offer:any) => {
+                if(cancelled||intentionalExit.current||reconnect.current.busy)return
+                return Ipc.send('streaming', 'sendSdp', {
                     sessionId: sessionId,
                     sdp: offer.sdp,
                 }).then((sdpResult:any) => {
-                    if (cancelled) return
+                    if (cancelled||intentionalExit.current||reconnect.current.busy) return
                     xPlayer.setRemoteOffer(sdpResult.sdp)
 
                     // Gather candidates
@@ -128,33 +143,38 @@ function LegacyStream({onRetry}:{onRetry:()=>void}) {
                         sessionId: sessionId,
                         ice: candidates,
                     }).then((iceResult:any) => {
-                        if (cancelled) return
+                        if (cancelled||intentionalExit.current||reconnect.current.busy) return
                         xPlayer.setIceCandidates(iceResult)
 
                         // All done. Waiting for the event 'connectionstate' to be triggered
 
                     }).catch((error) => {
-                        console.log('ICE Exchange error:', error)
-                        alert(t('errors.ICEExchangeError') + ' ' + JSON.stringify(error))
+                        if(cancelled||intentionalExit.current||reconnect.current.busy)return
+                        console.warn('ICE Exchange error:', error)
+                        watcher.update('failed')
                     })
 
-                }).catch((error) => {
-                    console.log('SDP Exchange error:', error)
-                    alert(t('errors.SDPExchangeError') + ' ' + JSON.stringify(error))
                 })
+            }).catch((error)=>{
+                if(cancelled||intentionalExit.current||reconnect.current.busy)return
+                console.warn('SDP Exchange error:', error)
+                watcher.update('failed')
             })
 
             xPlayer.getEventBus().on('connectionstate', (event) => {
-                if (cancelled) return
+                if(cancelled||reconnect.current.busy)return
+                if(intentionalExit.current){if(event.state==='closed')void router.replace('/home');return}
+                watcher.update(event.state)
+                if(watcher.failed)return
                 console.log('connectionstate changed:', event)
 
                 const connStatus = document.getElementById('component_streamcomponent_connectionstatus')
-                if(connStatus !== null){
-                    if(event.state === 'connected'){
+                if(event.state === 'connected'){
                         setConnected(true)
                         if(!history.current.connectedAt)history.current.connectedAt=Date.now()
-                        connStatus.innerText = t('streamWindow.clientHasBeenDisconnected')
-                        document.getElementById('component_streamcomponent_loader').className = 'hidden'
+                        if(connStatus)connStatus.innerText = t('streamWindow.clientHasBeenDisconnected')
+                        const loader=document.getElementById('component_streamcomponent_loader')
+                        if(loader)loader.className = 'hidden'
 
                         // Set audio / Video settings
                         // @TODO: Implement api's in xbox-xcloud-player
@@ -168,23 +188,10 @@ function LegacyStream({onRetry}:{onRetry:()=>void}) {
 
                         if(!stopHeartbeat.current)stopHeartbeat.current=startHeartbeat({send:()=>Ipc.send('streaming','sendKeepalive',{sessionId}),onSuccess:()=>{if(!cancelled)setConnectionError(value=>value==='keepalive'?'':value)},onFailure:(count,error)=>{if(!cancelled){console.warn('Classic keepalive failed',count,error);if(count>=3)setConnectionError('keepalive')}}})
 
-                    } else if(event.state === 'new'){
-                        connStatus.innerText = t('streamWindow.startingConnection')
-
-                    } else if(event.state === 'connecting'){
-                        connStatus.innerText = t('streamWindow.connectingToConsole')
-
-                    } else if(event.state === 'closed') {
-                        setConnected(false)
-                        recordHistory(intentionalExit.current?'ended':'failed')
-                        stopHeartbeat.current?.();stopHeartbeat.current=undefined
-                        // Client has been disconnected. Lets return to home.
-                        // xPlayer.close()
-                        console.log('Client has been disconnected. Returning to prev page.')
-                        if(reconnect.current.busy)return
-                        if(intentionalExit.current){void router.replace('/home');return}
-                        setConnectionError('closed')
-                    }
+                } else if(connStatus&&event.state === 'new'){
+                    connStatus.innerText = t('streamWindow.startingConnection')
+                } else if(connStatus&&event.state === 'connecting'){
+                    connStatus.innerText = t('streamWindow.connectingToConsole')
                 }
             })
         } else if(sessionId === '') {
@@ -273,6 +280,7 @@ function LegacyStream({onRetry}:{onRetry:()=>void}) {
         // Modal window
         return () => {
             cancelled = true
+            disposeConnection?.()
             if(xPlayer !== undefined){
                 xPlayer.close()
             }
