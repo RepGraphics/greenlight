@@ -5,6 +5,8 @@ import MessageHandler from './message/handler'
 
 export default class MessageChannel extends Channel {
     _handshakeCompleted = false
+    private touchInputEnabled=false
+    private disposed=false
 
     getChannelName() {
         return 'message'
@@ -18,6 +20,7 @@ export default class MessageChannel extends Channel {
     }
 
     onOpen() {
+        if(this.disposed)return
         console.log('[MessageChannel] Sending handshake...')
         const handshake = JSON.stringify({
             'type':'Handshake',
@@ -29,6 +32,7 @@ export default class MessageChannel extends Channel {
     }
 
     onMessage(event: MessageEvent<any>) {
+        if(this.disposed)return
         let data: any
         try { data = JSON.parse(typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data)) } catch { return }
         if (!data || typeof data.type !== 'string') return
@@ -87,8 +91,7 @@ export default class MessageChannel extends Channel {
         const orientationConfig = JSON.stringify(this.generateMessage('/streaming/characteristics/orientationchanged', { 'orientation': 0 }))
         this.send(orientationConfig)
 
-        const touchConfig = JSON.stringify(this.generateMessage('/streaming/characteristics/touchinputenabledchanged', { 'touchInputEnabled': false }))
-        this.send(touchConfig)
+        this.sendTouchConfiguration()
 
         const deviceConfig = JSON.stringify(this.generateMessage('/streaming/characteristics/clientdevicecapabilities', {}))
         this.send(deviceConfig)
@@ -107,6 +110,20 @@ export default class MessageChannel extends Channel {
         this.send(dimensionsConfig)
     }
 
+    // Preserve the desired state before handshake; send changes only once
+    // the existing message protocol is ready. A new player starts disabled.
+    setTouchInputEnabled(enabled:boolean){
+        if(this.disposed||this.touchInputEnabled===enabled)return
+        this.touchInputEnabled=enabled
+        if(this._handshakeCompleted&&this.isOpen())this.sendTouchConfiguration()
+    }
+
+    private sendTouchConfiguration(){
+        this.send(JSON.stringify(this.generateMessage('/streaming/characteristics/touchinputenabledchanged',{
+            touchInputEnabled:this.touchInputEnabled&&!this.getPlayer().consoleController,
+        })))
+    }
+
     generateMessage(path, data) {
         return {
             'type': 'Message',
@@ -118,6 +135,8 @@ export default class MessageChannel extends Channel {
     }
 
     destroy() {
-        // console.log('DebugChannel destroy() called')
+        this.disposed=true
+        this._handshakeCompleted=false
+        this.touchInputEnabled=false
     }
 }
