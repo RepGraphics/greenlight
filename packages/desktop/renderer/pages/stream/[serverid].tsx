@@ -2,7 +2,7 @@ import React from 'react'
 import { addSession,makeSessionRecord } from '../../lib/sessionhistory'
 import {downloadDiagnostics} from '../../lib/streamdiagnostics'
 import type { DiagnosticSample } from '../../lib/streamdiagnostics'
-import { ManualReconnect } from '../../lib/sessionrecovery'
+import { ManualReconnect, ClassicRecoveryBudget } from '../../lib/sessionrecovery'
 import { startHeartbeat } from '../../lib/keepalive'
 import { watchClassicConnection } from '../../lib/classicconnection'
 import { useStreamAwake } from '../../lib/useStreamAwake'
@@ -20,7 +20,7 @@ import StreamPreload from '../../components/ui/streampreload'
 import Ipc from '../../lib/ipc'
 import { useTranslation } from 'react-i18next'
 
-function LegacyStream({onRetry}:{onRetry:()=>void}) {
+function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecoveryBudget}) {
     const router = useRouter()
     const { settings: globalSettings } = useSettings()
     const target = typeof router.query.serverid === 'string' ? router.query.serverid : ''
@@ -42,6 +42,9 @@ function LegacyStream({onRetry}:{onRetry:()=>void}) {
     const [capturePending,setCapturePending]=React.useState(false)
     const [retrying,setRetrying]=React.useState(false)
     const [retryError,setRetryError]=React.useState(false)
+    const [recoveryCancelled,setRecoveryCancelled]=React.useState(false)
+    const cancelRecovery=React.useRef(false)
+    const cancelAutomaticRecovery=()=>{cancelRecovery.current=true;setRecoveryCancelled(true)}
     const [queueTime, setQueueTime] = React.useState(0)
     const activeSession = React.useRef('')
     const history=React.useRef({startedAt:Date.now(),connectedAt:0,saved:false,samples:[] as DiagnosticSample[]})
@@ -171,6 +174,7 @@ function LegacyStream({onRetry}:{onRetry:()=>void}) {
                 const connStatus = document.getElementById('component_streamcomponent_connectionstatus')
                 if(event.state === 'connected'){
                         setConnected(true)
+                        recovery.markConnected()
                         if(!history.current.connectedAt)history.current.connectedAt=Date.now()
                         if(connStatus)connStatus.innerText = t('streamWindow.clientHasBeenDisconnected')
                         const loader=document.getElementById('component_streamcomponent_loader')
@@ -219,7 +223,7 @@ function LegacyStream({onRetry}:{onRetry:()=>void}) {
                     sessionId: sessionId,
                 }).then((session:any) => {
                     if (cancelled) return
-                    if (!session) { clearInterval(streamStateInterval.current); alert(t('errors.failedToGetPlayerState')); void router.replace('/home'); return }
+                    if (!session) { clearInterval(streamStateInterval.current); recordHistory('failed'); setConnectionError('provisioning'); return }
                     console.log('Player state:', session)
 
                     switch(session.playerState){
@@ -247,16 +251,9 @@ function LegacyStream({onRetry}:{onRetry:()=>void}) {
                             // Error
                             clearInterval(streamStateInterval.current)
 
-                            if(session.errorDetails?.code === 'WNSError' && session.errorDetails?.message?.includes('WaitingForServerToRegister')){
-                                // Detected the "WaitingForServerToRegister" error. This means the console is not connected to the xbox servers
-                                alert(t('errors.unableToStartStreamSession') + '\n\n' + t('errors.streamErrorResult') + ' ' + session.state + '\n' + t('errors.details') + ' [' + session.errorDetails?.code + '] ' + session.errorDetails?.message)
-                            } else {
-                                alert(t('errors.streamErrorResult') + ' ' + session.state + '\n' + t('errors.details') + ' [' + session.errorDetails?.code + '] ' + session.errorDetails?.message)
-                            }
                             recordHistory('failed')
                             console.log('Full stream error:', session.errorDetails)
-                            onDisconnect()
-                            void router.replace('/home')
+                            setConnectionError(session.errorDetails?.code==='WNSError'&&session.errorDetails?.message?.includes('WaitingForServerToRegister')?'unavailable':'provisioning')
                             break
 
                         case 'queued':
@@ -272,7 +269,7 @@ function LegacyStream({onRetry}:{onRetry:()=>void}) {
                     }
 
                 }).catch((error) => {
-                    if (!cancelled) { clearInterval(streamStateInterval.current); alert(t('errors.failedToGetPlayerState')); onDisconnect(); void router.replace('/home') }
+                    if (!cancelled) { clearInterval(streamStateInterval.current); recordHistory('failed'); setConnectionError('provisioning') }
                 }).finally(() => { polling = false })
             }, 1000)
         }
@@ -293,14 +290,28 @@ function LegacyStream({onRetry}:{onRetry:()=>void}) {
         }
     }, [router.isReady, router.query.serverid, sessionId, xPlayer])
 
-    function retryClassic(){
-        if(reconnect.current.busy||!activeSession.current||capturePending)return
+    const retryClassic=React.useCallback((automatic=false)=>{
+        if(intentionalExit.current||reconnect.current.busy||!activeSession.current||capturePending)return
+        if(automatic&&cancelRecovery.current)return
+        cancelRecovery.current=true
+        setRecoveryCancelled(true)
         setRetrying(true);setRetryError(false)
         recordHistory('failed')
         stopHeartbeat.current?.();stopHeartbeat.current=undefined
         const id=activeSession.current
-        void reconnect.current.run(()=>Ipc.send('streaming','stopStream',{sessionId:id}),()=>{activeSession.current='';intentionalExit.current=true;onRetry()},()=>{setRetrying(false);setRetryError(true)})
-    }
+        void reconnect.current.run(()=>Ipc.send('streaming','stopStream',{sessionId:id}),()=>{
+            activeSession.current='';intentionalExit.current=true
+            recovery.recordRetry(automatic);onRetry()
+        },()=>{setRetrying(false);setRetryError(true)})
+    },[capturePending,recordHistory,onRetry,recovery])
+    const autoDelay=recovery.delay(Boolean(globalSettings.v3_auto_reconnect),target.startsWith('xcloud_'),{
+        error:connectionError,active:Boolean(activeSession.current),blocked:capturePending||retrying||retryError||recoveryCancelled
+    })
+    React.useEffect(()=>{
+        if(autoDelay===null)return
+        const timer=setTimeout(()=>retryClassic(true),autoDelay)
+        return()=>clearTimeout(timer)
+    },[autoDelay,retryClassic])
 
     function gamepadSend(button){
         console.log('Pressed button:', button)
@@ -308,6 +319,7 @@ function LegacyStream({onRetry}:{onRetry:()=>void}) {
     }
 
     function onDisconnect(){
+        cancelAutomaticRecovery()
         recordHistory('ended')
         intentionalExit.current=true
         stopHeartbeat.current?.();stopHeartbeat.current=undefined
@@ -330,7 +342,7 @@ function LegacyStream({onRetry}:{onRetry:()=>void}) {
                 <title>Greenlight - {t('streamWindow.pageTitle')} {router.query.serverid}</title>
             </Head>
 
-            {connectionError && <div className='gl-experimental-error' role='alert'><p>{t('dashboard.classicConnectionLost')}</p><p>{t('dashboard.classicFailure_'+connectionError)}</p>{retryError&&<p role='alert'>{t('dashboard.classicRetryFailed')}</p>}{retrying&&<p role='status'>{t('dashboard.classicRetrying')}</p>}<button type='button' className='btn btn-primary' disabled={retrying||capturePending} onClick={retryClassic}>{t('dashboard.retryStream')}</button> <button type='button' className='btn' onClick={exportClassicDiagnostics}>{t('dashboard.exportDiagnostics')}</button> <button className='btn' disabled={retrying||capturePending} onClick={()=>{onDisconnect();void router.replace('/home')}}>{t('dashboard.backHint')}</button></div>}
+            {connectionError && <div className='gl-experimental-error gl-classic-error' role='alert'><p>{t('dashboard.classicConnectionLost')}</p><p>{t('dashboard.classicFailure_'+connectionError)}</p>{retryError&&<p role='alert'>{t('dashboard.classicRetryFailed')}</p>}{retrying&&<p role='status'>{t('dashboard.classicRetrying')}</p>}{autoDelay!==null&&<p role='status'>{t('dashboard.recoveryPending')} <button type='button' className='btn' onClick={cancelAutomaticRecovery}>{t('dashboard.cancelBackup')}</button></p>}<button type='button' className='btn btn-primary' disabled={retrying||capturePending} onClick={()=>retryClassic()}>{t('dashboard.retryStream')}</button> <button type='button' className='btn' onClick={exportClassicDiagnostics}>{t('dashboard.exportDiagnostics')}</button> <button className='btn' disabled={retrying||capturePending} onClick={()=>{onDisconnect();void router.replace('/home')}}>{t('dashboard.backHint')}</button></div>}
             { (xPlayer !== undefined) ? <StreamComponent connected={connected} onCapturePending={setCapturePending} onMetrics={recordClassicSample} onExportDiagnostics={exportClassicDiagnostics} onLeave={()=>{recordHistory('ended');intentionalExit.current=true;activeSession.current='';void router.replace('/home')}} onDisconnect={ () => {
                 onDisconnect()
             }} onMenu={ consoleController ? undefined : () => {
@@ -344,14 +356,20 @@ function LegacyStream({onRetry}:{onRetry:()=>void}) {
     )
 }
 
+function ClassicStreamSession(){
+    const recovery=React.useRef(new ClassicRecoveryBudget())
+    const [attempt,setAttempt]=React.useState(0)
+    const retry=React.useCallback(()=>setAttempt(value=>value+1),[])
+    return <LegacyStream key={attempt} onRetry={retry} recovery={recovery.current}/>
+}
+
 export default function Stream() {
     const router = useRouter()
     const { settings } = useSettings()
     const target = typeof router.query.serverid === 'string' ? router.query.serverid : ''
-    const [classicAttempt,setClassicAttempt]=React.useState(0)
     const [engine, setEngine] = React.useState<string | null>(null)
     React.useEffect(() => { if (router.isReady && target && engine === null) setEngine(settings.streaming_engine || 'legacy') }, [router.isReady, target, engine, settings.streaming_engine])
     if (!engine) return null
     if (engine === 'experimental') return <ExperimentalStream key={target} target={target} onExit={() => { void router.replace('/home') }} />
-    return <LegacyStream key={target+'-'+classicAttempt} onRetry={()=>setClassicAttempt(value=>value+1)} />
+    return <ClassicStreamSession key={target}/>
 }

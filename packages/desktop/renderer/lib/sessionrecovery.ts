@@ -17,3 +17,18 @@ export class ManualReconnect {
         finally{this.pending=false}
     }
 }
+
+// A budget belongs to one console visit, not to a remounted Classic player.
+export class ClassicRecoveryBudget {
+    private connected=false
+    private attempts=0
+    markConnected(){this.connected=true}
+    recordRetry(automatic:boolean){
+        if(automatic)this.attempts++
+        else{this.attempts=0;this.connected=false}
+    }
+    delay(enabled:boolean,cloud:boolean,state:{error:string;active:boolean;blocked:boolean}){
+        if(!state.active||state.blocked||!['closed','keepalive','provisioning','unavailable'].includes(state.error))return null
+        return recoveryDelay(enabled,cloud,this.connected,this.attempts)
+    }
+}
