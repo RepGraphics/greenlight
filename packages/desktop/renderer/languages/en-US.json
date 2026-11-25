@@ -482,7 +482,7 @@
       "failure_stop": "The previous Xbox session could not be stopped. Retry to close it before starting another session.",
       "failure_heartbeat": "The Xbox session stopped responding to keepalive requests.",
       "failure_stats": "WebRTC statistics stopped updating for 15 seconds. The native media pipeline may be stalled.",
-      "autoRecoveryPreference": "Remember automatic recovery across V3 Remote Play sessions. Recovery is limited to two attempts and may interrupt gameplay.",
+      "autoRecoveryPreference": "Remember automatic recovery across Classic and V3 Remote Play sessions. Recovery is limited to two attempts and may interrupt gameplay.",
       "failure_server": "Xbox requested that the streaming session disconnect.",
       "streamShortcuts": "V3 streaming shortcuts",
       "streamShortcutsHint": "Choose F6–F10 or disable each action for either streaming engine. Assigning an existing key clears its previous shortcut. Shortcuts are ignored while editing text, using native pointer lock or when mapped to gamepad emulation.",
@@ -557,6 +557,8 @@
       "compare_averageBitrate": "Average bitrate",
       "compare_rtt95": "RTT p95",
       "compare_jitter95": "Jitter p95",
+      "classicFailure_provisioning": "The Xbox session could not be provisioned or stopped responding. Retry the connection.",
+      "classicFailure_unavailable": "The console is not registered with Xbox services. Check that it is online and Remote Play is enabled.",
       "classicRetryFailed": "The previous session could not be stopped. Retry or return to the dashboard.",
       "classicRetrying": "Stopping the previous session before reconnecting…"
     }
