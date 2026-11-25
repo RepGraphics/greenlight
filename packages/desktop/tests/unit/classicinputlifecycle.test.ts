@@ -17,15 +17,18 @@ test('Classic rejects invalid physical indices and resets on a new lifecycle',()
     input.read([{GamepadIndex:5,A:1}]);input.reset()
     assert.deepEqual(input.read([{GamepadIndex:2,A:1}]),[{GamepadIndex:0,A:1}])
 })
-function fixture(){
+function fixture(initialFocus=true){
     let next=0,stops=0,queueLength=0,frames=[{GamepadIndex:4,A:1}]
     const timers=new Map<number,()=>void>(),sent:Array<Array<Record<string,number>>>=[]
     const channel={_state:'connected',getGamepadQueueLength:()=>queueLength,queueGamepadStates:(states:Array<Record<string,number>>)=>sent.push(states)}
     const driver={requestStates:()=>frames,run:()=>assert.fail('upstream loop'),stop:()=>{stops++},_application:{getChannelProcessor:()=>channel}}
     const schedule=((callback:()=>void)=>{timers.set(++next,callback);return next}) as unknown as typeof setTimeout
     const cancel=((id:number)=>timers.delete(id)) as unknown as typeof clearTimeout
-    assert.equal(installClassicInputLifecycle(driver,schedule,cancel),true)
-    return {driver,timers,sent,channel,get stops(){return stops},setFrames(value:typeof frames){frames=value},setQueue(n:number){queueLength=n},tick(){const entry=timers.entries().next().value;if(!entry)throw Error('No timer');timers.delete(entry[0]);entry[1]()}}
+    let focused=initialFocus
+    const listeners=new Set<(value:boolean)=>void>()
+    const focus={focused:()=>focused,subscribe(listener:(value:boolean)=>void){listeners.add(listener);return()=>{listeners.delete(listener)}}}
+    assert.equal(installClassicInputLifecycle(driver,schedule,cancel,focus),true)
+    return {driver,timers,sent,channel,listeners,focus(value:boolean){focused=value;for(const fn of [...listeners])fn(value)},get stops(){return stops},setFrames(value:typeof frames){frames=value},setQueue(n:number){queueLength=n},tick(){const entry=timers.entries().next().value;if(!entry)throw Error('No timer');timers.delete(entry[0]);entry[1]()}}
 }
 test('Classic input polling is idempotent and stops even if a stale callback fires',()=>{
     const f=fixture()
@@ -105,4 +108,38 @@ test('Classic stick ownership is independent, bounded and reset on stop',()=>{
     pad.releaseAll();f.tick();assert.equal(f.sent.at(-1)![0].LeftThumbXAxis,0);assert.equal(f.sent.at(-1)![0].RightThumbYAxis,0)
     pad.press(4,'B');f.driver.stop();f.driver.run();assert.deepEqual(f.driver.requestStates(),[])
     f.driver.stop()
+})
+
+test('Classic releases held controller input once on blur and resumes only after focus returns',()=>{
+    const f=fixture()
+    f.driver.run();assert.equal(f.sent.at(-1)?.[0].A,1)
+    f.focus(false);f.tick();assert.equal(f.sent.at(-1)?.[0].A,0)
+    const count=f.sent.length;f.tick();assert.equal(f.sent.length,count)
+    f.focus(true);f.tick();assert.equal(f.sent.at(-1)?.[0].A,1)
+    f.driver.stop();assert.equal(f.listeners.size,0)
+})
+test('Classic focus release survives backpressure and a quick focus return',()=>{
+    const f=fixture()
+    f.driver.run();f.setQueue(10);f.focus(false);f.tick()
+    assert.equal(f.sent.length,1)
+    f.focus(true);f.setQueue(0);f.tick()
+    assert.equal(f.sent.at(-1)?.[0].A,0)
+    f.tick();assert.equal(f.sent.at(-1)?.[0].A,1)
+    f.driver.stop()
+})
+test('Classic rejects initial background capture and discards hidden virtual input',()=>{
+    const f=fixture(false),pad=classicVirtualPad(f.driver)!
+    f.setFrames([]);f.driver.run();assert.equal(f.sent.length,0)
+    pad.press(1,'B');f.tick();assert.equal(f.sent.length,0)
+    pad.press(2,'A');f.focus(true);f.tick();assert.equal(f.sent.length,0)
+    pad.press(3,'B');f.tick();assert.equal(f.sent.at(-1)?.[0].B,1)
+    f.focus(false);f.tick();assert.equal(f.sent.at(-1)?.[0].B,0)
+    f.driver.stop()
+})
+test('stale focus listeners cannot alter a restarted Classic polling generation',()=>{
+    const f=fixture()
+    f.driver.run();const old=[...f.listeners][0];f.driver.stop()
+    assert.equal(f.listeners.size,0)
+    f.driver.run();old(false);f.tick();assert.equal(f.sent.at(-1)?.[0].A,1)
+    f.channel._state='closed';f.tick();assert.equal(f.listeners.size,0)
 })

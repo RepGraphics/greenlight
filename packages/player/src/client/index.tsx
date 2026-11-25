@@ -33,6 +33,7 @@ export interface StreamPlayerProps {
     muted?: boolean;
     codecProfiles?: string[];
     touchControls?: boolean;
+    directTouch?: boolean;
     keyboardMapping?: Record<string, string>;
     microphone?: boolean;
     nativeMouseKeyboard?: boolean;
@@ -70,8 +71,10 @@ export interface communicationHandler {
 export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
     ({
         onStatusChanged,
-        communicationHandler, useWebGpu = true, autoGamepad = false, multiController = false, consoleController = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false, codecProfiles = [], touchControls = false, keyboardMapping, microphone = false, onMicrophoneStatus, nativeMouseKeyboard = false, deadzone = 0.08, invertY = false, swapSticks = false, mouseSensitivity = 1, buttonMapping, onMetrics, keyframeRequest = 0, guideRequest = 0, onGuideUnavailable, onFailureReason
+        communicationHandler, useWebGpu = true, autoGamepad = false, multiController = false, consoleController = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false, codecProfiles = [], touchControls = false, directTouch = false, keyboardMapping, microphone = false, onMicrophoneStatus, nativeMouseKeyboard = false, deadzone = 0.08, invertY = false, swapSticks = false, mouseSensitivity = 1, buttonMapping, onMetrics, keyframeRequest = 0, guideRequest = 0, onGuideUnavailable, onFailureReason
     }, ref): ReactElement => {
+        const playback=useRef({volume,muted});
+        playback.current={volume,muted};
         const handler = useRef(communicationHandler);
         handler.current = communicationHandler;
         const failureCallback=useRef(onFailureReason);
@@ -192,14 +195,26 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             sync(); const timer = setInterval(sync, 500);
             return () => { clearInterval(timer); input.detach() };
         }, [player, consoleController, nativeMouseKeyboard, playerState, mouseSensitivity]);
+        useEffect(()=>{
+            if(!player||consoleController||!directTouch||playerState!=='Connected'||useWebGpu)return;
+            const input=new Touch();
+            let surface:HTMLElement|undefined;
+            const sync=()=>{
+                const candidate=player.getVideoElement();
+                const element=candidate?.tagName==='VIDEO'&&candidate.isConnected?candidate:undefined;
+                if(element===surface)return;
+                input.detach();surface=element;
+                if(element)input.attach(player);
+            };
+            sync();const timer=setInterval(sync,250);
+            return()=>{clearInterval(timer);input.detach()};
+        },[player,playerState,consoleController,directTouch,useWebGpu]);
         const metricsCallback = useRef(onMetrics);
         metricsCallback.current = onMetrics;
         const [metrics, setMetrics] = useState<StreamMetrics>({ width: 0, height: 0, fps: 0, bitrate: 0, jitter: 0, loss: 0, rtt: 0 });
         useEffect(() => {
             if (!player) return;
             const update = () => {
-                const audio = player.getAudioElement();
-                if (audio) { audio.volume = Math.max(0, Math.min(1, volume)); audio.muted = muted }
                 if (showStats || metricsCallback.current) {
                     const stats = player.getStats();
                     const age=stats.lastStatsAt?performance.now()-stats.lastStatsAt:0;
@@ -212,7 +227,8 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             update();
             const timer = setInterval(update, 1000);
             return () => clearInterval(timer);
-        }, [player, showStats, volume, muted]);
+        }, [player, showStats]);
+        useEffect(()=>{player?.setPlayback(volume,muted)},[player,volume,muted]);
 
         useImperativeHandle(ref, () => ({
             ping(echo: string) {
@@ -277,7 +293,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             const connect = async () => {
                 if(!active())return;
                 watchdog.beginHandshake();
-                instance = new xCloudPlayer('playerContainer', useWebGpu, videoBitrate, codecProfiles, consoleController);
+                instance = new xCloudPlayer('playerContainer', useWebGpu, videoBitrate, codecProfiles, consoleController,playback.current.volume,playback.current.muted);
                 instance.init();
                 setPlayer(instance);
                 status('Connecting');

@@ -361,6 +361,8 @@
       "volume": "Volume",
       "touchControls": "Touch controls",
       "guideUnavailable": "Connect a client controller or enable keyboard or touch controls to open the Xbox guide.",
+      "directTouch": "Direct touch (experimental)",
+      "directTouchHint": "Touch the video directly. Requires game support; one contact at a time. Switch back to touch controls for the virtual gamepad.",
       "microphoneFailed": "Microphone could not be enabled. Check permissions or use the classic player.",
       "v3Renderer": "V3 video renderer",
       "standardVideo": "Standard video (recommended)",
