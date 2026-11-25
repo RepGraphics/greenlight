@@ -79,7 +79,13 @@ export default class StreamManager {
         const timer=this.monitorTimers.get(sessionId)
         if(timer!==undefined)this.cancel(timer)
         this.monitorTimers.delete(sessionId)
-        const operation=Promise.resolve().then(()=>this.getApi(session.type).stopStream(sessionId)).then(result=>{
+        const operation=Promise.resolve().then(()=>this.getApi(session.type).stopStream(sessionId)).catch(error=>{
+            // A remote session which no longer exists is already stopped.
+            // Other failures are not proof of termination; retain ownership
+            // and allow a later retry instead of starting another stream.
+            if(error?.status===404||error?.status===410)return true
+            throw error
+        }).then(result=>{
             if(this.getSession(sessionId)===session){delete this._sessions[sessionId];this.monitorFailures.delete(sessionId)}
             return result
         }).finally(()=>{
