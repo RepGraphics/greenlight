@@ -1,0 +1,67 @@
+import {test} from 'node:test'
+import assert from 'node:assert/strict'
+import {SessionLifecycle} from '../../renderer/lib/sessionlifecycle'
+
+const flush=()=>new Promise<void>(resolve=>setImmediate(resolve))
+function deferred<T>(){
+    let resolve!:(value:T)=>void,reject!:(error:Error)=>void
+    const promise=new Promise<T>((ok,fail)=>{resolve=ok;reject=fail})
+    return {promise,resolve,reject}
+}
+function fixture(){
+    const callbacks=new Map<number,()=>void>()
+    let id=0
+    const lifecycle=new SessionLifecycle(((fn:()=>void)=>{callbacks.set(++id,fn);return id}) as unknown as typeof setTimeout,((timer:number)=>callbacks.delete(timer)) as unknown as typeof clearTimeout)
+    return {lifecycle,callbacks,expire(){const list=[...callbacks.values()];callbacks.clear();list.forEach(fn=>fn())}}
+}
+test('replacement waits for slow cancelled provisioning and teardown',async()=>{
+    const {lifecycle}=fixture(),pending=deferred<string>(),closing=deferred<void>()
+    const calls:string[]=[]
+    const stopFirst=lifecycle.begin({start:()=>{calls.push('start-old');return pending.promise},stop:id=>{calls.push('stop-'+id);return closing.promise},onSession:()=>assert.fail('late session'),onError:()=>assert.fail('unexpected error')})
+    await flush();stopFirst()
+    const stopSecond=lifecycle.begin({start:async()=>{calls.push('start-new');return 'new'},stop:async id=>{calls.push('stop-'+id)},onSession:id=>calls.push('ready-'+id),onError:()=>assert.fail('unexpected error')})
+    await flush();assert.deepEqual(calls,['start-old'])
+    pending.resolve('old');await flush()
+    assert.deepEqual(calls,['start-old','stop-old'])
+    closing.resolve();await flush()
+    assert.deepEqual(calls,['start-old','stop-old','start-new','ready-new'])
+    stopSecond();await flush();assert.equal(calls.at(-1),'stop-new')
+})
+test('failed stop blocks replacement and retains the old session for manual retry',async()=>{
+    const {lifecycle}=fixture()
+    let stops=0,starts=0
+    const errors:string[]=[]
+    const first=lifecycle.begin({start:async()=> 'old',stop:async()=>{if(++stops<=2)throw Error('offline')},onSession:()=>{},onError:reason=>errors.push(reason)})
+    await flush();first();await flush()
+    const second=lifecycle.begin({start:async()=>{starts++;return 'new'},stop:async()=>{},onSession:()=>{},onError:reason=>errors.push(reason)})
+    await flush();assert.equal(starts,0);assert.deepEqual(errors,['stop'])
+    second()
+    const third=lifecycle.begin({start:async()=>{starts++;return 'new'},stop:async()=>{},onSession:()=>{},onError:reason=>errors.push(reason)})
+    await flush();assert.equal(starts,1);assert.equal(stops,3)
+    third();await flush()
+})
+test('timed-out provisioning is cleaned up on late success without delivering the session',async()=>{
+    const {lifecycle,expire,callbacks}=fixture(),pending=deferred<string>()
+    const errors:string[]=[],stopped:string[]=[]
+    const dispose=lifecycle.begin({start:()=>pending.promise,stop:async id=>{stopped.push(id)},onSession:()=>assert.fail('late session'),onError:reason=>errors.push(reason)})
+    await flush();expire();assert.deepEqual(errors,['start'])
+    pending.resolve('late');await flush()
+    assert.deepEqual(stopped,['late']);assert.equal(callbacks.size,0)
+    dispose();await flush();assert.deepEqual(stopped,['late'])
+})
+test('disposing a queued attempt skips provisioning',async()=>{
+    const {lifecycle}=fixture()
+    const stop=lifecycle.begin({start:async()=>assert.fail('cancelled start'),stop:async()=>assert.fail('unexpected stop'),onSession:()=>assert.fail('unexpected session'),onError:()=>assert.fail('unexpected error')})
+    stop();await flush()
+})
+test('failed or invalid provisioning permits a subsequent attempt',async()=>{
+    const {lifecycle,callbacks}=fixture(),errors:string[]=[]
+    for(const start of [async()=>{throw Error('offline')},async()=>null]){
+        const dispose=lifecycle.begin({start,stop:async()=>{},onSession:()=>assert.fail('invalid session'),onError:reason=>errors.push(reason)})
+        await flush();dispose()
+    }
+    const ready:string[]=[]
+    const dispose=lifecycle.begin({start:async()=> 'valid',stop:async()=>{},onSession:id=>ready.push(id),onError:()=>assert.fail('unexpected failure')})
+    await flush();assert.deepEqual(errors,['start','start']);assert.deepEqual(ready,['valid']);assert.equal(callbacks.size,0)
+    dispose();await flush()
+})
