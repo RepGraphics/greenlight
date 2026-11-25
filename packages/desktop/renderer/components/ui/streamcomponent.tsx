@@ -1,4 +1,6 @@
 import React from 'react'
+import { recordingMimeType,startStreamRecording,downloadRecording } from '../../lib/streamrecording'
+import { startInstantReplay,replayDuration } from '../../lib/instantreplay'
 import { canCapture, captureScreenshotBlob, saveStreamScreenshot, toggleStreamPictureInPicture } from '../../lib/streamcapture'
 import { storeCapture } from '../../lib/capturelibrary'
 import {sanitizeSample} from '../../lib/streamdiagnostics'
@@ -14,6 +16,8 @@ import Ipc from '../../lib/ipc'
 import { useTranslation } from 'react-i18next'
 
 interface StreamComponentProps {
+    connected?:boolean;
+    onCapturePending?:(pending:boolean)=>void;
     onDisconnect?: () => void;
     onLeave?: () => void;
     onMetrics?: (sample:DiagnosticSample)=>void;
@@ -23,6 +27,8 @@ interface StreamComponentProps {
 }
 
 function StreamComponent({
+    connected=false,
+    onCapturePending,
     onDisconnect,
     onLeave,
     onMetrics,
@@ -54,6 +60,40 @@ function StreamComponent({
             else {await toggleStreamPictureInPicture(video);setPipActive(document.pictureInPictureElement===video)}
         }catch{setCaptureMessage(action==='pip'?'classicPipFailed':'classicScreenshotFailed')}finally{captureLock.current=false;setCaptureBusy(false)}
     }
+    const recording=React.useRef<ReturnType<typeof startStreamRecording>|null>(null)
+    const replay=React.useRef<ReturnType<typeof startInstantReplay>|null>(null)
+    const mounted=React.useRef(false)
+    const saving=React.useRef(false)
+    const [recordingActive,setRecordingActive]=React.useState(false)
+    const [replayActive,setReplayActive]=React.useState(false)
+    const [replayReady,setReplayReady]=React.useState(false)
+    const [clip,setClip]=React.useState<Blob|null>(null)
+    const [clipBusy,setClipBusy]=React.useState(false)
+    const protectedCapture=recordingActive||Boolean(clip)||clipBusy
+    React.useEffect(()=>{onCapturePending?.(protectedCapture)},[onCapturePending,protectedCapture])
+    React.useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;recording.current?.stop();replay.current?.dispose()}},[])
+    React.useEffect(()=>{if(!connected||!settings.video_enabled){recording.current?.stop();replay.current?.dispose();replay.current=null;setReplayActive(false);setReplayReady(false)}},[connected,settings.video_enabled])
+    React.useEffect(()=>{if(!protectedCapture)return;const guard=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue=''};window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard)},[protectedCapture])
+    const currentClassicAudio=()=>document.querySelector<HTMLAudioElement>('#streamComponentHolder audio')
+    const toggleRecording=()=>{
+        if(recording.current){recording.current.stop();return}
+        if(replay.current||saving.current||clip||!connected)return
+        const video=currentClassicVideo();if(!settings.video_enabled||!canCapture(video)||!recordingMimeType())return
+        try{recording.current=startStreamRecording(video,(blob,error)=>{recording.current=null;if(!mounted.current)return;setRecordingActive(false);setClip(blob);setCaptureMessage(error?'recordingFailed':'recordingStopped')},currentClassicAudio());setRecordingActive(true)}catch{setCaptureMessage('recordingFailed')}
+    }
+    const toggleReplay=()=>{
+        if(saving.current)return
+        if(replay.current){replay.current.dispose();replay.current=null;setReplayActive(false);setReplayReady(false);return}
+        const video=currentClassicVideo();if(recording.current||clip||!connected||!settings.video_enabled||!canCapture(video)||!recordingMimeType())return
+        try{replay.current=startInstantReplay(video,ready=>{if(mounted.current)setReplayReady(ready)},()=>{replay.current=null;if(mounted.current){setReplayActive(false);setReplayReady(false);setCaptureMessage('replayFailed')}},settings.v3_replay_seconds,currentClassicAudio());setReplayActive(true)}catch{setCaptureMessage('replayFailed')}
+    }
+    const saveReplay=async()=>{
+        if(!replay.current||saving.current||clip)return
+        saving.current=true;setClipBusy(true)
+        try{const blob=await replay.current.save();if(mounted.current){setClip(blob);setCaptureMessage(blob?'replaySaved':'replayFailed')}}catch{if(mounted.current)setCaptureMessage('replayFailed')}finally{saving.current=false;if(mounted.current)setClipBusy(false)}
+    }
+    const saveClip=async()=>{if(!clip||saving.current)return;saving.current=true;setClipBusy(true);try{await storeCapture('clip',clip);if(mounted.current){setClip(null);setCaptureMessage('captureLibrarySaved')}}catch{if(mounted.current)setCaptureMessage('captureLibraryFailed')}finally{saving.current=false;if(mounted.current)setClipBusy(false)}}
+    const canLeave=()=>{if(recording.current||saving.current||clip){setCaptureMessage('saveClipBeforeExit');return false}return true}
     const [hud, setHud] = React.useState(settings.stream_performance_hud)
     const [metrics, setMetrics] = React.useState<{ fps?: number; width?: number; height?: number; jitter?: number; loss?: number; bitrate?: number }>({})
     React.useEffect(() => {
@@ -374,6 +414,7 @@ function StreamComponent({
     }
 
     function streamDisconnect() {
+        if(!canLeave())return
         onLeave?.()
         document.getElementById('streamComponentHolder').innerHTML = ''
 
@@ -381,6 +422,7 @@ function StreamComponent({
     }
 
     function endStream() {
+        if(!canLeave())return
         if (confirm(t("streamWindow.endStreamConfirmMessage"))) {
             document.getElementById('streamComponentHolder').innerHTML = ''
             onDisconnect()
@@ -437,6 +479,9 @@ function StreamComponent({
             <div>
                 {hud && <div className='gl-performance-hud' aria-label={t('dashboard.performanceHud')}><span>{metrics.width && metrics.height ? metrics.width + '×' + metrics.height : '—'}</span><span>{metrics.fps != null ? Math.round(metrics.fps) : '—'} FPS</span><span>{metrics.bitrate != null ? metrics.bitrate.toFixed(1) : '—'} Mbps</span><span>{metrics.jitter != null ? metrics.jitter.toFixed(1) : '—'} ms {t('dashboard.jitter')}</span><span>{metrics.loss ?? '—'} {t('dashboard.packetsLost')}</span></div>}
                 {captureMessage&&<div className='gl-recording-result' role='status'>{t('dashboard.'+captureMessage)} <button type='button' className='btn' onClick={()=>setCaptureMessage('')}>{t('dashboard.dismiss')}</button></div>}
+                {recordingActive&&<div className='gl-recording-indicator' role='status'><span/>REC</div>}
+                {replayActive&&<div className='gl-replay-indicator' role='status'>{t(replayReady?'dashboard.replayReady':'dashboard.replayBuffering',{seconds:replayDuration(settings.v3_replay_seconds)})}</div>}
+                {clip&&<div className='gl-recording-result'><strong>{t('dashboard.clipReady')}</strong> · {(clip.size/1048576).toFixed(2)} MiB <button type='button' className='btn' disabled={clipBusy} onClick={()=>{downloadRecording(clip);setClip(null)}}>{t('dashboard.saveClip')}</button><button type='button' className='btn' disabled={clipBusy} onClick={()=>void saveClip()}>{t('dashboard.saveToLibrary')}</button><button type='button' className='btn' disabled={clipBusy} onClick={()=>setClip(null)}>{t('dashboard.discardClip')}</button></div>}
                 <div id="streamComponentHolder">
                 </div>
 
@@ -498,6 +543,9 @@ function StreamComponent({
                             <button type='button' className='btn' disabled={!captureReady||captureBusy} title={t('dashboard.screenshot')} aria-label={t('dashboard.screenshot')} onClick={()=>void capture('download')}><i className='fa-solid fa-camera' aria-hidden='true'/></button>
                             <button type='button' className='btn' disabled={!captureReady||captureBusy} title={t('dashboard.saveToLibrary')} aria-label={t('dashboard.saveToLibrary')} onClick={()=>void capture('library')}><i className='fa-solid fa-floppy-disk' aria-hidden='true'/></button>
                             <button type='button' className='btn' disabled={!captureReady||captureBusy} aria-pressed={pipActive} title={t('dashboard.classicPip')} aria-label={t('dashboard.classicPip')} onClick={()=>void capture('pip')}><i className='fa-solid fa-window-restore' aria-hidden='true'/></button>
+                            <button type='button' className='btn' disabled={!recordingActive&&(!connected||!captureReady||replayActive||Boolean(clip)||clipBusy)} aria-pressed={recordingActive} title={t(recordingActive?'dashboard.stopRecording':'dashboard.startRecording')} aria-label={t(recordingActive?'dashboard.stopRecording':'dashboard.startRecording')} onClick={toggleRecording}><i className={'fa-solid '+(recordingActive?'fa-stop':'fa-circle')} aria-hidden='true'/></button>
+                            <button type='button' className='btn' disabled={clipBusy||(!replayActive&&(!connected||!captureReady||recordingActive||Boolean(clip)))} aria-pressed={replayActive} title={t('dashboard.instantReplay')} aria-label={t('dashboard.instantReplay')} onClick={toggleReplay}><i className='fa-solid fa-clock-rotate-left' aria-hidden='true'/></button>
+                            {replayActive&&<button type='button' className='btn' disabled={clipBusy||Boolean(clip)} title={t('dashboard.saveReplay')} aria-label={t('dashboard.saveReplay')} onClick={()=>void saveReplay()}><i className='fa-solid fa-film' aria-hidden='true'/></button>}
                             <button type='button' className='btn' aria-pressed={controlsPinned} title={t('dashboard.pinControls')} onClick={togglePin}><i className='fa-solid fa-thumbtack' aria-hidden='true' /></button>
                             <button type='button' className='btn' aria-label={t('dashboard.fullscreen')} aria-pressed={fullscreen} onClick={() => { void toggleFullscreen() }}><i className={'fa-solid ' + (fullscreen ? 'fa-compress' : 'fa-expand')} aria-hidden='true' /></button>
                             <Button label={<i className="fa-solid fa-bug"></i>} title={t("streamWindow.debugTitle")} onClick={(e) => {

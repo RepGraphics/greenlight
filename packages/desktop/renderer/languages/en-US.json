@@ -515,7 +515,7 @@
       "adaptiveRecoveryHint": "When automatic Remote Play recovery is enabled, lower the bitrate for the next attempt only if recent fresh statistics show sustained poor connection quality. Does not restart healthy streams or change saved quality preferences.",
       "sessionQualityOverride": "Temporary bitrate override for this session",
       "replayDuration": "Instant replay segment duration",
-      "replayDurationHint": "Choose 15, 30 or 60 seconds for the next V3 stream. Replay remains opt-in and segments may be shorter.",
+      "replayDurationHint": "Choose 15, 30 or 60 seconds for the next stream. Replay remains opt-in and segments may be shorter.",
       "shortcut_replay": "Save recent replay segment",
       "diagnosticsViewer": "Diagnostics viewer",
       "diagnosticsViewerHint": "Open a Greenlight Classic or V3 diagnostic JSON report (up to 2 MiB). Reports are analysed locally and are not uploaded or saved.",

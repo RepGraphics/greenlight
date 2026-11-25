@@ -10,12 +10,11 @@ export function recordingMimeType() {
     return ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(type=>MediaRecorder.isTypeSupported(type))
 }
 
-export function startStreamRecording(video: HTMLVideoElement, onFinished:(blob:Blob|null,error:boolean)=>void) {
+export function startStreamRecording(video: HTMLVideoElement, onFinished:(blob:Blob|null,error:boolean)=>void, audio:HTMLAudioElement|null=document.querySelector<HTMLAudioElement>('.gl-experimental-stream #playerContainer audio')) {
     const mimeType=recordingMimeType()
     if(!mimeType || !(video.srcObject instanceof MediaStream)) throw new Error('Recording unavailable')
     const videoTrack=video.srcObject.getVideoTracks().find(track=>track.readyState==='live')
     if(!videoTrack) throw new Error('No live video')
-    const audio=document.querySelector<HTMLAudioElement>('.gl-experimental-stream #playerContainer audio')
     const audioTrack=audio?.srcObject instanceof MediaStream ? audio.srcObject.getAudioTracks().find(track=>track.readyState==='live') : undefined
     // Only remote media tracks. Never record local microphone or desktop.
     const tracks=[videoTrack,...(audioTrack?[audioTrack]:[])].map(track=>track.clone())
@@ -34,7 +33,7 @@ export function startStreamRecording(video: HTMLVideoElement, onFinished:(blob:B
     const stop=()=>{
         if(stopping||finished)return
         stopping=true;clearTimeout(timer)
-        deadline=setTimeout(()=>{failed=true;finish()},5000)
+        deadline=setTimeout(()=>{failed=true;chunks.length=0;finish()},5000)
         try{if(recorder.state!=='inactive')recorder.stop()}catch{failed=true;finish()}
     }
     recorder.ondataavailable=event=>{

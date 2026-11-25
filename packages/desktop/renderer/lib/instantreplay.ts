@@ -7,13 +7,12 @@ export interface ReplaySegment { blob:Blob; startedAt:number; endedAt:number }
 export function validReplaySegment(segment:ReplaySegment, now:number, duration=30){
     return segment.blob.size>0&&segment.blob.size<=replayMaxBytes&&segment.blob.type.startsWith('video/webm')&&Number.isFinite(segment.startedAt)&&Number.isFinite(segment.endedAt)&&segment.endedAt>=segment.startedAt&&segment.endedAt<=now&&now-segment.endedAt<=replayDuration(duration)*2000
 }
-export function startInstantReplay(video:HTMLVideoElement,onReady:(ready:boolean)=>void,onError:()=>void,duration:unknown=30){
+export function startInstantReplay(video:HTMLVideoElement,onReady:(ready:boolean)=>void,onError:()=>void,duration:unknown=30,audio:HTMLAudioElement|null=document.querySelector<HTMLAudioElement>('.gl-experimental-stream #playerContainer audio')){
     const seconds=replayDuration(duration)
     const mime=recordingMimeType()
     if(!mime||!(video.srcObject instanceof MediaStream))throw Error('Replay unavailable')
     const source=video.srcObject.getVideoTracks().find(track=>track.readyState==='live')
     if(!source)throw Error('No live video')
-    const audio=document.querySelector<HTMLAudioElement>('.gl-experimental-stream #playerContainer audio')
     const audioTrack=audio?.srcObject instanceof MediaStream?audio.srcObject.getAudioTracks().find(track=>track.readyState==='live'):undefined
     const tracks=[source,...(audioTrack?[audioTrack]:[])].map(track=>track.clone())
     const stream=new MediaStream(tracks)
@@ -51,7 +50,7 @@ export function startInstantReplay(video:HTMLVideoElement,onReady:(ready:boolean
             if(bytes+event.data.size>replayMaxBytes){overflow=true;chunks.length=0;fail();return}
             bytes+=event.data.size;chunks.push(event.data)
         }
-        current.onerror=fail
+        current.onerror=()=>{if(recorder===current)fail()}
         current.onstop=()=>{
             if(disposed||recorder!==current||overflow)return
             clearTimeout(timer)
@@ -65,7 +64,7 @@ export function startInstantReplay(video:HTMLVideoElement,onReady:(ready:boolean
             begin()
         }
         try{current.start(1000)}catch{fail();return}
-        timer=setTimeout(()=>{try{if(current.state!=='inactive')current.stop()}catch{fail()}},seconds*1000)
+        timer=setTimeout(()=>{saveDeadline=setTimeout(fail,5000);try{if(current.state!=='inactive')current.stop()}catch{fail()}},seconds*1000)
     }
     begin()
     if(disposed)throw Error('Replay could not start')

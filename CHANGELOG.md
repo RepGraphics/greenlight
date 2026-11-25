@@ -6,6 +6,8 @@ Changes on `main-v2` are development changes, not a new numbered release. See [c
 
 ### Added
 
+- Classic gameplay recording and instant replay with explicit remote-audio capture, local clip saving and unsaved-capture exit protection.
+
 - Explicit Classic reconnect action after a connection failure, with serialized old-session termination and duplicate-retry protection.
 
 - Compare two Classic or V3 diagnostic exports locally with per-attempt metric differences and transport-state sampling.

@@ -38,6 +38,7 @@ function LegacyStream({onRetry}:{onRetry:()=>void}) {
     const [connectionError,setConnectionError]=React.useState('')
     const intentionalExit=React.useRef(false)
     const reconnect=React.useRef(new ManualReconnect())
+    const [capturePending,setCapturePending]=React.useState(false)
     const [retrying,setRetrying]=React.useState(false)
     const [retryError,setRetryError]=React.useState(false)
     const [queueTime, setQueueTime] = React.useState(0)
@@ -285,7 +286,7 @@ function LegacyStream({onRetry}:{onRetry:()=>void}) {
     }, [router.isReady, router.query.serverid, sessionId, xPlayer])
 
     function retryClassic(){
-        if(reconnect.current.busy||!activeSession.current)return
+        if(reconnect.current.busy||!activeSession.current||capturePending)return
         setRetrying(true);setRetryError(false)
         recordHistory('failed')
         stopHeartbeat.current?.();stopHeartbeat.current=undefined
@@ -321,8 +322,8 @@ function LegacyStream({onRetry}:{onRetry:()=>void}) {
                 <title>Greenlight - {t('streamWindow.pageTitle')} {router.query.serverid}</title>
             </Head>
 
-            {connectionError && <div className='gl-experimental-error' role='alert'><p>{t('dashboard.classicConnectionLost')}</p><p>{t('dashboard.classicFailure_'+connectionError)}</p>{retryError&&<p role='alert'>{t('dashboard.classicRetryFailed')}</p>}{retrying&&<p role='status'>{t('dashboard.classicRetrying')}</p>}<button type='button' className='btn btn-primary' disabled={retrying} onClick={retryClassic}>{t('dashboard.retryStream')}</button> <button type='button' className='btn' onClick={exportClassicDiagnostics}>{t('dashboard.exportDiagnostics')}</button> <button className='btn' disabled={retrying} onClick={()=>{onDisconnect();void router.replace('/home')}}>{t('dashboard.backHint')}</button></div>}
-            { (xPlayer !== undefined) ? <StreamComponent onMetrics={recordClassicSample} onExportDiagnostics={exportClassicDiagnostics} onLeave={()=>{recordHistory('ended');intentionalExit.current=true;activeSession.current='';void router.replace('/home')}} onDisconnect={ () => {
+            {connectionError && <div className='gl-experimental-error' role='alert'><p>{t('dashboard.classicConnectionLost')}</p><p>{t('dashboard.classicFailure_'+connectionError)}</p>{retryError&&<p role='alert'>{t('dashboard.classicRetryFailed')}</p>}{retrying&&<p role='status'>{t('dashboard.classicRetrying')}</p>}<button type='button' className='btn btn-primary' disabled={retrying||capturePending} onClick={retryClassic}>{t('dashboard.retryStream')}</button> <button type='button' className='btn' onClick={exportClassicDiagnostics}>{t('dashboard.exportDiagnostics')}</button> <button className='btn' disabled={retrying||capturePending} onClick={()=>{onDisconnect();void router.replace('/home')}}>{t('dashboard.backHint')}</button></div>}
+            { (xPlayer !== undefined) ? <StreamComponent connected={connected} onCapturePending={setCapturePending} onMetrics={recordClassicSample} onExportDiagnostics={exportClassicDiagnostics} onLeave={()=>{recordHistory('ended');intentionalExit.current=true;activeSession.current='';void router.replace('/home')}} onDisconnect={ () => {
                 onDisconnect()
             }} onMenu={ consoleController ? undefined : () => {
                 gamepadSend('nexus')
