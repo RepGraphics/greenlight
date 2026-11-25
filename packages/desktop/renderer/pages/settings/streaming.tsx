@@ -1,4 +1,5 @@
 import React from 'react'
+import { recordingOptions,recordingDurations,recordingBitrates } from '../../lib/streamrecording'
 import Head from 'next/head'
 
 import SettingsSidebar from '../../components/settings/sidebar'
@@ -91,6 +92,8 @@ function SettingsStreaming() {
                     <p><label htmlFor='keep-awake'>{t('dashboard.streamKeepAwake')}</label><input id='keep-awake' type='checkbox' checked={settings.stream_keep_awake} onChange={event=>setSettings({...settings,stream_keep_awake:event.target.checked})}/></p><p>{t('dashboard.streamKeepAwakeHint')}</p>
                     <p><label htmlFor='auto-reconnect'>{t('dashboard.autoRecovery')}</label><input id='auto-reconnect' type='checkbox' checked={settings.v3_auto_reconnect} onChange={event=>setSettings({...settings,v3_auto_reconnect:event.target.checked})}/></p><p>{t('dashboard.autoRecoveryPreference')}</p>
                     <p><label htmlFor='adaptive-recovery'>{t('dashboard.adaptiveRecovery')}</label><input id='adaptive-recovery' type='checkbox' checked={settings.v3_adaptive_recovery} onChange={event=>setSettings({...settings,v3_adaptive_recovery:event.target.checked})}/></p><p>{t('dashboard.adaptiveRecoveryHint')}</p>
+                    <p><label htmlFor='recording-duration'>{t('dashboard.recordingDuration')}</label><select id='recording-duration' value={recordingOptions(settings.recording_seconds,settings.recording_bitrate).seconds} onChange={event=>setSettings({...settings,recording_seconds:Number(event.target.value)})}>{recordingDurations.map(seconds=><option key={seconds} value={seconds}>{seconds/60} min</option>)}</select></p>
+                    <p><label htmlFor='recording-quality'>{t('dashboard.recordingQuality')}</label><select id='recording-quality' value={recordingOptions(settings.recording_seconds,settings.recording_bitrate).videoBitsPerSecond} onChange={event=>setSettings({...settings,recording_bitrate:Number(event.target.value)})}>{recordingBitrates.map(bitrate=><option key={bitrate} value={bitrate}>{bitrate/1000000} Mbps</option>)}</select></p><p>{t('dashboard.recordingOptionsHint')}</p>
                     <p><label htmlFor='replay-duration'>{t('dashboard.replayDuration')}</label><select id='replay-duration' value={settings.v3_replay_seconds} onChange={event=>setSettings({...settings,v3_replay_seconds:Number(event.target.value)})}>{[15,30,60].map(seconds=><option key={seconds} value={seconds}>{seconds} s</option>)}</select></p><p>{t('dashboard.replayDurationHint')}</p>
                     <h2>{t('dashboard.requestedResolution')}</h2><p>{t('dashboard.resolutionHint')}</p>
                     <p><label htmlFor='home-resolution'>{t('dashboard.homeResolution')}</label><select id='home-resolution' value={settings.xhome_resolution} onChange={e=>setSettings({...settings,xhome_resolution:Number(e.target.value)})}><option value={720}>720p</option><option value={1080}>1080p</option></select></p>

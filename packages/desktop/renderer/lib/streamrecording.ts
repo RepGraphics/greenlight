@@ -1,5 +1,11 @@
 export const recordingLimitBytes = 128 * 1024 * 1024
 export const recordingLimitMs = 5 * 60 * 1000
+export const recordingStopThresholdBytes = 120 * 1024 * 1024
+export const recordingDurations = [60,180,300,600] as const
+export const recordingBitrates = [1500000,3000000,6000000] as const
+export function recordingOptions(seconds:unknown,bitrate:unknown){
+    return {seconds:recordingDurations.find(value=>value===seconds)??300,videoBitsPerSecond:recordingBitrates.find(value=>value===bitrate)??3000000}
+}
 
 export function recordingFilename(date = new Date()) {
     return 'greenlight-clip-' + date.toISOString().replace(/[:.]/g,'-') + '.webm'
@@ -30,12 +36,13 @@ export function cloneRemoteMedia(video: HTMLVideoElement, audio: HTMLAudioElemen
     }
 }
 
-export function startStreamRecording(video: HTMLVideoElement, onFinished:(blob:Blob|null,error:boolean)=>void, audio:HTMLAudioElement|null=document.querySelector<HTMLAudioElement>('.gl-experimental-stream #playerContainer audio')) {
+export function startStreamRecording(video: HTMLVideoElement, onFinished:(blob:Blob|null,error:boolean)=>void, audio:HTMLAudioElement|null=document.querySelector<HTMLAudioElement>('.gl-experimental-stream #playerContainer audio'),preferences?:{seconds?:unknown;videoBitsPerSecond?:unknown}) {
+    const options=recordingOptions(preferences?.seconds,preferences?.videoBitsPerSecond)
     const mimeType=recordingMimeType()
     if(!mimeType) throw new Error('Recording unavailable')
     const {tracks,stream}=cloneRemoteMedia(video,audio)
     let recorder:MediaRecorder
-    try {recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:3000000,audioBitsPerSecond:128000})}
+    try {recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:options.videoBitsPerSecond,audioBitsPerSecond:128000})}
     catch(error){tracks.forEach(track=>track.stop());throw error}
     const chunks:Blob[]=[]
     let bytes=0
@@ -56,12 +63,12 @@ export function startStreamRecording(video: HTMLVideoElement, onFinished:(blob:B
         if(finished||overflow||event.data.size===0)return
         if(bytes+event.data.size>recordingLimitBytes){failed=true;overflow=true;chunks.length=0;stop();return}
         chunks.push(event.data);bytes+=event.data.size
-        if(bytes>=recordingLimitBytes)stop()
+        if(bytes>=recordingStopThresholdBytes)stop()
     }
     recorder.onerror=()=>{failed=true;stop()}
     recorder.onstop=finish
     try{recorder.start(1000)}catch(error){recorder.ondataavailable=null;recorder.onerror=null;recorder.onstop=null;tracks.forEach(track=>track.stop());throw error}
-    timer=setTimeout(stop,recordingLimitMs)
+    timer=setTimeout(stop,options.seconds*1000)
     return {stop,startedAt:Date.now()}
 }
 
