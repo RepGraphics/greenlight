@@ -2,6 +2,7 @@ import React from 'react'
 import { addSession,makeSessionRecord } from '../../lib/sessionhistory'
 import {downloadDiagnostics} from '../../lib/streamdiagnostics'
 import type { DiagnosticSample } from '../../lib/streamdiagnostics'
+import { ManualReconnect } from '../../lib/sessionrecovery'
 import { startHeartbeat } from '../../lib/keepalive'
 import { useStreamAwake } from '../../lib/useStreamAwake'
 import { configureClassicConsoleController } from '../../lib/classicconsolecontroller'
@@ -18,7 +19,7 @@ import StreamPreload from '../../components/ui/streampreload'
 import Ipc from '../../lib/ipc'
 import { useTranslation } from 'react-i18next'
 
-function LegacyStream() {
+function LegacyStream({onRetry}:{onRetry:()=>void}) {
     const router = useRouter()
     const { settings: globalSettings } = useSettings()
     const target = typeof router.query.serverid === 'string' ? router.query.serverid : ''
@@ -36,6 +37,9 @@ function LegacyStream() {
     const [connected,setConnected]=React.useState(false)
     const [connectionError,setConnectionError]=React.useState('')
     const intentionalExit=React.useRef(false)
+    const reconnect=React.useRef(new ManualReconnect())
+    const [retrying,setRetrying]=React.useState(false)
+    const [retryError,setRetryError]=React.useState(false)
     const [queueTime, setQueueTime] = React.useState(0)
     const activeSession = React.useRef('')
     const history=React.useRef({startedAt:Date.now(),connectedAt:0,saved:false,samples:[] as DiagnosticSample[]})
@@ -46,6 +50,7 @@ function LegacyStream() {
     useStreamAwake(sessionId,connected&&!connectionError&&!target.startsWith('xcloud_')&&Boolean(settings.stream_keep_awake))
     React.useEffect(() => {
         return () => {
+            reconnect.current.dispose()
             recordHistory('interrupted')
             const id = activeSession.current
             activeSession.current = ''
@@ -175,6 +180,7 @@ function LegacyStream() {
                         // Client has been disconnected. Lets return to home.
                         // xPlayer.close()
                         console.log('Client has been disconnected. Returning to prev page.')
+                        if(reconnect.current.busy)return
                         if(intentionalExit.current){void router.replace('/home');return}
                         setConnectionError('closed')
                     }
@@ -278,6 +284,15 @@ function LegacyStream() {
         }
     }, [router.isReady, router.query.serverid, sessionId, xPlayer])
 
+    function retryClassic(){
+        if(reconnect.current.busy||!activeSession.current)return
+        setRetrying(true);setRetryError(false)
+        recordHistory('failed')
+        stopHeartbeat.current?.();stopHeartbeat.current=undefined
+        const id=activeSession.current
+        void reconnect.current.run(()=>Ipc.send('streaming','stopStream',{sessionId:id}),()=>{activeSession.current='';intentionalExit.current=true;onRetry()},()=>{setRetrying(false);setRetryError(true)})
+    }
+
     function gamepadSend(button){
         console.log('Pressed button:', button)
         xPlayer.getChannelProcessor('input').pressButton(0, 'Nexus')
@@ -306,7 +321,7 @@ function LegacyStream() {
                 <title>Greenlight - {t('streamWindow.pageTitle')} {router.query.serverid}</title>
             </Head>
 
-            {connectionError && <div className='gl-experimental-error' role='alert'><p>{t('dashboard.classicConnectionLost')}</p><p>{t('dashboard.classicFailure_'+connectionError)}</p><button type='button' className='btn' onClick={exportClassicDiagnostics}>{t('dashboard.exportDiagnostics')}</button> <button className='btn btn-primary' onClick={()=>{onDisconnect();void router.replace('/home')}}>{t('dashboard.backHint')}</button></div>}
+            {connectionError && <div className='gl-experimental-error' role='alert'><p>{t('dashboard.classicConnectionLost')}</p><p>{t('dashboard.classicFailure_'+connectionError)}</p>{retryError&&<p role='alert'>{t('dashboard.classicRetryFailed')}</p>}{retrying&&<p role='status'>{t('dashboard.classicRetrying')}</p>}<button type='button' className='btn btn-primary' disabled={retrying} onClick={retryClassic}>{t('dashboard.retryStream')}</button> <button type='button' className='btn' onClick={exportClassicDiagnostics}>{t('dashboard.exportDiagnostics')}</button> <button className='btn' disabled={retrying} onClick={()=>{onDisconnect();void router.replace('/home')}}>{t('dashboard.backHint')}</button></div>}
             { (xPlayer !== undefined) ? <StreamComponent onMetrics={recordClassicSample} onExportDiagnostics={exportClassicDiagnostics} onLeave={()=>{recordHistory('ended');intentionalExit.current=true;activeSession.current='';void router.replace('/home')}} onDisconnect={ () => {
                 onDisconnect()
             }} onMenu={ consoleController ? undefined : () => {
@@ -324,9 +339,10 @@ export default function Stream() {
     const router = useRouter()
     const { settings } = useSettings()
     const target = typeof router.query.serverid === 'string' ? router.query.serverid : ''
+    const [classicAttempt,setClassicAttempt]=React.useState(0)
     const [engine, setEngine] = React.useState<string | null>(null)
     React.useEffect(() => { if (router.isReady && target && engine === null) setEngine(settings.streaming_engine || 'legacy') }, [router.isReady, target, engine, settings.streaming_engine])
     if (!engine) return null
     if (engine === 'experimental') return <ExperimentalStream key={target} target={target} onExit={() => { void router.replace('/home') }} />
-    return <LegacyStream key={target} />
+    return <LegacyStream key={target+'-'+classicAttempt} onRetry={()=>setClassicAttempt(value=>value+1)} />
 }

@@ -6,6 +6,8 @@ Changes on `main-v2` are development changes, not a new numbered release. See [c
 
 ### Added
 
+- Explicit Classic reconnect action after a connection failure, with serialized old-session termination and duplicate-retry protection.
+
 - Compare two Classic or V3 diagnostic exports locally with per-attempt metric differences and transport-state sampling.
 
 - Classic screenshot download, screenshot library storage and picture-in-picture controls, with bounded decoded-frame validation.

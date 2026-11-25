@@ -554,7 +554,9 @@
       "compare_averageFps": "Average FPS",
       "compare_averageBitrate": "Average bitrate",
       "compare_rtt95": "RTT p95",
-      "compare_jitter95": "Jitter p95"
+      "compare_jitter95": "Jitter p95",
+      "classicRetryFailed": "The previous session could not be stopped. Retry or return to the dashboard.",
+      "classicRetrying": "Stopping the previous session before reconnecting…"
     }
   }
 }
