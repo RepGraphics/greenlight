@@ -6,6 +6,8 @@ Changes on `main-v2` are development changes, not a new numbered release. See [c
 
 ### Added
 
+- Classic live video filters, sharpening, presets and aspect-ratio adjustments, sharing saved defaults with the experimental player.
+
 - Classic configurable streaming shortcuts, mute control and wrapped capture toolbar; mapped gameplay keys and editable controls are protected.
 
 - Classic gameplay recording and instant replay with explicit remote-audio capture, local clip saving and unsaved-capture exit protection.
