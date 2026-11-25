@@ -149,6 +149,7 @@ export default class InputChannel extends Channel {
     }
 
     queuePointerFrame(data:PointerFrame){
+        if(this.stopped||!this.isOpen())return
         this._inputQueue.queuePointerFrame(data)
     }
 

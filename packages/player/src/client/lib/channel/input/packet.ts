@@ -26,8 +26,14 @@ export interface InputFrame {
     RightTrigger: number;
 }
 
+export interface PointerContact {
+    type:'pointerdown'|'pointermove'|'pointerup';
+    x:number;
+    y:number;
+    pressure:number;
+}
 export interface PointerFrame {
-    events: Array<any>;
+    events: PointerContact[];
 }
 
 export interface MouseFrame {
@@ -149,12 +155,7 @@ export default class InputPacket {
     }
 
     _calculatePointerSize(frames:Array<PointerFrame>){
-        let pointerSize = 1
-        for(const frame in frames){
-            pointerSize = pointerSize + 1 + (frames[frame].events.length * 20)
-        }
-
-        return pointerSize
+        return 2+20*frames.reduce((count,frame)=>count+frame.events.length,0)
     }
 
     _calculateMouseSize(frames:Array<MouseFrame>){
@@ -246,64 +247,24 @@ export default class InputPacket {
         return offset
     }
 
-    _writePointerData(packet:DataView, offset:number, frames:Array<PointerFrame>){
-        packet.setUint8(offset, 1)
-        // packet.setUint8(offset, frames.length)
-        offset++
-
-        if(frames.length >= 2){
-            console.warn('pointerQueue is bigger then 1. Only one event will be sent.')
+    _writePointerData(packet:DataView,offset:number,frames:Array<PointerFrame>){
+        const events=frames.flatMap(frame=>frame.events)
+        if(events.length>255)throw Error('Too many pointer events')
+        packet.setUint8(offset++,1)
+        packet.setUint8(offset++,events.length)
+        const clamp=(value:number)=>Number.isFinite(value)?Math.max(0,Math.min(1,value)):0
+        for(const event of events){
+            const released=event.type==='pointerup'
+            packet.setUint16(offset,released?0:1,true)
+            packet.setUint16(offset+2,released?0:1,true)
+            packet.setUint8(offset+4,released?0:Math.round(255*clamp(event.pressure)))
+            packet.setUint16(offset+5,0,true)
+            packet.setUint32(offset+7,0,true)
+            packet.setUint32(offset+11,released?0:Math.round(clamp(event.x)*Math.max(0,this._serverVideoWidth-1)),true)
+            packet.setUint32(offset+15,released?0:Math.round(clamp(event.y)*Math.max(0,this._serverVideoHeight-1)),true)
+            packet.setUint8(offset+19,event.type==='pointerdown'?1:released?2:3)
+            offset+=20
         }
-
-        // for (; frames.length > 0;) {
-        // this._inputFps.count()
-        const frame = frames[0]
-        if(frame !== undefined){
-            packet.setUint8(offset, frame.events.length)
-            offset++
-
-            const screenWidth = this._serverVideoWidth
-            const screenHeight = this._serverVideoHeight
-
-            for(let i = 0; i < frame.events.length; i++){
-                const event = frame.events[i]
-                const rect = event.target.getBoundingClientRect()
-
-                let e = 0.06575749909301447 * (screenHeight / 1)
-                let n = 0.06575749909301447 * (screenWidth / 1)
-
-                // @TODO: Check if this is correct
-                e =1
-                n =1
-
-                if(event.type === 'pointerup'){
-                    e = 0
-                    n = 0
-                }
-
-                packet.setUint16(offset, e, true)
-                packet.setUint16(offset+2, n, true)
-                packet.setUint8(offset+4, 255*event.pressure)
-                packet.setUint16(offset+5, event.twist, true)
-                packet.setUint32(offset+7, 0, true)
-                let o = (event.x - rect.left) * (screenWidth / rect.width)
-                    , l = (event.y - rect.top) * (screenHeight / rect.height)
-
-                if(event.type === 'pointerup'){
-                    // Reset x and y to 0 on pointerup
-                    o = 0
-                    l = 0
-                }
-
-                packet.setUint32(offset+11, o, true)
-                packet.setUint32(offset+15, l, true)
-                packet.setUint8(offset+19, (event.type === 'pointerdown') ? 1 :
-                    (event.type === 'pointerup') ? 2 : (event.type === 'pointermove') ? 3 : 0)
-                    
-                offset = offset+20
-            }
-        }
-
         return offset
     }
 

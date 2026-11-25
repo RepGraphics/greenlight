@@ -1,70 +1,59 @@
-import xCloudPlayer from '../player'
+import type xCloudPlayer from '../player'
+import type {PointerContact} from '../channel/input/packet'
+import {normalizedTouchPoint} from './touchcoordinates'
 
-export default class Touch {
-    private _player: xCloudPlayer | undefined
-    private _index: number
-
-    private _pointerEvents = {}
-    private _lastPointerId = -1
-
-    private _mouseDown = false
-
-    private _listener = {
-        onPointer: this.onPointer.bind(this),
+// Keep the existing single-contact wire format. Do not register a virtual pad.
+export default class Touch{
+    private player?:xCloudPlayer
+    private surface?:HTMLVideoElement
+    private active:number|null=null
+    private previousTouchAction=''
+    constructor(_index=0){}
+    private send(contact:PointerContact){this.player?._channels.input.queuePointerFrame({events:[contact]})}
+    private release=()=>{
+        if(this.active===null)return
+        const pointer=this.active;this.active=null
+        this.send({type:'pointerup',x:0,y:0,pressure:0})
+        try{if(this.surface?.hasPointerCapture(pointer))this.surface.releasePointerCapture(pointer)}catch{}
     }
-
-    constructor(index:number){
-        this._index = index
-    }
-
-    attach(xCloudPlayer:xCloudPlayer){
-        this._player = xCloudPlayer
-
-        this._player._channels.control.sendGamepadState(this._index, true, this)
-
-        // Mod the video UI to capture MKB input
-        if(this._player.getVideoElement() === undefined){
-            console.log('VideoComponent is not attached. this._player._videoComponent is:', this._player.getVideoElement())
-            return
-        } else {
-            this._player.getVideoElement()?.addEventListener('pointermove', this._listener.onPointer, { passive: false })
-            this._player.getVideoElement()?.addEventListener('pointerdown', this._listener.onPointer, { passive: false })
-            this._player.getVideoElement()?.addEventListener('pointerup', this._listener.onPointer, { passive: false })
-        }
-
-    }
-
-    detach(){
-        if(this._player === undefined){
-            console.log('Player is not attached. this._player is:', this._player)
+    private hidden=()=>{if(document.hidden)this.release()}
+    private onPointer=(event:PointerEvent)=>{
+        const surface=this.surface,player=this.player
+        if(!surface||!player||event.pointerType!=='touch')return
+        if(event.type==='pointerup'||event.type==='pointercancel'||event.type==='lostpointercapture'){
+            if(this.active===event.pointerId){this.release();event.preventDefault()}
             return
         }
-        this._player._channels.control.sendGamepadState(this._index, false)
-
-        this._player.getVideoElement()?.removeEventListener('pointermove', this._listener.onPointer)
-        this._player.getVideoElement()?.removeEventListener('pointerdown', this._listener.onPointer)
-        this._player.getVideoElement()?.removeEventListener('pointerup', this._listener.onPointer)
-    }
-
-    onPointer(event:PointerEvent) {
-        this._lastPointerId = event.pointerId
-
-        if(event.pointerType === 'mouse' && event.type === 'pointerdown'){
-            this._mouseDown = true
+        if(document.hidden||!document.hasFocus()||!surface.isConnected)return
+        const input=player._channels.input
+        if(!input.isOpen()||!input.getServerVideoWidth()||!input.getServerVideoHeight())return
+        const down=event.type==='pointerdown'
+        if(down?this.active!==null:this.active!==event.pointerId)return
+        const point=normalizedTouchPoint(event.clientX,event.clientY,surface.getBoundingClientRect(),surface.videoWidth,surface.videoHeight,getComputedStyle(surface).objectFit,down)
+        if(!point)return
+        if(down){
+            try{surface.setPointerCapture(event.pointerId)}catch{return}
+            this.active=event.pointerId
         }
-
-        if(event.pointerType === 'mouse' && event.type === 'pointerup'){
-            this._mouseDown = false
-        }
-
-        if(event.pointerType === 'mouse' && event.type === 'pointermove' && this._mouseDown === false){
-            // ignore events if the pointer type is mouse and is not pressed.
-        } else {
-            this._player?._channels.input.queuePointerFrame({
-                events: [event],
-            })
-        }
+        this.send({type:down?'pointerdown':'pointermove',...point,pressure:Number.isFinite(event.pressure)?Math.max(0,Math.min(1,event.pressure)):0})
         event.preventDefault()
     }
-
+    attach(player:xCloudPlayer){
+        this.detach()
+        const surface=player.getVideoElement()
+        if(!surface||surface.tagName!=='VIDEO'||!surface.isConnected)return
+        this.player=player;this.surface=surface as HTMLVideoElement
+        this.previousTouchAction=surface.style.touchAction;surface.style.touchAction='none'
+        for(const name of ['pointerdown','pointermove','pointerup','pointercancel','lostpointercapture'])surface.addEventListener(name,this.onPointer as EventListener,{passive:false})
+        window.addEventListener('blur',this.release);document.addEventListener('visibilitychange',this.hidden)
+    }
+    detach(){
+        const surface=this.surface
+        if(!surface)return
+        this.release()
+        for(const name of ['pointerdown','pointermove','pointerup','pointercancel','lostpointercapture'])surface.removeEventListener(name,this.onPointer as EventListener)
+        surface.style.touchAction=this.previousTouchAction
+        window.removeEventListener('blur',this.release);document.removeEventListener('visibilitychange',this.hidden)
+        this.surface=undefined;this.player=undefined
+    }
 }
