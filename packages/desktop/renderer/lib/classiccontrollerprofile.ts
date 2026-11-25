@@ -1,3 +1,4 @@
+import { installClassicInputLifecycle } from './classicinputlifecycle'
 import {defaultButtonMapping,validateButtonMapping} from '../../../player/src/client/lib/input/mapping'
 import {readProfiles,snapshotProfile} from './controllerprofiles'
 import type {ControllerProfile} from './controllerprofiles'
@@ -38,5 +39,6 @@ export function configureClassicControllerProfile<T>(driver:ClassicDriver<T>|und
         const mapped=mapClassicPhysicalInput(buttons,axes,profile)
         return original.call(this,mapped.buttons,mapped.axes)
     }
+    installClassicInputLifecycle(driver)
     return true
 }
