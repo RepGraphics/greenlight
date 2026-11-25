@@ -138,16 +138,17 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
         }, [player, playerState, microphone]);
         useEffect(() => {
             if (!player || consoleController || !nativeMouseKeyboard || playerState !== 'Connected') return;
-            let input: MouseKeyboard | undefined;
+            const input = new MouseKeyboard(0, mouseSensitivity);
             let surface: HTMLElement | undefined;
             const sync = () => {
-                const element = player.getVideoElement();
-                if (!element || element === surface) return;
-                input?.detach();
-                input = new MouseKeyboard(0, mouseSensitivity); input.attach(player); surface = element;
+                const candidate = player.getVideoElement();
+                const element = candidate?.isConnected ? candidate : undefined;
+                if (element === surface) return;
+                input.detach(); surface = element;
+                if(element)input.attach(player);
             };
             sync(); const timer = setInterval(sync, 500);
-            return () => { clearInterval(timer); input?.detach() };
+            return () => { clearInterval(timer); input.detach() };
         }, [player, consoleController, nativeMouseKeyboard, playerState, mouseSensitivity]);
         const metricsCallback = useRef(onMetrics);
         metricsCallback.current = onMetrics;
