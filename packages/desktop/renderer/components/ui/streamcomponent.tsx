@@ -10,6 +10,7 @@ import { storeCapture } from '../../lib/capturelibrary'
 import {sanitizeSample,summarizeDiagnostics} from '../../lib/streamdiagnostics'
 import {recommendLowerBitrate} from '../../lib/bitrateadvisor'
 import {ClassicMetricsSampler} from '../../lib/classicmetrics'
+import { ClassicStatsPoller } from '../../lib/classicstatspoller'
 import { ClassicMicrophone, negotiateClassicChat } from '../../lib/classicmicrophone'
 import type {DiagnosticSample} from '../../lib/streamdiagnostics'
 import { useSettings } from '../../context/userContext'
@@ -126,29 +127,30 @@ function StreamComponent({
     const [qualitySamples,setQualitySamples]=React.useState<DiagnosticSample[]>([])
     const recentSamples=React.useRef<DiagnosticSample[]>([])
     React.useEffect(()=>{
-        let disposed=false,busy=false
         const sampler=new ClassicMetricsSampler()
         const started=performance.now()
         recentSamples.current=[];setQualitySamples([]);setMetrics({})
-        const sample=async()=>{
-            if(busy||disposed||!connected||!xPlayer._webrtcClient)return
-            busy=true
-            try{
-                const peer=xPlayer._webrtcClient
-                const stats=await peer.getStats()
-                if(disposed)return
-                const result=sampler.sample(stats,performance.now(),{peerState:peer.connectionState,iceState:peer.iceConnectionState,signalingState:peer.signalingState})
-                const value=sanitizeSample(result,(performance.now()-started)/1000)
-                onMetrics?.(value)
-                recentSamples.current=[...recentSamples.current.slice(-29),value]
-                setQualitySamples(recentSamples.current)
-                setMetrics(value.statsFresh===false?{}:value)
-            }catch{
-                if(!disposed){const value=sanitizeSample({width:0,height:0,fps:0,bitrate:0,jitter:0,rtt:0,loss:0,statsFresh:false},(performance.now()-started)/1000);recentSamples.current=[...recentSamples.current.slice(-29),value];setQualitySamples(recentSamples.current);setMetrics({});onMetrics?.(value)}
-            }finally{busy=false}
+        if(!connected)return
+        const publish=(result:Omit<DiagnosticSample,'elapsedSeconds'>,now:number)=>{
+            const value=sanitizeSample(result,(now-started)/1000)
+            recentSamples.current=[...recentSamples.current.slice(-29),value]
+            setQualitySamples(recentSamples.current)
+            setMetrics(value.statsFresh===false?{}:value)
+            onMetrics?.(value)
         }
-        void sample();const interval=setInterval(sample,1000)
-        return()=>{disposed=true;clearInterval(interval)}
+        const poller=new ClassicStatsPoller(
+            async()=>{
+                const peer=xPlayer._webrtcClient
+                if(!peer)throw Error('Classic peer unavailable')
+                const stats=await peer.getStats()
+                return {stats,peerState:peer.connectionState,iceState:peer.iceConnectionState,signalingState:peer.signalingState}
+            },
+            ({stats,...peer},now)=>publish(sampler.sample(stats,now,peer),now),
+            now=>publish({width:0,height:0,fps:0,bitrate:0,jitter:0,rtt:0,loss:0,statsFresh:false},now)
+        )
+        const sample=()=>poller.tick()
+        sample();const interval=setInterval(sample,1000)
+        return()=>{poller.dispose();clearInterval(interval)}
     },[connected,xPlayer,onMetrics])
     const quality=summarizeDiagnostics(qualitySamples)
     const suggestedCap=connected?recommendLowerBitrate(qualitySamples,activeCap):null
