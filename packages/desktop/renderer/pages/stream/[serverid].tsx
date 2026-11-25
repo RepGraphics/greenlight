@@ -4,7 +4,7 @@ import { recoveryBitrate } from '../../lib/bitrateadvisor'
 import {downloadDiagnostics} from '../../lib/streamdiagnostics'
 import type { DiagnosticSample } from '../../lib/streamdiagnostics'
 import { ManualReconnect, ClassicRecoveryBudget } from '../../lib/sessionrecovery'
-import { ClassicSessionExit } from '../../lib/classicsessionexit'
+import { SessionLifecycle } from '../../lib/sessionlifecycle'
 import { startHeartbeat } from '../../lib/keepalive'
 import { watchClassicConnection } from '../../lib/classicconnection'
 import { ClassicStatsWatchdog } from '../../lib/classicstatswatchdog'
@@ -27,7 +27,7 @@ import StreamPreload from '../../components/ui/streampreload'
 import Ipc from '../../lib/ipc'
 import { useTranslation } from 'react-i18next'
 
-function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecoveryBudget}) {
+function LegacyStream({onRetry,recovery,lifecycle}:{onRetry:()=>void;recovery:ClassicRecoveryBudget;lifecycle:SessionLifecycle}) {
     const router = useRouter()
     const { settings: globalSettings } = useSettings()
     const target = typeof router.query.serverid === 'string' ? router.query.serverid : ''
@@ -55,7 +55,7 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
     const cancelAutomaticRecovery=()=>{cancelRecovery.current=true;setRecoveryCancelled(true)}
     const [queueTime, setQueueTime] = React.useState(0)
     const activeSession = React.useRef('')
-    const sessionExit=React.useRef(new ClassicSessionExit())
+    const exitBusy=React.useRef(false)
     const mounted=React.useRef(true)
     const [exiting,setExiting]=React.useState(false)
     const startupFailed=React.useRef(false)
@@ -82,12 +82,32 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
             mounted.current=false
             reconnect.current.dispose()
             recordHistory('interrupted')
-            void sessionExit.current.stop(activeSession,id=>Ipc.send('streaming','stopStream',{sessionId:id}))
         }
     }, [])
 
+    // Own provisioning separately from the WebRTC/player effect. Its cleanup
+    // must not run just because a session ID or player becomes available.
+    React.useEffect(()=>{
+        if(!router.isReady||!target||intentionalExit.current)return
+        const cloud=target.startsWith('xcloud_')
+        return lifecycle.begin({
+            start:()=>Ipc.send('streaming','startStream',{type:cloud?'cloud':'home',resolution:cloud?settings.xcloud_resolution:settings.xhome_resolution,target:cloud?target.slice(7):target}),
+            stop:id=>Ipc.send('streaming','stopStream',{sessionId:id}),
+            onSession:id=>{
+                if(intentionalExit.current)return
+                activeSession.current=id;setSessionId(id)
+            },
+            onError:reason=>{
+                if(intentionalExit.current)return
+                startupFailed.current=true
+                if(reason==='stop')setRetryError(true)
+                recordHistory('failed');setConnectionError('start')
+            }
+        })
+    },[router.isReady,target,lifecycle])
+
     React.useEffect(() => {
-        if (!router.isReady || typeof router.query.serverid !== 'string') return
+        if (!router.isReady || typeof router.query.serverid !== 'string' || !sessionId) return
         let cancelled = false
         let polling = false
         let disposeConnection: (()=>void)|undefined
@@ -226,26 +246,6 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
                     connStatus.innerText = t('streamWindow.connectingToConsole')
                 }
             })
-        } else if(sessionId === '') {
-            // Stream is not ready yet, lets start it...
-
-            Ipc.send('streaming', 'startStream', {
-                type: streamType,
-                resolution: streamType === 'cloud' ? settings.xcloud_resolution : settings.xhome_resolution,
-                target: serverId,
-            }).then((result:string) => {
-                console.log('StartStream session:', result)
-                if(typeof result!=='string'||!result)throw Error('Invalid session identifier')
-                if(cancelled||intentionalExit.current){void Ipc.send('streaming','stopStream',{sessionId:result}).catch(()=>{});return}
-                activeSession.current = result
-                setSessionId(result)
-
-            }).catch(() => {
-                if(cancelled||intentionalExit.current)return
-                startupFailed.current=true
-                recordHistory('failed')
-                setConnectionError('start')
-            })
         } else {
 
             streamStateInterval.current = setInterval(() => {
@@ -325,12 +325,7 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
     const retryClassic=React.useCallback((automatic=false,requestedCap:number|null=null)=>{
         if(intentionalExit.current||reconnect.current.busy||capturePending)return
         if(automatic&&cancelRecovery.current)return
-        if(!activeSession.current){
-            if(automatic||!startupFailed.current)return
-            startupFailed.current=false;intentionalExit.current=true
-            recovery.rememberAttempt(connectionError,history.current.samples);recovery.recordRetry(false);onRetry()
-            return
-        }
+        if(!activeSession.current&&(automatic||!startupFailed.current))return
         const lower=automatic&&connectionError==='closed'&&history.current.samples.at(-1)?.peerState==='failed'?recoveryBitrate(history.current.samples,activeCap,'transport',Boolean(globalSettings.v3_adaptive_recovery)):null
         const cap=requestedCap??lower
         cancelRecovery.current=true
@@ -338,15 +333,15 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
         setRetrying(true);setRetryError(false)
         recordHistory('failed')
         stopHeartbeat.current?.();stopHeartbeat.current=undefined
-        const id=activeSession.current
-        void reconnect.current.run(()=>Ipc.send('streaming','stopStream',{sessionId:id}),()=>{
+        // Wait for a late session ID and its acknowledged stop before remounting.
+        void reconnect.current.run(async()=>{if(!await lifecycle.end())throw Error('Unable to stop previous session')},()=>{
             activeSession.current='';intentionalExit.current=true
             recovery.rememberAttempt(connectionError,history.current.samples)
             recovery.recordRetry(automatic)
             if(cap!==null)recovery.applyBitrate(cap)
             onRetry()
         },()=>{setRetrying(false);setRetryError(true)})
-    },[capturePending,recordHistory,onRetry,recovery,connectionError,activeCap,globalSettings.v3_adaptive_recovery])
+    },[capturePending,recordHistory,onRetry,recovery,lifecycle,connectionError,activeCap,globalSettings.v3_adaptive_recovery])
     const autoDelay=recovery.delay(Boolean(globalSettings.v3_auto_reconnect),target.startsWith('xcloud_'),{
         error:connectionError,active:Boolean(activeSession.current),blocked:capturePending||retrying||retryError||recoveryCancelled
     })
@@ -362,7 +357,8 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
     }
 
     function onDisconnect(){
-        if(sessionExit.current.busy)return
+        if(exitBusy.current||reconnect.current.busy||capturePending)return
+        exitBusy.current=true
         cancelAutomaticRecovery()
         intentionalExit.current=true
         reconnect.current.dispose()
@@ -373,9 +369,10 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
         stopHeartbeat.current?.();stopHeartbeat.current=undefined
         if(streamStateInterval.current)clearInterval(streamStateInterval.current)
         // Retain remote ownership until termination is acknowledged.
-        void sessionExit.current.stop(activeSession,id=>Ipc.send('streaming','stopStream',{sessionId:id})).then(stopped=>{
+        void lifecycle.end().then(stopped=>{
+            exitBusy.current=false
             if(!mounted.current)return
-            if(stopped){void router.replace('/home');return}
+            if(stopped){activeSession.current='';void router.replace('/home');return}
             setExiting(false)
             setConnectionError('stop')
         })
@@ -405,9 +402,10 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
 
 function ClassicStreamSession(){
     const recovery=React.useRef(new ClassicRecoveryBudget())
+    const lifecycle=React.useRef(new SessionLifecycle())
     const [attempt,setAttempt]=React.useState(0)
     const retry=React.useCallback(()=>setAttempt(value=>value+1),[])
-    return <LegacyStream key={attempt} onRetry={retry} recovery={recovery.current}/>
+    return <LegacyStream key={attempt} onRetry={retry} recovery={recovery.current} lifecycle={lifecycle.current}/>
 }
 
 export default function Stream() {
