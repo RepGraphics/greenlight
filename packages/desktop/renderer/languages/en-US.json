@@ -360,6 +360,8 @@
       "muteAudio": "Mute audio",
       "volume": "Volume",
       "touchControls": "Touch controls",
+      "directTouch": "Direct touch (experimental)",
+      "directTouchHint": "Touch the video directly. Requires game support; one contact at a time. Switch back to touch controls for the virtual gamepad.",
       "microphoneFailed": "Microphone could not be enabled. Check permissions or use the classic player.",
       "v3Renderer": "V3 video renderer",
       "standardVideo": "Standard video (recommended)",

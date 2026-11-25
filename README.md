@@ -32,6 +32,7 @@ An independently maintained fork of [Greenlight](https://github.com/unknownskl/g
 | Controller profiles, remapping and calibration | Yes | Yes |
 | Console-paired controller mode | Yes | Yes |
 | On-screen touch gamepad | Experimental | Experimental |
+| Direct touchscreen input | Experimental | Experimental (standard video, single contact) |
 | Native mouse/keyboard | — | Experimental |
 | Video filters and sharpening | Yes | Yes |
 | Screenshots and picture-in-picture | Yes | Standard video only |
