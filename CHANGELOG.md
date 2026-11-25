@@ -6,6 +6,8 @@ Changes on `main-v2` are development changes, not a new numbered release. See [c
 
 ### Added
 
+- Classic diagnostics export from the stream toolbar and connection failure screen; local viewer supports Classic and V3 reports.
+
 - Classic session history, engine and outcome filters, and local CSV export of filtered session records.
 
 - Configurable 30–300 second diagnostics graph windows with visible gaps for missing samples; protected retry actions while captures are unsaved.

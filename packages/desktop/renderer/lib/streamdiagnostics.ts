@@ -20,12 +20,15 @@ export function summarizeDiagnostics(samples: DiagnosticSample[]) {
     return { sampleCount:valid.length, averageFps:mean(valid.map(sample => sample.fps)), averageBitrate:mean(valid.map(sample => sample.bitrate).filter(value => value > 0)), rtt95, jitter95, packetsLostDuringWindow:loss, quality }
 }
 
-export function downloadDiagnostics(samples: DiagnosticSample[], type: 'cloud' | 'home', state: string, renderer: string, previousAttempts: Array<{state:string;reason:string;samples:DiagnosticSample[]}>=[], failureReason='') {
-    const report = { schema: 4, previousAttempts, failureReason, summary: summarizeDiagnostics(samples), engine: 'v3', type, renderer: renderer === 'webgpu' ? 'webgpu' : 'video', state, units: { bitrate: 'Mbps', jitter: 'ms', rtt: 'ms', loss: 'cumulative packets' }, samples }
+export function createDiagnosticReport(samples: DiagnosticSample[], type: 'cloud' | 'home', state: string, renderer: string, previousAttempts: Array<{state:string;reason:string;samples:DiagnosticSample[]}>=[], failureReason='',engine:'classic'|'v3'='v3') {
+    return { schema: 4, previousAttempts, failureReason, summary: summarizeDiagnostics(samples), engine, type, renderer: renderer === 'webgpu' ? 'webgpu' : 'video', state, units: { bitrate: 'Mbps', jitter: 'ms', rtt: 'ms', loss: 'cumulative packets' }, samples:samples.slice(-300).map(s=>sanitizeSample(s,s.elapsedSeconds)) }
+}
+export function downloadDiagnostics(...args:Parameters<typeof createDiagnosticReport>){
+    const report=createDiagnosticReport(...args)
     const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }))
     const link = document.createElement('a')
     link.href = url
-    link.download = 'greenlight-stream-diagnostics.json'
+    link.download = report.engine==='classic'?'greenlight-classic-diagnostics.json':'greenlight-stream-diagnostics.json'
     document.body.appendChild(link)
     link.click()
     link.remove()
