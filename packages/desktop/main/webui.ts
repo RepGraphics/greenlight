@@ -1,4 +1,5 @@
 import { isAllowedWebIpc } from './ipc/policy'
+import { createWebUiRateLimiter, TokenBucket } from './helpers/webuiratelimit'
 import Application from './application'
 import express from 'express'
 import expressWS from 'express-ws'
@@ -20,7 +21,7 @@ export default class WebUI {
 
     private authorized(req) {
         const header = req.headers.authorization || ''
-        if (!header.startsWith('Basic ')) return false
+        if (typeof header !== 'string' || header.length > 512 || !header.startsWith('Basic ')) return false
         const credential = Buffer.from(header.slice(6), 'base64').toString('utf8')
         const expected = Buffer.from('greenlight:' + this.accessToken)
         const actual = Buffer.from(credential)
@@ -52,6 +53,10 @@ export default class WebUI {
         this._express = express()
         this._ws = expressWS(this._express)
         this._ipc = this._application._ipc
+        // The server binds only to loopback: one bounded budget, no spoofable
+        // forwarded-IP headers and no unbounded per-client state.
+        this._express.use(createWebUiRateLimiter(new TokenBucket(240,20)))
+        const failedAuthBudget = new TokenBucket(8,0.2)
 
         // this._application._events.on('start', () => {
         //     this._ipc.onUserLoaded()
@@ -62,6 +67,12 @@ export default class WebUI {
             res.setHeader('X-Content-Type-Options', 'nosniff')
             res.setHeader('Referrer-Policy', 'no-referrer')
             if (!this.authorized(req)) {
+                const retryAfter = failedAuthBudget.consume()
+                if (retryAfter > 0) {
+                    res.setHeader('Retry-After', String(retryAfter))
+                    res.status(429).send('Too many authentication attempts')
+                    return
+                }
                 res.setHeader('WWW-Authenticate', 'Basic realm="Greenlight WebUI", charset="UTF-8"')
                 res.status(401).send('Authentication required')
                 return
