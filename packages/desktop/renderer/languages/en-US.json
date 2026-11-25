@@ -544,7 +544,17 @@
       "classicScreenshotSaved": "Screenshot downloaded.",
       "classicScreenshotFailed": "Could not capture or save this video frame.",
       "classicPip": "Picture-in-picture",
-      "classicPipFailed": "Picture-in-picture is unavailable for this video."
+      "classicPipFailed": "Picture-in-picture is unavailable for this video.",
+      "compareDiagnostics": "Compare diagnostic reports",
+      "compareDiagnosticsHint": "Open a second report as a baseline. Values are descriptive differences (current minus baseline), not a controlled performance benchmark.",
+      "diagnosticBaseline": "Baseline report",
+      "diagnosticCurrent": "Current report",
+      "diagnosticDelta": "Difference",
+      "diagnosticMetric": "Metric",
+      "compare_averageFps": "Average FPS",
+      "compare_averageBitrate": "Average bitrate",
+      "compare_rtt95": "RTT p95",
+      "compare_jitter95": "Jitter p95"
     }
   }
 }

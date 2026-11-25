@@ -59,7 +59,7 @@ function StreamComponent({
     React.useEffect(() => {
         if (!hud&&!onMetrics) return
         let disposed = false, busy = false
-        let previous: { bytes: number; time: number } | undefined
+        let previous: { bytes: number; time: number; id:string } | undefined
         const sample = async () => {
             if (busy || disposed || !xPlayer._webrtcClient) return
             busy = true
@@ -71,9 +71,9 @@ function StreamComponent({
                 stats.forEach(report => {
                     if (report.type !== 'inbound-rtp' || report.kind !== 'video') return
                     const bytes = report.bytesReceived, time = report.timestamp
-                    const bitrate = previous && time > previous.time && bytes >= previous.bytes ? (bytes - previous.bytes) * 8 / (time - previous.time) / 1000 : undefined
-                    if (typeof bytes === 'number' && typeof time === 'number') previous = { bytes, time }
-                    onMetrics?.(sanitizeSample({fps:report.framesPerSecond??0,width:report.frameWidth??0,height:report.frameHeight??0,jitter:typeof report.jitter==='number'?report.jitter*1000:0,loss:report.packetsLost??0,bitrate:bitrate??0,rtt,statsFresh:bitrate!==undefined},0))
+                    const bitrate = previous && previous.id===report.id && time > previous.time && bytes >= previous.bytes ? (bytes - previous.bytes) * 8 / (time - previous.time) / 1000 : undefined
+                    if (typeof bytes === 'number' && typeof time === 'number') previous = { bytes, time, id:report.id }
+                    onMetrics?.(sanitizeSample({fps:report.framesPerSecond??0,width:report.frameWidth??0,height:report.frameHeight??0,jitter:typeof report.jitter==='number'?report.jitter*1000:0,loss:report.packetsLost??0,bitrate:bitrate??0,rtt,statsFresh:bitrate!==undefined,peerState:xPlayer._webrtcClient.connectionState,iceState:xPlayer._webrtcClient.iceConnectionState,signalingState:xPlayer._webrtcClient.signalingState},0))
                     if(hud)setMetrics({ fps: report.framesPerSecond, width: report.frameWidth, height: report.frameHeight, jitter: typeof report.jitter === 'number' ? report.jitter * 1000 : undefined, loss: report.packetsLost, bitrate })
                 })
             } catch { /* stats may be unavailable during disconnect */ } finally { busy = false }

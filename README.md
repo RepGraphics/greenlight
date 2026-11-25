@@ -33,7 +33,8 @@ An independently maintained fork of [Greenlight](https://github.com/unknownskl/g
 | Console-paired controller mode | Yes | Yes |
 | Touch gamepad and native mouse/keyboard | — | Experimental |
 | Video filters and sharpening | — | Yes |
-| Screenshots, picture-in-picture and local clips | — | Standard video only |
+| Screenshots and picture-in-picture | Yes | Standard video only |
+| Local clips | — | Standard video only |
 | Live network graphs and diagnostic exports | — | Yes |
 | Automatic Remote Play recovery | — | Opt-in |
 | Local session history | — | Opt-in |

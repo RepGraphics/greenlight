@@ -6,6 +6,8 @@ Changes on `main-v2` are development changes, not a new numbered release. See [c
 
 ### Added
 
+- Compare two Classic or V3 diagnostic exports locally with per-attempt metric differences and transport-state sampling.
+
 - Classic screenshot download, screenshot library storage and picture-in-picture controls, with bounded decoded-frame validation.
 
 - Classic diagnostics export from the stream toolbar and connection failure screen; local viewer supports Classic and V3 reports.

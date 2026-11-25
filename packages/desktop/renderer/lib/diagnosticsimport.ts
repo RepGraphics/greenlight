@@ -18,9 +18,9 @@ function attempt(raw:Record<string,unknown>):ImportedAttempt{
     return {state:typeof raw.state==='string'&&states.includes(raw.state)?raw.state:'Unknown',reason:typeof raw.reason==='string'&&reasons.includes(raw.reason)?raw.reason:'',samples:samples(raw.samples)}
 }
 export function parseDiagnostics(text:string){
-    if(text.length>diagnosticFileLimit)throw Error('Diagnostic report too large')
+    if(text.length>diagnosticFileLimit||new TextEncoder().encode(text).byteLength>diagnosticFileLimit)throw Error('Diagnostic report too large')
     const raw=object(JSON.parse(text))
-    if(![1,2,3,4].includes(Number(raw.schema))||(raw.engine!=='v3'&&!(raw.engine==='classic'&&raw.schema===4))||!Array.isArray(raw.samples))throw Error('Unsupported diagnostic format')
+    if(typeof raw.schema!=='number'||![1,2,3,4].includes(raw.schema)||(raw.engine!=='v3'&&!(raw.engine==='classic'&&raw.schema===4))||!Array.isArray(raw.samples))throw Error('Unsupported diagnostic format')
     const current=attempt({...raw,reason:raw.failureReason})
     const previous=Array.isArray(raw.previousAttempts)?raw.previousAttempts.slice(-3).map(item=>attempt(object(item))):[]
     return {schema:Number(raw.schema),engine:raw.engine==='classic'?'classic':'v3',type:raw.type==='home'?'home':raw.type==='cloud'?'cloud':'unknown',renderer:raw.renderer==='webgpu'?'webgpu':'video',attempts:[...previous,current]}

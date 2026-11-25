@@ -21,7 +21,9 @@ export function summarizeDiagnostics(samples: DiagnosticSample[]) {
 }
 
 export function createDiagnosticReport(samples: DiagnosticSample[], type: 'cloud' | 'home', state: string, renderer: string, previousAttempts: Array<{state:string;reason:string;samples:DiagnosticSample[]}>=[], failureReason='',engine:'classic'|'v3'='v3') {
-    return { schema: 4, previousAttempts, failureReason, summary: summarizeDiagnostics(samples), engine, type, renderer: renderer === 'webgpu' ? 'webgpu' : 'video', state, units: { bitrate: 'Mbps', jitter: 'ms', rtt: 'ms', loss: 'cumulative packets' }, samples:samples.slice(-300).map(s=>sanitizeSample(s,s.elapsedSeconds)) }
+    const bounded=samples.slice(-300).map(s=>sanitizeSample(s,s.elapsedSeconds))
+    const previous=previousAttempts.slice(-3).map(attempt=>({state:attempt.state,reason:attempt.reason,samples:attempt.samples.slice(-300).map(s=>sanitizeSample(s,s.elapsedSeconds))}))
+    return { schema: 4, previousAttempts:previous, failureReason, summary: summarizeDiagnostics(bounded), engine, type, renderer: renderer === 'webgpu' ? 'webgpu' : 'video', state, units: { bitrate: 'Mbps', jitter: 'ms', rtt: 'ms', loss: 'cumulative packets' }, samples:bounded }
 }
 export function downloadDiagnostics(...args:Parameters<typeof createDiagnosticReport>){
     const report=createDiagnosticReport(...args)
