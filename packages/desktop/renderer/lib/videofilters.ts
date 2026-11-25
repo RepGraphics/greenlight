@@ -17,3 +17,8 @@ export function videoFilterCss(value: unknown) {
     const colors = 'brightness('+f.brightness+'%) contrast('+f.contrast+'%) saturate('+f.saturation+'%)'
     return f.sharpening > 0 ? colors+' url(#gl-stream-sharpen)' : colors
 }
+
+export function classicVideoPresentation(value:unknown,display:unknown){
+    const mode=display==='stretch'||display==='zoom'?display:'default'
+    return {mode,className:'gl-classic-display-'+mode,filter:videoFilterCss(value)}
+}

@@ -17,3 +17,11 @@ export function reconcileSlots(previous:ControllerSlot[], connected:number[], vi
     if(virtualPrimary&&!result.some(item=>item.slot===0))result.push({slot:0,physicalId:null})
     return result.sort((a,b)=>a.slot-b.slot)
 }
+
+// Keep a working primary controller; otherwise pick a free physical pad
+// deterministically. Fixed multiplayer slots never steal another controller.
+export function selectPhysicalGamepad(current:number,fixed:number,connected:number[],occupied:number[]):number{
+    const free=[...new Set(connected.filter(id=>Number.isSafeInteger(id)&&id>=0&&!occupied.includes(id)))].sort((a,b)=>a-b)
+    if(fixed>=0)return free.includes(fixed)?fixed:-1
+    return free.includes(current)?current:free[0]??-1
+}

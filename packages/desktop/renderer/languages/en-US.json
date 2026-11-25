@@ -1,5 +1,18 @@
 {
   "translation": {
+    "renderingDiagnostics": {
+      "title": "Rendering capability diagnostics",
+      "notice": "These are browser and display hints only. They do not establish that Xbox is sending HDR, that the decoder supports its HDR profile, or that the renderer preserves HDR.",
+      "displayHdr": "Display HDR hint",
+      "videoHdr": "Video HDR hint",
+      "wideGamut": "Display P3 or wider hint",
+      "webGpu": "WebGPU API exposed",
+      "codecs": "Advertised WebRTC receive codecs",
+      "reported": "Reported",
+      "notReported": "Not reported",
+      "unknown": "Unknown",
+      "refresh": "Refresh capabilities"
+    },
     "languageName": "English",
     "authorOfLocalization": "English Localization by unknownskl",
     "header": {
@@ -471,6 +484,9 @@
       "stopRecording": "Stop recording",
       "recordingFailed": "Recording interrupted or unavailable.",
       "recordingStopped": "Recording stopped.",
+      "recordingDuration": "Maximum recording duration",
+      "recordingQuality": "Recording video bitrate",
+      "recordingOptionsHint": "Applies to the next recording in either player. Recording may finish early near the 128 MiB memory cap. Higher bitrate increases encoding load and file size.",
       "clipReady": "Recorded clip ready",
       "saveClip": "Save WebM",
       "discardClip": "Discard clip",
@@ -480,6 +496,11 @@
       "homeResolution": "Remote Play display resolution",
       "cloudResolution": "Cloud Gaming display resolution",
       "autoRecovery": "Auto-reconnect (Remote Play)",
+      "consolePowerOn": "Turn on",
+      "consolePowerOff": "Turn off",
+      "consolePowerOffConfirm": "Turn off {{name}}? This may interrupt gameplay on the console.",
+      "consolePowerRequested": "Xbox accepted the power request. Refresh to check the console state.",
+      "consolePowerFailed": "Console power request failed. Check remote management, connectivity and active streams.",
       "recoveryPending": "Attempting to restart the Remote Play session shortly. This may interrupt gameplay.",
       "failure_media": "No inbound audio or video progress for 15 seconds, despite a connected transport.",
       "failure_transport": "The WebRTC transport disconnected or failed.",
@@ -487,7 +508,7 @@
       "failure_stop": "The previous Xbox session could not be stopped. Retry to close it before starting another session.",
       "failure_heartbeat": "The Xbox session stopped responding to keepalive requests.",
       "failure_stats": "WebRTC statistics stopped updating for 15 seconds. The native media pipeline may be stalled.",
-      "autoRecoveryPreference": "Remember automatic recovery across V3 Remote Play sessions. Recovery is limited to two attempts and may interrupt gameplay.",
+      "autoRecoveryPreference": "Remember automatic recovery across Classic and V3 Remote Play sessions. Recovery is limited to two attempts and may interrupt gameplay.",
       "failure_server": "Xbox requested that the streaming session disconnect.",
       "streamShortcuts": "V3 streaming shortcuts",
       "streamShortcutsHint": "Choose F6–F10 or disable each action for either streaming engine. Assigning an existing key clears its previous shortcut. Shortcuts are ignored while editing text, using native pointer lock or when mapped to gamepad emulation.",
@@ -562,6 +583,8 @@
       "compare_averageBitrate": "Average bitrate",
       "compare_rtt95": "RTT p95",
       "compare_jitter95": "Jitter p95",
+      "classicFailure_provisioning": "The Xbox session could not be provisioned or stopped responding. Retry the connection.",
+      "classicFailure_unavailable": "The console is not registered with Xbox services. Check that it is online and Remote Play is enabled.",
       "classicRetryFailed": "The previous session could not be stopped. Retry or return to the dashboard.",
       "classicRetrying": "Stopping the previous session before reconnecting…"
     }

@@ -15,7 +15,7 @@ import Label from '../components/ui/label'
 import Loader from '../components/ui/loader'
 
 function Home({ account }: { account?: { gamertag?: string; level?: string | number } }) {
-    const consoles = useQuery('consoles', () => Ipc.send('consoles', 'get'), { staleTime: 60*1000 })
+    const consoles = useQuery('consoles', () => Ipc.send('consoles', 'get', {force:true}), { staleTime: 60*1000 })
     const { t } = useTranslation()
     const { favourites: gameFavourites } = useGameFavourites()
     const hasCloud = Number(account?.level) > 1
@@ -24,6 +24,18 @@ function Home({ account }: { account?: { gamertag?: string; level?: string | num
     const [lastConsole, setLastConsole] = React.useState<string | null>(null)
     const [search, setSearch] = React.useState('')
     const [onlyFavourites, setOnlyFavourites] = React.useState(false)
+    const [powerBusy,setPowerBusy]=React.useState(false)
+    const [powerMessage,setPowerMessage]=React.useState('')
+    const powerLock=React.useRef(false)
+    const canControlPower=typeof window!=='undefined'&&window.Greenlight?.isWebUI()===false
+    const changePower=async(item:{id:string;name:string},action:'on'|'off')=>{
+        if(powerLock.current||!canControlPower)return
+        if(action==='off'&&!window.confirm(t('dashboard.consolePowerOffConfirm',{name:item.name})))return
+        powerLock.current=true;setPowerBusy(true);setPowerMessage('')
+        try{await Ipc.send('consoles','power',{consoleId:item.id,action});setPowerMessage('consolePowerRequested');void consoles.refetch()}
+        catch{setPowerMessage('consolePowerFailed')}
+        finally{powerLock.current=false;setPowerBusy(false)}
+    }
     const storageKey = 'greenlight.dashboard.' + (account?.gamertag || 'local')
     React.useEffect(() => {
         try {
@@ -63,7 +75,8 @@ function Home({ account }: { account?: { gamertag?: string; level?: string | num
                     <button type='button' className={'btn ' + (onlyFavourites ? 'btn-primary' : '')} aria-pressed={onlyFavourites} onClick={() => setOnlyFavourites(!onlyFavourites)}><i className='fa-solid fa-star' aria-hidden='true' /> {t('dashboard.favourites')}</button>
                     <span className='gl-console-count'>{t('dashboard.consoleCount', { count: visible.length })}</span>
                 </div>
-                <div className='gl-console-grid' aria-busy={consoles.isFetching}>
+                {powerMessage&&<div className='gl-console-feedback' role='status'>{t('dashboard.'+powerMessage)} <button type='button' className='btn' onClick={()=>setPowerMessage('')}>{t('dashboard.dismiss')}</button></div>}
+                <div className='gl-console-grid' aria-busy={consoles.isFetching||powerBusy}>
                 { (consoles.isLoading === true) ? <Loader></Loader> :
                     consoles.isError && !Array.isArray(consoles.data) ? <div className='gl-console-feedback' role='alert'>{t('dashboard.consoleError')}</div> :
                     visible.length > 0 ? visible.map((item) => {
@@ -108,9 +121,10 @@ function Home({ account }: { account?: { gamertag?: string; level?: string | num
 
                                 <ConsoleProfileSettings id={String(item.id)} name={String(item.name || item.id)} />
                                 <div className='gl-console-actions'>
-                                    <Link href={ `/stream/${encodeURIComponent(item.id)}` } onClick={() => save(favourites, item.id)}>
+                                    {ready(item)&&<Link href={ `/stream/${encodeURIComponent(item.id)}` } onClick={event=>{if(powerBusy){event.preventDefault();return}save(favourites,item.id)}} aria-disabled={powerBusy}>
                                         <span className='btn btn-primary'>{t('page.myConsoles.startStreamBtn')}</span>
-                                    </Link>
+                                    </Link>}
+                                    {canControlPower&&item.remoteManagementEnabled===true&&<button type='button' className='btn' disabled={powerBusy||consoles.isFetching} onClick={()=>void changePower(item,item.powerState==='On'?'off':'on')}><i className='fa-solid fa-power-off' aria-hidden='true'/> {t(item.powerState==='On'?'dashboard.consolePowerOff':'dashboard.consolePowerOn')}</button>}
                                 </div>
                             </Card>
                         )

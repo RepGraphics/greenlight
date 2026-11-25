@@ -1,6 +1,8 @@
 import React from 'react'
 import { classicShortcutAction } from '../../lib/streamshortcuts'
 import { normalizeClassicVolume, observeClassicAudio } from '../../lib/classicaudio'
+import { classicVideoPresentation, validateVideoFilters, sharpeningKernel } from '../../lib/videofilters'
+import VideoFilterControls from './videofiltercontrols'
 import { recordingMimeType,startStreamRecording,downloadRecording } from '../../lib/streamrecording'
 import { startInstantReplay,replayDuration } from '../../lib/instantreplay'
 import { canCapture, captureScreenshotBlob, saveStreamScreenshot, toggleStreamPictureInPicture } from '../../lib/streamcapture'
@@ -39,7 +41,11 @@ function StreamComponent({
     xPlayer,
 }: StreamComponentProps) {
     const { t } = useTranslation()
-    const { settings } = useSettings()
+    const { settings,setSettings } = useSettings()
+    const [filters,setFilters]=React.useState(()=>validateVideoFilters(settings.v3_video_filters))
+    const [displayMode,setDisplayMode]=React.useState(settings.video_size)
+    const [showFilters,setShowFilters]=React.useState(false)
+    const presentation=classicVideoPresentation(filters,displayMode)
     const [captureReady,setCaptureReady]=React.useState(false)
     const [captureBusy,setCaptureBusy]=React.useState(false)
     const [captureMessage,setCaptureMessage]=React.useState('')
@@ -68,6 +74,13 @@ function StreamComponent({
     const mounted=React.useRef(false)
     const saving=React.useRef(false)
     const [recordingActive,setRecordingActive]=React.useState(false)
+    const [recordingElapsed,setRecordingElapsed]=React.useState(0)
+    React.useEffect(()=>{
+        if(!recordingActive)return
+        const update=()=>setRecordingElapsed(Math.max(0,Math.floor((Date.now()-(recording.current?.startedAt??Date.now()))/1000)))
+        update();const timer=setInterval(update,1000)
+        return()=>clearInterval(timer)
+    },[recordingActive])
     const [replayActive,setReplayActive]=React.useState(false)
     const [replayReady,setReplayReady]=React.useState(false)
     const [clip,setClip]=React.useState<Blob|null>(null)
@@ -82,7 +95,7 @@ function StreamComponent({
         if(recording.current){recording.current.stop();return}
         if(replay.current||saving.current||clip||!connected)return
         const video=currentClassicVideo();if(!settings.video_enabled||!canCapture(video)||!recordingMimeType())return
-        try{recording.current=startStreamRecording(video,(blob,error)=>{recording.current=null;if(!mounted.current)return;setRecordingActive(false);setClip(blob);setCaptureMessage(error?'recordingFailed':'recordingStopped')},currentClassicAudio());setRecordingActive(true)}catch{setCaptureMessage('recordingFailed')}
+        try{recording.current=startStreamRecording(video,(blob,error)=>{recording.current=null;if(!mounted.current)return;setRecordingActive(false);setClip(blob);setCaptureMessage(error?'recordingFailed':'recordingStopped')},currentClassicAudio(),{seconds:settings.recording_seconds,videoBitsPerSecond:settings.recording_bitrate});setRecordingElapsed(0);setRecordingActive(true)}catch{setCaptureMessage('recordingFailed')}
     }
     const toggleReplay=()=>{
         if(saving.current)return
@@ -485,11 +498,22 @@ function StreamComponent({
             <div>
                 {hud && <div className='gl-performance-hud' aria-label={t('dashboard.performanceHud')}><span>{metrics.width && metrics.height ? metrics.width + '×' + metrics.height : '—'}</span><span>{metrics.fps != null ? Math.round(metrics.fps) : '—'} FPS</span><span>{metrics.bitrate != null ? metrics.bitrate.toFixed(1) : '—'} Mbps</span><span>{metrics.jitter != null ? metrics.jitter.toFixed(1) : '—'} ms {t('dashboard.jitter')}</span><span>{metrics.loss ?? '—'} {t('dashboard.packetsLost')}</span></div>}
                 {captureMessage&&!clip&&<div className='gl-recording-result' role='status'>{t('dashboard.'+captureMessage)} <button type='button' className='btn' onClick={()=>setCaptureMessage('')}>{t('dashboard.dismiss')}</button></div>}
-                {recordingActive&&<div className='gl-recording-indicator' role='status'><span/>REC</div>}
+                {recordingActive&&<div className='gl-recording-indicator' role='status'><span/>REC {Math.floor(recordingElapsed/60)}:{String(recordingElapsed%60).padStart(2,'0')}</div>}
                 {replayActive&&<div className='gl-replay-indicator' role='status'>{t(replayReady?'dashboard.replayReady':'dashboard.replayBuffering',{seconds:replayDuration(settings.v3_replay_seconds)})}</div>}
                 {clip&&<div className='gl-recording-result'>{captureMessage&&<p role='status'>{t('dashboard.'+captureMessage)}</p>}<strong>{t('dashboard.clipReady')}</strong> · {(clip.size/1048576).toFixed(2)} MiB <button type='button' className='btn' disabled={clipBusy} onClick={()=>{downloadRecording(clip);setClip(null)}}>{t('dashboard.saveClip')}</button><button type='button' className='btn' disabled={clipBusy} onClick={()=>void saveClip()}>{t('dashboard.saveToLibrary')}</button><button type='button' className='btn' disabled={clipBusy} onClick={()=>setClip(null)}>{t('dashboard.discardClip')}</button></div>}
-                <div id="streamComponentHolder">
+                {filters.sharpening>0&&<svg width='0' height='0' aria-hidden='true' style={{position:'absolute',pointerEvents:'none'}}><defs><filter id='gl-stream-sharpen' colorInterpolationFilters='sRGB'><feConvolveMatrix order={3} kernelMatrix={sharpeningKernel(filters.sharpening)} divisor={1} edgeMode='duplicate' preserveAlpha={true}/></filter></defs></svg>}
+                <div id="streamComponentHolder" className={presentation.className} style={{'--gl-classic-video-filter':presentation.filter} as React.CSSProperties}>
                 </div>
+                {showFilters&&<div className='gl-live-video-panel' role='region' aria-label={t('dashboard.videoFilters')}>
+                    <h2>{t('dashboard.videoFilters')}</h2>
+                    <VideoFilterControls value={filters} onChange={setFilters}/>
+                    <label>{t('settings.videoAudio.aspectSizeLabel')} <select value={displayMode} onChange={event=>setDisplayMode(event.target.value)}>
+                        <option value='default'>{t('settings.videoAudio.aspectSizeValueDefault')}</option>
+                        <option value='stretch'>{t('settings.videoAudio.aspectSizeValueStretch')}</option>
+                        <option value='zoom'>{t('settings.videoAudio.aspectSizeValueZoom')}</option>
+                    </select></label>
+                    <div className='gl-console-toolbar'><button type='button' className='btn' onClick={()=>setSettings({...settings,v3_video_filters:filters,video_size:presentation.mode})}>{t('dashboard.saveVideoDefaults')}</button><button type='button' className='btn' onClick={()=>setShowFilters(false)}>{t('dashboard.dismiss')}</button></div>
+                </div>}
 
                 <div id="component_streamcomponent_loader">
                     <Card className='padbottom'>
@@ -545,6 +569,7 @@ function StreamComponent({
                             width: '25%',
                             textAlign: 'right',
                         }}>
+                            <button type='button' className='btn' aria-label={t('dashboard.videoFilters')} title={t('dashboard.videoFilters')} aria-pressed={showFilters} onClick={()=>setShowFilters(value=>!value)}><i className='fa-solid fa-sliders' aria-hidden='true'/></button>
                             <button type='button' className='btn' title={t('dashboard.refreshVideo')} onClick={refreshVideo}><i className='fa-solid fa-rotate' aria-hidden='true'/></button>{onExportDiagnostics&&<button type='button' className='btn' title={t('dashboard.exportDiagnostics')} aria-label={t('dashboard.exportDiagnostics')} onClick={onExportDiagnostics}><i className='fa-solid fa-file-arrow-down' aria-hidden='true'/></button>}<button type='button' className='btn' aria-label={t('dashboard.performanceHud')} aria-pressed={hud} onClick={() => setHud(value => !value)}><i className='fa-solid fa-chart-line' aria-hidden='true' /></button>
                             <button type='button' className='btn' disabled={!captureReady||captureBusy} title={t('dashboard.screenshot')} aria-label={t('dashboard.screenshot')} onClick={()=>void capture('download')}><i className='fa-solid fa-camera' aria-hidden='true'/></button>
                             <button type='button' className='btn' disabled={!captureReady||captureBusy} title={t('dashboard.saveToLibrary')} aria-label={t('dashboard.saveToLibrary')} onClick={()=>void capture('library')}><i className='fa-solid fa-floppy-disk' aria-hidden='true'/></button>
