@@ -1,6 +1,11 @@
 export type CaptureKind = 'screenshot'|'clip'
 export interface CaptureInfo { id:string; kind:CaptureKind; name:string; createdAt:number; size:number }
 interface Capture extends CaptureInfo { blob:Blob }
+export type CaptureSort='newest'|'oldest'|'largest'|'name'
+export function filterCaptures(entries:CaptureInfo[],kind:string,query:string,sort:CaptureSort){
+    const term=query.trim().toLowerCase()
+    return entries.filter(item=>(kind==='all'||item.kind===kind)&&(!term||item.name.toLowerCase().includes(term))).sort((a,b)=>sort==='oldest'?a.createdAt-b.createdAt:sort==='largest'?b.size-a.size:sort==='name'?a.name.localeCompare(b.name):b.createdAt-a.createdAt)
+}
 export const captureLimitBytes=512*1024*1024
 export const captureLimitCount=200
 export function canStoreCapture(size:number,count:number,total:number){

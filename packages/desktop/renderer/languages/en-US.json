@@ -528,7 +528,13 @@
       "classicFailure_keepalive": "Three consecutive session keepalive requests failed. Return to the dashboard and reconnect.",
       "streamKeepAwake": "Prevent local idle disconnects (keep awake)",
       "streamKeepAwakeHint": "Keep this computer and display awake during connected Remote Play sessions in the desktop app. Does not simulate controller input or override Xbox/game inactivity limits. Disabled by default.",
-      "captureRename": "Rename capture"
+      "captureRename": "Rename capture",
+      "captureSearch": "Search captures",
+      "captureSort": "Sort captures",
+      "captureSort_newest": "Newest first",
+      "captureSort_oldest": "Oldest first",
+      "captureSort_largest": "Largest first",
+      "captureSort_name": "Name"
     }
   }
 }

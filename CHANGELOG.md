@@ -6,6 +6,8 @@ Changes on `main-v2` are development changes, not a new numbered release. See [c
 
 ### Added
 
+- Capture-library filename search and sorting; mocked provisioning, retry and duplicate-stop tests.
+
 - Rename saved captures with portable filename validation; mocked session API and recording lifecycle tests.
 
 - Opt-in desktop Remote Play keep-awake leases for Classic and V3, without simulated controller input.

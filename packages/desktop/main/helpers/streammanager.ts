@@ -22,8 +22,11 @@ export default class StreamManager {
 
     _sessions:Record<string,streamSession> = Object.create(null)
     private monitorFailures = new Map<string, number>()
+    private monitorTimers = new Map<string, ReturnType<typeof setTimeout>>()
+    private monitorInFlight = new Set<string>()
+    private stopping = new Map<string, Promise<unknown>>()
     
-    constructor(application){
+    constructor(application, private schedule:typeof setTimeout=setTimeout, private cancel:typeof clearTimeout=clearTimeout){
         this._application = application
     }
 
@@ -57,6 +60,7 @@ export default class StreamManager {
                     type: type,
                     playerState: 'pending',
                 }
+                if(this.getSession(sessionId))throw new Error('Duplicate streaming session identifier')
                 this._sessions[sessionId] = streamSession
                 this.monitorSession(sessionId)
 
@@ -67,25 +71,23 @@ export default class StreamManager {
         })
     }
 
-    stopStream(sessionId){
-        return new Promise((resolve, reject) => {
-            const session = this.getSession(sessionId)
-            if(session === undefined){
-                resolve(true)
-                return
-            }
-
-            this.getApi(session.type).stopStream(sessionId).then((result) => {
-                console.log('Current sessions:', this._sessions)
-                delete this._sessions[sessionId]
-                this.monitorFailures.delete(sessionId)
-                console.log('new sessions:', this._sessions)
-
-                resolve(result)
-            }).catch((error) => {
-                reject(error)
-            })
+    stopStream(sessionId:string):Promise<unknown>{
+        const pending=this.stopping.get(sessionId)
+        if(pending)return pending
+        const session=this.getSession(sessionId)
+        if(!session)return Promise.resolve(true)
+        const timer=this.monitorTimers.get(sessionId)
+        if(timer!==undefined)this.cancel(timer)
+        this.monitorTimers.delete(sessionId)
+        const operation=Promise.resolve().then(()=>this.getApi(session.type).stopStream(sessionId)).then(result=>{
+            if(this.getSession(sessionId)===session){delete this._sessions[sessionId];this.monitorFailures.delete(sessionId)}
+            return result
+        }).finally(()=>{
+            this.stopping.delete(sessionId)
+            if(this.getSession(sessionId)===session)this.monitorSession(sessionId)
         })
+        this.stopping.set(sessionId,operation)
+        return operation
     }
 
     sendSdp(sessionId:string, sdp:any){
@@ -156,11 +158,17 @@ export default class StreamManager {
     }
 
     monitorSession(sessionId: string) {
-        setTimeout(async () => {
+        if(this.monitorTimers.has(sessionId)||this.monitorInFlight.has(sessionId)||this.stopping.has(sessionId))return
+        const initial=this.getSession(sessionId)
+        if(!initial||initial.playerState==='failed'||initial.playerState==='started')return
+        const timer=this.schedule(async () => {
+            this.monitorTimers.delete(sessionId)
+            if(this.stopping.has(sessionId))return
             const session = this.getSession(sessionId)
-            if (!session || session.playerState === 'failed' || session.playerState === 'started') return
+            if (!session || session!==initial || session.playerState === 'failed' || session.playerState === 'started') return
+            this.monitorInFlight.add(sessionId)
             const fail = (code: string, message: string) => {
-                if (this.getSession(sessionId) !== session) return
+                if (this.getSession(sessionId) !== session || this.stopping.has(sessionId)) return
                 session.errorDetails = { code, message }
                 session.playerState = 'failed'
                 this.monitorFailures.delete(sessionId)
@@ -168,7 +176,7 @@ export default class StreamManager {
             try {
                 const api = this.getApi(session.type)
                 const result: any = await api.getStreamState(sessionId)
-                if (this.getSession(sessionId) !== session) return
+                if (this.getSession(sessionId) !== session || this.stopping.has(sessionId)) return
                 session.state = result.state
                 if (result.state === 'Provisioned') {
                     session.playerState = 'started'
@@ -181,14 +189,14 @@ export default class StreamManager {
                 }
                 if (result.state === 'ReadyToConnect') {
                     const token = await this._application._authentication._msal.getMsalToken()
-                    if (this.getSession(sessionId) !== session) return
+                    if (this.getSession(sessionId) !== session || this.stopping.has(sessionId)) return
                     await api.sendMSALAuth(sessionId, token.data.lpt)
                 } else if (result.state === 'WaitingForResources') {
                     session.playerState = 'queued'
                     if (!session.waitingTimes) {
                         try {
                             const waitingTimes = await api.getWaitingTimes(session.target)
-                            if (this.getSession(sessionId) !== session) return
+                            if (this.getSession(sessionId) !== session || this.stopping.has(sessionId)) return
                             session.waitingTimes = waitingTimes
                         } catch {
                             // Queue estimates are optional; continue monitoring the stream.
@@ -197,16 +205,19 @@ export default class StreamManager {
                 }
                 this.monitorFailures.delete(sessionId)
             } catch (error) {
-                if (this.getSession(sessionId) !== session) return
+                if (this.getSession(sessionId) !== session || this.stopping.has(sessionId)) return
                 const failures = (this.monitorFailures.get(sessionId) || 0) + 1
                 this.monitorFailures.set(sessionId, failures)
                 if (error?.status === 404 || failures >= 5) {
                     fail('StreamStateUnavailable', 'Unable to retrieve the streaming session. Please reconnect.')
                     return
                 }
+            } finally {
+                this.monitorInFlight.delete(sessionId)
+                if (this.getSession(sessionId) === session) this.monitorSession(sessionId)
             }
-            if (this.getSession(sessionId) === session) this.monitorSession(sessionId)
         }, 1000)
+        this.monitorTimers.set(sessionId,timer)
     }
 
     getActiveSessions(){

@@ -2,14 +2,16 @@ import React from 'react'
 import Head from 'next/head'
 import Card from '../../components/ui/card'
 import SettingsSidebar from '../../components/settings/sidebar'
-import { listCaptures,getCapture,deleteCapture,renameCapture,downloadCapture,captureLimitBytes,captureLimitCount } from '../../lib/capturelibrary'
-import type { CaptureInfo } from '../../lib/capturelibrary'
+import { listCaptures,getCapture,deleteCapture,renameCapture,downloadCapture,captureLimitBytes,captureLimitCount,filterCaptures } from '../../lib/capturelibrary'
+import type { CaptureInfo,CaptureSort } from '../../lib/capturelibrary'
 import { useTranslation } from 'react-i18next'
 
 export default function Captures(){
     const {t}=useTranslation()
     const [entries,setEntries]=React.useState<CaptureInfo[]>([])
     const [filter,setFilter]=React.useState('all')
+    const [query,setQuery]=React.useState('')
+    const [sort,setSort]=React.useState<CaptureSort>('newest')
     const [busy,setBusy]=React.useState(true)
     const [error,setError]=React.useState(false)
     const [preview,setPreview]=React.useState<{url:string;kind:CaptureInfo['kind'];name:string}|null>(null)
@@ -31,8 +33,8 @@ export default function Captures(){
         }catch{if(mounted.current)setError(true)}finally{if(mounted.current)setBusy(false)}
     }
     const total=entries.reduce((sum,item)=>sum+item.size,0)
-    const visible=entries.filter(item=>filter==='all'||item.kind===filter)
-    return <><Head><title>Greenlight - {t('dashboard.captureLibrary')}</title></Head><SettingsSidebar><Card><h1>{t('dashboard.captureLibrary')}</h1><p>{t('dashboard.captureLibraryDescription')}</p><p>{entries.length} / {captureLimitCount} · {(total/1048576).toFixed(1)} / {captureLimitBytes/1048576} MiB</p><progress value={total} max={captureLimitBytes}/><p><label htmlFor='capture-filter'>{t('dashboard.historyFilter')}</label><select id='capture-filter' value={filter} onChange={e=>setFilter(e.target.value)}><option value='all'>{t('dashboard.historyAll')}</option><option value='screenshot'>{t('dashboard.screenshot')}</option><option value='clip'>{t('dashboard.clipReady')}</option></select></p>{error&&<p role='alert'>{t('dashboard.captureLibraryFailed')}</p>}<button type='button' className='btn' disabled={busy} onClick={()=>{setBusy(true);void refresh()}}>{t('dashboard.retryStream')}</button></Card>
+    const visible=filterCaptures(entries,filter,query,sort)
+    return <><Head><title>Greenlight - {t('dashboard.captureLibrary')}</title></Head><SettingsSidebar><Card><h1>{t('dashboard.captureLibrary')}</h1><p>{t('dashboard.captureLibraryDescription')}</p><p>{entries.length} / {captureLimitCount} · {(total/1048576).toFixed(1)} / {captureLimitBytes/1048576} MiB</p><progress value={total} max={captureLimitBytes}/><p><label htmlFor='capture-filter'>{t('dashboard.historyFilter')}</label><select id='capture-filter' value={filter} onChange={e=>setFilter(e.target.value)}><option value='all'>{t('dashboard.historyAll')}</option><option value='screenshot'>{t('dashboard.screenshot')}</option><option value='clip'>{t('dashboard.clipReady')}</option></select></p><p><label htmlFor='capture-search'>{t('dashboard.captureSearch')}</label><input id='capture-search' className='text' value={query} onChange={e=>setQuery(e.target.value)} maxLength={80}/></p><p><label htmlFor='capture-sort'>{t('dashboard.captureSort')}</label><select id='capture-sort' value={sort} onChange={e=>setSort(e.target.value as CaptureSort)}>{(['newest','oldest','largest','name'] as CaptureSort[]).map(value=><option key={value} value={value}>{t('dashboard.captureSort_'+value)}</option>)}</select></p>{error&&<p role='alert'>{t('dashboard.captureLibraryFailed')}</p>}<button type='button' className='btn' disabled={busy} onClick={()=>{setBusy(true);void refresh()}}>{t('dashboard.retryStream')}</button></Card>
     {preview&&<Card><h2>{preview.name}</h2>{preview.kind==='screenshot'?<img src={preview.url} alt={preview.name} className='gl-capture-preview'/>:<video src={preview.url} controls playsInline className='gl-capture-preview'/>}<button className='btn' onClick={closePreview}>{t('dashboard.dismiss')}</button></Card>}
     <Card>{!visible.length?<p>{t('dashboard.captureLibraryEmpty')}</p>:<div className='gl-capture-list'>{visible.map(item=><div key={item.id} className='gl-capture-item'><div><strong>{item.kind==='screenshot'?t('dashboard.screenshot'):t('dashboard.clipReady')}</strong><p>{item.name}</p><p>{new Date(item.createdAt).toLocaleString()} · {(item.size/1048576).toFixed(2)} MiB</p></div><div className='gl-console-toolbar'><button className='btn' disabled={busy} onClick={()=>void act(item,'preview')}>{t('dashboard.capturePreview')}</button><button className='btn' disabled={busy} onClick={()=>void act(item,'download')}>{t('dashboard.captureDownload')}</button><button className='btn' disabled={busy} onClick={()=>void act(item,'rename')}>{t('dashboard.captureRename')}</button><button className='btn btn-cancel' disabled={busy} onClick={()=>void act(item,'delete')}>{t('dashboard.captureDelete')}</button></div></div>)}</div>}</Card></SettingsSidebar></>
 }
