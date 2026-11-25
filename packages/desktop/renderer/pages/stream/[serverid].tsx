@@ -1,4 +1,5 @@
 import React from 'react'
+import { startHeartbeat } from '../../lib/keepalive'
 import { useStreamAwake } from '../../lib/useStreamAwake'
 import { configureClassicConsoleController } from '../../lib/classicconsolecontroller'
 import { readConsoleProfiles } from '../../lib/consoleprofiles'
@@ -25,7 +26,7 @@ function LegacyStream() {
     const [consoleController] = React.useState(()=>!target.startsWith('xcloud_') && Boolean(globalSettings.v3_console_controller))
 
     const streamStateInterval = React.useRef<ReturnType<typeof setInterval> | undefined>(undefined)
-    const keepaliveInterval = React.useRef<ReturnType<typeof setInterval> | undefined>(undefined)
+    const stopHeartbeat = React.useRef<(()=>void)|undefined>(undefined)
 
     const [xPlayer, setxPlayer] = React.useState(undefined)
     const [sessionId, setSessionId] = React.useState('')
@@ -47,14 +48,6 @@ function LegacyStream() {
         if (!router.isReady || typeof router.query.serverid !== 'string') return
         let cancelled = false
         let polling = false
-        let heartbeatBusy=false
-        let heartbeatFailures=0
-        let heartbeatStarted=false
-        const heartbeat=async()=>{
-            if(cancelled||heartbeatBusy||intentionalExit.current)return
-            heartbeatBusy=true
-            try{await Ipc.send('streaming','sendKeepalive',{sessionId});heartbeatFailures=0}catch(error){if(!cancelled){heartbeatFailures++;console.warn('Classic keepalive failed',heartbeatFailures,error);if(heartbeatFailures>=3)setConnectionError('keepalive')}}finally{heartbeatBusy=false;if(!cancelled&&!intentionalExit.current)keepaliveInterval.current=setTimeout(heartbeat,heartbeatFailures?5000:20000)}
-        }
         // Detect stream type and title / server id
         let streamType = 'home'
         let serverId = router.query.serverid
@@ -157,7 +150,7 @@ function LegacyStream() {
                             xPlayer._videoComponent._videoRender.style.opacity = 0
                         }
 
-                        if(!heartbeatStarted){heartbeatStarted=true;void heartbeat()}
+                        if(!stopHeartbeat.current)stopHeartbeat.current=startHeartbeat({send:()=>Ipc.send('streaming','sendKeepalive',{sessionId}),onSuccess:()=>{if(!cancelled)setConnectionError(value=>value==='keepalive'?'':value)},onFailure:(count,error)=>{if(!cancelled){console.warn('Classic keepalive failed',count,error);if(count>=3)setConnectionError('keepalive')}}})
 
                     } else if(event.state === 'new'){
                         connStatus.innerText = t('streamWindow.startingConnection')
@@ -167,6 +160,7 @@ function LegacyStream() {
 
                     } else if(event.state === 'closed') {
                         setConnected(false)
+                        stopHeartbeat.current?.();stopHeartbeat.current=undefined
                         // Client has been disconnected. Lets return to home.
                         // xPlayer.close()
                         console.log('Client has been disconnected. Returning to prev page.')
@@ -264,9 +258,7 @@ function LegacyStream() {
                 xPlayer.close()
             }
 
-            if(keepaliveInterval.current){
-                clearInterval(keepaliveInterval.current)
-            }
+            stopHeartbeat.current?.();stopHeartbeat.current=undefined
 
             if(streamStateInterval.current){
                 clearInterval(streamStateInterval.current)
@@ -281,6 +273,7 @@ function LegacyStream() {
 
     function onDisconnect(){
         intentionalExit.current=true
+        stopHeartbeat.current?.();stopHeartbeat.current=undefined
         if (!sessionId) { void router.replace('/home'); return }
         activeSession.current = ''
         Ipc.send('streaming', 'stopStream', {

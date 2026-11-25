@@ -1,0 +1,40 @@
+name: Client regression tests
+on:
+  push:
+    branches: [main-v2]
+    paths: ['packages/desktop/**','packages/player/**','package.json','yarn.lock','.github/workflows/client-tests.yml']
+  pull_request:
+    branches: [main-v2]
+    paths: ['packages/desktop/**','packages/player/**','package.json','yarn.lock','.github/workflows/client-tests.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: client-tests-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm install --global yarn@1.22.22
+      - run: yarn install --frozen-lockfile --ignore-scripts
+      - name: Unit and integration tests with coverage
+        shell: bash
+        run: |
+          set -o pipefail
+          yarn desktop test:coverage 2>&1 | tee client-coverage.txt
+      - name: Upload test and coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: client-regression-report
+          path: client-coverage.txt
+          if-no-files-found: warn
