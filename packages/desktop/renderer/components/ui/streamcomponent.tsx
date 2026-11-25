@@ -1,5 +1,6 @@
 import React from 'react'
 import { classicShortcutAction } from '../../lib/streamshortcuts'
+import { normalizeClassicVolume, observeClassicAudio } from '../../lib/classicaudio'
 import { recordingMimeType,startStreamRecording,downloadRecording } from '../../lib/streamrecording'
 import { startInstantReplay,replayDuration } from '../../lib/instantreplay'
 import { canCapture, captureScreenshotBlob, saveStreamScreenshot, toggleStreamPictureInPicture } from '../../lib/streamcapture'
@@ -164,19 +165,13 @@ function StreamComponent({
 
 
     //Client-side volume control
-    const [volume, setVolume] = React.useState(1.0) //without any controls, the volume has been maxed by default, let's follow this assumption and start at full for our slider
-    const handleVolumeChange = (newVolume: number) => {
-
-        const audioElement = currentClassicAudio()
-
-        if(audioElement) {
-            setVolume(newVolume)
-            audioElement.volume = newVolume
-        } else {
-            console.error('VolumeSlider: handleChange: failed to find current or lost previous audioelement. Current element:', audioElement)
-        }
-
-    }
+    const [volume, setVolume] = React.useState(1.0)
+    const handleVolumeChange = (newVolume: number) => setVolume(previous=>normalizeClassicVolume(newVolume,previous))
+    React.useEffect(()=>{
+        const holder=document.getElementById('streamComponentHolder')
+        if(!holder)return
+        return observeClassicAudio(holder,volume,muted)
+    },[xPlayer,connected,volume,muted])
     const volumeIcon = ( //from https://www.svgrepo.com/svg/502904/volume-low and optimized w/ https://jakearchibald.github.io/svgomg/
         <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 14v-4a1 1 0 0 1 1-1h2.65a1 1 0 0 0 .624-.22l3.101-2.48A1 1 0 0 1 16 7.08v9.84a1 1 0 0 1-1.625.78l-3.101-2.48a1 1 0 0 0-.625-.22H8a1 1 0 0 1-1-1Z" /></svg>
     )
@@ -394,7 +389,7 @@ function StreamComponent({
 
 
 
-    const toggleMute=()=>{const audio=currentClassicAudio();if(!audio)return;audio.muted=!audio.muted;setMuted(audio.muted)}
+    const toggleMute=()=>setMuted(value=>!value)
     const shortcutHandler=React.useRef<(event:KeyboardEvent)=>void>(()=>{})
     shortcutHandler.current=(event)=>{
         const element=event.target instanceof Element?event.target:null
