@@ -360,6 +360,7 @@
       "muteAudio": "Mute audio",
       "volume": "Volume",
       "touchControls": "Touch controls",
+      "guideUnavailable": "Connect a client controller or enable keyboard or touch controls to open the Xbox guide.",
       "microphoneFailed": "Microphone could not be enabled. Check permissions or use the classic player.",
       "v3Renderer": "V3 video renderer",
       "standardVideo": "Standard video (recommended)",
