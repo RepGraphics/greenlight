@@ -1,5 +1,18 @@
 {
   "translation": {
+    "renderingDiagnostics": {
+      "title": "Rendering capability diagnostics",
+      "notice": "These are browser and display hints only. They do not establish that Xbox is sending HDR, that the decoder supports its HDR profile, or that the renderer preserves HDR.",
+      "displayHdr": "Display HDR hint",
+      "videoHdr": "Video HDR hint",
+      "wideGamut": "Display P3 or wider hint",
+      "webGpu": "WebGPU API exposed",
+      "codecs": "Advertised WebRTC receive codecs",
+      "reported": "Reported",
+      "notReported": "Not reported",
+      "unknown": "Unknown",
+      "refresh": "Refresh capabilities"
+    },
     "languageName": "English",
     "authorOfLocalization": "English Localization by unknownskl",
     "header": {
