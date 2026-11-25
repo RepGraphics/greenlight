@@ -5,6 +5,7 @@ import Head from 'next/head'
 import Ipc from '../lib/ipc'
 import { useRouter } from 'next/router'
 import HandheldLayout from '../components/ui/handheldlayout'
+import Appearance from '../components/ui/appearance'
 import DashboardInput from '../components/ui/dashboardinput'
 import Notifications from '../components/ui/notifications'
 import Header from '../components/header'
@@ -128,16 +129,10 @@ export default function MyApp({ Component, pageProps }) {
                 <title>Greenlight</title>
             </Head>
 
-            <div style={ {
-                background: 'radial-gradient(ellipse at top left, #17351b 0%, #171917 32%, #121212 72%)',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat',
-                backgroundSize: 'cover',
-                width: '100vw',
-                height: '100vh',
-            }}>
+            <div className='gl-app-shell'>
                 <QueryClientProvider client={queryClient}>
                     <UserProvider>
+                        <Appearance />
                         <LanguageProvider>
                             <GameFavouritesProvider key={prevUserState.gamertag} account={prevUserState.gamertag || 'local'}>
                                 <HandheldLayout streaming={router.pathname.startsWith('/stream/')}>{appBody}</HandheldLayout>

@@ -12,6 +12,7 @@ import {recommendLowerBitrate} from '../../lib/bitrateadvisor'
 import {ClassicMetricsSampler} from '../../lib/classicmetrics'
 import NetworkGraphs from './networkgraphs'
 import { appendGraphSample } from '../../lib/networkgraph'
+import { ClassicMicrophone, negotiateClassicChat } from '../../lib/classicmicrophone'
 import type {DiagnosticSample} from '../../lib/streamdiagnostics'
 import { useSettings } from '../../context/userContext'
 import Button from './button'
@@ -25,6 +26,7 @@ import { useTranslation } from 'react-i18next'
 
 interface StreamComponentProps {
     connected?:boolean;
+    sessionId?:string;
     activeCap?:number;
     onRestartQuality?:(cap:number)=>void;
     onCapturePending?:(pending:boolean)=>void;
@@ -38,6 +40,7 @@ interface StreamComponentProps {
 
 function StreamComponent({
     connected=false,
+    sessionId='',
     activeCap=0,
     onRestartQuality,
     onCapturePending,
@@ -186,7 +189,18 @@ function StreamComponent({
     let debugElement = document.getElementById('component_streamcomponent_debug')
     let webRtcStatsInterval
 
-    const [micStatus, setMicStatus] = React.useState(false)
+    const [micStatus,setMicStatus]=React.useState(false)
+    const [micBusy,setMicBusy]=React.useState(false)
+    const [micError,setMicError]=React.useState(false)
+    const microphone=React.useRef<ClassicMicrophone|null>(null)
+    React.useEffect(()=>{
+        setMicStatus(false);setMicBusy(false);setMicError(false)
+        if(!connected||!sessionId||!xPlayer._webrtcClient)return
+        const peer=xPlayer._webrtcClient
+        const controller=new ClassicMicrophone(peer,()=>navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,channelCount:1}}),signal=>negotiateClassicChat(peer,activeCap,async sdp=>{const answer=await Ipc.send('streaming','sendChatSdp',{sessionId,sdp});return answer?.sdp},signal),()=>{if(microphone.current===controller){setMicStatus(false);setMicError(true)}})
+        microphone.current=controller
+        return()=>{microphone.current=null;controller.dispose()}
+    },[connected,sessionId,xPlayer,activeCap])
     const [waitingSeconds, setWaitingSeconds] = React.useState(0)
 
 
@@ -435,18 +449,20 @@ function StreamComponent({
     }
     React.useEffect(()=>{const handler=(event:KeyboardEvent)=>shortcutHandler.current(event);window.addEventListener('keydown',handler,true);return()=>window.removeEventListener('keydown',handler,true)},[])
 
-    function toggleMic() {
-        if (xPlayer.getChannelProcessor('chat').isPaused === true) {
-            xPlayer.getChannelProcessor('chat').startMic()
-            setMicStatus(true)
-        } else {
-            xPlayer.getChannelProcessor('chat').stopMic()
-            setMicStatus(false)
-        }
+    async function toggleMic(){
+        const controller=microphone.current
+        if(!connected||!controller||controller.busy)return
+        setMicBusy(true);setMicError(false)
+        try{
+            if(controller.active){await controller.disable();if(microphone.current===controller)setMicStatus(false)}
+            else{const enabled=await controller.enable();if(microphone.current===controller)setMicStatus(enabled)}
+        }catch{if(microphone.current===controller){setMicStatus(false);setMicError(true)}}
+        finally{if(microphone.current===controller)setMicBusy(false)}
     }
 
     function streamDisconnect() {
         if(!canLeave())return
+        microphone.current?.dispose()
         onLeave?.()
         document.getElementById('streamComponentHolder').innerHTML = ''
 
@@ -457,6 +473,7 @@ function StreamComponent({
         if(!canLeave())return
         if (confirm(t("streamWindow.endStreamConfirmMessage"))) {
             document.getElementById('streamComponentHolder').innerHTML = ''
+            microphone.current?.dispose()
             onDisconnect()
             xPlayer.close()
         }
@@ -514,6 +531,7 @@ function StreamComponent({
                 {showGraphs&&<NetworkGraphs samples={qualitySamples} onClose={()=>setShowGraphs(false)}/>}
                 {showQuality&&<div className='gl-performance-hud gl-quality-advice' style={{top:'auto',bottom:100}}><span>{t('dashboard.connectionQuality')}: {t('dashboard.quality_'+quality.quality)}</span><span>RTT p95: {quality.rtt95??'—'} ms</span><span>Jitter p95: {quality.jitter95??'—'} ms</span><span>{t('dashboard.averageBitrate')}: {quality.averageBitrate??'—'} Mbps</span><span>{t('dashboard.currentBitrateCap')}: {activeCap?Math.round(activeCap/1000)+' Mbps':t('settings.streaming.unlimitedLabel')}</span><span>{t('dashboard.qualityHint_'+quality.quality)}</span>{suggestedCap!==null&&onRestartQuality&&<button type='button' className='btn' disabled={protectedCapture} style={{pointerEvents:'auto'}} onClick={()=>setQualityCap(suggestedCap)}>{t('dashboard.lowerBitrateSuggestion',{bitrate:Math.round(suggestedCap/1000)})}</button>}</div>}
                 {qualityCap!==null&&<div className='gl-live-video-panel' role='dialog' aria-label={t('dashboard.restartQuality')}><h2>{t('dashboard.restartQuality')}</h2><p>{t('dashboard.restartQualityWarning',{bitrate:Math.round(qualityCap/1000)})}</p><button type='button' className='btn btn-primary' disabled={protectedCapture||!connected} onClick={()=>{const cap=qualityCap;setQualityCap(null);onRestartQuality?.(cap)}}>{t('dashboard.retryStream')}</button> <button type='button' className='btn' onClick={()=>setQualityCap(null)}>{t('dashboard.cancelBackup')}</button></div>}
+                {micError&&<div className='gl-mic-error' role='alert'>{t('dashboard.microphoneFailed')} <button type='button' className='btn' onClick={()=>setMicError(false)}>{t('dashboard.dismiss')}</button></div>}
                 {captureMessage&&!clip&&<div className='gl-recording-result' role='status'>{t('dashboard.'+captureMessage)} <button type='button' className='btn' onClick={()=>setCaptureMessage('')}>{t('dashboard.dismiss')}</button></div>}
                 {recordingActive&&<div className='gl-recording-indicator' role='status'><span/>REC {Math.floor(recordingElapsed/60)}:{String(recordingElapsed%60).padStart(2,'0')}</div>}
                 {replayActive&&<div className='gl-replay-indicator' role='status'>{t(replayReady?'dashboard.replayReady':'dashboard.replayBuffering',{seconds:replayDuration(settings.v3_replay_seconds)})}</div>}
@@ -565,8 +583,8 @@ function StreamComponent({
                             <Button disabled={!onMenu} label={<span><i className="fa-brands fa-xbox"></i> {t("streamWindow.menuBtn")}</span>} title={t("streamWindow.menuTitle")} onClick={(e) => {
                                 e.target.blur(); onMenu?.()
                             }}></Button> &nbsp;
-                            <Button label={(micStatus === false) ? <span><i className="fa-solid fa-microphone-slash"></i> {t("streamWindow.micMuted")}</span> : <span><i className="fa-solid fa-microphone"></i> {t("streamWindow.micActive")}</span>} title={(micStatus === false) ? t("streamWindow.enableMic") : t("streamWindow.disableMic")} className={(micStatus === false) ? 'btn-cancel' : 'btn-primary'} onClick={(e) => {
-                                e.target.blur(); toggleMic()
+                            <Button disabled={!connected||micBusy} label={(micStatus === false) ? <span><i className="fa-solid fa-microphone-slash"></i> {t("streamWindow.micMuted")}</span> : <span><i className="fa-solid fa-microphone"></i> {t("streamWindow.micActive")}</span>} title={(micStatus === false) ? t("streamWindow.enableMic") : t("streamWindow.disableMic")} className={(micStatus === false) ? 'btn-cancel' : 'btn-primary'} onClick={(e) => {
+                                e.target.blur(); void toggleMic()
                             }}></Button>
                         </div>
 

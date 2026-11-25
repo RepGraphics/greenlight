@@ -44,3 +44,36 @@ test('Classic polling retains disconnect neutral state under backpressure',()=>{
     f.tick();assert.equal(f.sent.at(-1)?.[0].A,1)
     f.channel._state='closed';f.tick();assert.equal(f.timers.size,0)
 })
+
+test('a stale callback cannot send frames or orphan the timer of a restarted Classic driver',()=>{
+    const f=fixture()
+    f.driver.run()
+    const stale=[...f.timers.values()][0]
+    f.driver.stop()
+    f.setFrames([{GamepadIndex:2,A:0}])
+    f.driver.run()
+    const active=[...f.timers.keys()][0]
+    const sent=f.sent.length
+    stale()
+    assert.equal(f.sent.length,sent)
+    assert.deepEqual([...f.timers.keys()],[active])
+    f.tick()
+    assert.equal(f.sent.length,sent+1)
+    assert.equal(f.timers.size,1)
+    f.driver.stop()
+    assert.equal(f.timers.size,0)
+})
+test('a stopped channel cannot revive an old polling generation after reopening',()=>{
+    const f=fixture()
+    f.driver.run()
+    const stale=[...f.timers.values()][0]
+    f.channel._state='closed';f.tick()
+    assert.equal(f.timers.size,0)
+    f.channel._state='connected';f.driver.run()
+    const sent=f.sent.length
+    stale()
+    assert.equal(f.sent.length,sent)
+    assert.equal(f.timers.size,1)
+    f.driver.stop()
+    assert.equal(f.timers.size,0)
+})

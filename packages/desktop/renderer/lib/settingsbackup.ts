@@ -1,6 +1,7 @@
 import { validateShortcuts } from './streamshortcuts'
 import { recordingDurations,recordingBitrates } from './streamrecording'
 import { validateVideoFilters } from './videofilters'
+import { appearanceThemes,appearanceAccents } from './appearance'
 import type { defaultSettings } from '../context/userContext.defaults'
 import { readProfiles, snapshotProfile } from './controllerprofiles'
 import { readGameProfiles } from './gameprofiles'
@@ -20,6 +21,10 @@ export function portableSettings(value: unknown): Partial<Settings> {
     }
     number('xhome_bitrate',0,40960); number('xcloud_bitrate',0,40960); number('v3_deadzone',0,0.5); number('v3_mouse_sensitivity',0.25,4)
     for (const key of ['xhome_resolution','xcloud_resolution'] as const) if (raw[key] === 720 || raw[key] === 1080) result[key] = raw[key]
+    const theme=appearanceThemes.find(value=>value===raw.appearance_theme)
+    const accent=appearanceAccents.find(value=>value===raw.appearance_accent)
+    if(theme)result.appearance_theme=theme
+    if(accent)result.appearance_accent=accent
     if (raw.streaming_engine === 'legacy' || raw.streaming_engine === 'experimental') result.streaming_engine = raw.streaming_engine
     if (raw.v3_video_filters && typeof raw.v3_video_filters === 'object') result.v3_video_filters = validateVideoFilters(raw.v3_video_filters)
     if (raw.v3_renderer === 'video' || raw.v3_renderer === 'webgpu') result.v3_renderer = raw.v3_renderer

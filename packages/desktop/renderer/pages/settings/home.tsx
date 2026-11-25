@@ -1,5 +1,6 @@
 import React from 'react'
 import SettingsBackup from '../../components/settings/settingsbackup'
+import AppearanceSettings from '../../components/settings/appearancesettings'
 import UpdateChecker from '../../components/settings/updatechecker'
 import { useTranslation } from 'react-i18next'
 import LanguageSelector from '../../components/settings/LanguageSelector'
@@ -74,6 +75,7 @@ function SettingsHome() {
                 </Card>
 
                 <LanguageSelector />
+                <AppearanceSettings />
                 <SettingsBackup />
                 <UpdateChecker />
 
