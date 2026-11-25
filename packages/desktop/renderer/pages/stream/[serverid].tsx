@@ -4,6 +4,7 @@ import { recoveryBitrate } from '../../lib/bitrateadvisor'
 import {downloadDiagnostics} from '../../lib/streamdiagnostics'
 import type { DiagnosticSample } from '../../lib/streamdiagnostics'
 import { ManualReconnect, ClassicRecoveryBudget } from '../../lib/sessionrecovery'
+import { ClassicSessionExit } from '../../lib/classicsessionexit'
 import { startHeartbeat } from '../../lib/keepalive'
 import { watchClassicConnection } from '../../lib/classicconnection'
 import { ClassicStatsWatchdog } from '../../lib/classicstatswatchdog'
@@ -52,6 +53,9 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
     const cancelAutomaticRecovery=()=>{cancelRecovery.current=true;setRecoveryCancelled(true)}
     const [queueTime, setQueueTime] = React.useState(0)
     const activeSession = React.useRef('')
+    const sessionExit=React.useRef(new ClassicSessionExit())
+    const mounted=React.useRef(true)
+    const [exiting,setExiting]=React.useState(false)
     const startupFailed=React.useRef(false)
     const statsWatchdog=React.useRef(new ClassicStatsWatchdog())
     const failStats=React.useRef<(()=>void)|undefined>(undefined)
@@ -71,12 +75,12 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
     useStreamAwake(sessionId,connected&&!connectionError&&!target.startsWith('xcloud_')&&Boolean(settings.stream_keep_awake))
     useDiscordPresence(sessionId,connected&&!connectionError&&settings.discord_presence_enabled===true,settings.discord_application_id)
     React.useEffect(() => {
+        mounted.current=true
         return () => {
+            mounted.current=false
             reconnect.current.dispose()
             recordHistory('interrupted')
-            const id = activeSession.current
-            activeSession.current = ''
-            if (id) void Ipc.send('streaming', 'stopStream', { sessionId: id }).catch(() => {})
+            void sessionExit.current.stop(activeSession,id=>Ipc.send('streaming','stopStream',{sessionId:id}))
         }
     }, [])
 
@@ -188,7 +192,7 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
 
             xPlayer.getEventBus().on('connectionstate', (event) => {
                 if(cancelled||reconnect.current.busy)return
-                if(intentionalExit.current){if(event.state==='closed')void router.replace('/home');return}
+                if(intentionalExit.current)return
                 watcher.update(event.state)
                 if(watcher.failed)return
                 console.log('connectionstate changed:', event)
@@ -356,21 +360,23 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
     }
 
     function onDisconnect(){
+        if(sessionExit.current.busy)return
         cancelAutomaticRecovery()
-        recordHistory('ended')
         intentionalExit.current=true
+        reconnect.current.dispose()
+        recordHistory('ended')
+        setConnected(false)
+        setExiting(true)
+        setConnectionError('')
         stopHeartbeat.current?.();stopHeartbeat.current=undefined
-        if (!sessionId) { void router.replace('/home'); return }
-        activeSession.current = ''
-        Ipc.send('streaming', 'stopStream', {
-            sessionId: sessionId,
-        }).then((result) => {
-            console.log('Stream stopped:', result)
-        }).catch(() => console.warn('Unable to stop remote session'))
-
-        if(streamStateInterval.current){
-            clearInterval(streamStateInterval.current)
-        }
+        if(streamStateInterval.current)clearInterval(streamStateInterval.current)
+        // Retain remote ownership until termination is acknowledged.
+        void sessionExit.current.stop(activeSession,id=>Ipc.send('streaming','stopStream',{sessionId:id})).then(stopped=>{
+            if(!mounted.current)return
+            if(stopped){void router.replace('/home');return}
+            setExiting(false)
+            setConnectionError('stop')
+        })
     }
 
     return (
@@ -379,8 +385,9 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
                 <title>Greenlight - {t('streamWindow.pageTitle')} {router.query.serverid}</title>
             </Head>
 
-            {connectionError && <div className='gl-experimental-error gl-classic-error' role='alert'><p>{t('dashboard.classicConnectionLost')}</p><p>{t('dashboard.classicFailure_'+connectionError)}</p>{retryError&&<p role='alert'>{t('dashboard.classicRetryFailed')}</p>}{retrying&&<p role='status'>{t('dashboard.classicRetrying')}</p>}{autoDelay!==null&&<p role='status'>{t('dashboard.recoveryPending')} <button type='button' className='btn' onClick={cancelAutomaticRecovery}>{t('dashboard.cancelBackup')}</button></p>}<button type='button' className='btn btn-primary' disabled={retrying||capturePending} onClick={()=>retryClassic()}>{t('dashboard.retryStream')}</button> <button type='button' className='btn' onClick={exportClassicDiagnostics}>{t('dashboard.exportDiagnostics')}</button> <button className='btn' disabled={retrying||capturePending} onClick={()=>{onDisconnect();void router.replace('/home')}}>{t('dashboard.backHint')}</button></div>}
-            { (xPlayer !== undefined) ? <StreamComponent connected={connected&&!connectionError} sessionId={sessionId} activeCap={activeCap} onRestartQuality={cap=>retryClassic(false,cap)} onCapturePending={setCapturePending} onMetrics={recordClassicSample} onExportDiagnostics={exportClassicDiagnostics} onLeave={()=>{recordHistory('ended');intentionalExit.current=true;activeSession.current='';void router.replace('/home')}} onDisconnect={ () => {
+            {exiting&&<div className='gl-experimental-error gl-classic-error' role='status'><p>{t('dashboard.classicStopping')}</p></div>}
+            {connectionError && <div className='gl-experimental-error gl-classic-error' role='alert'><p>{t('dashboard.classicConnectionLost')}</p><p>{t('dashboard.classicFailure_'+connectionError)}</p>{retryError&&<p role='alert'>{t('dashboard.classicRetryFailed')}</p>}{retrying&&<p role='status'>{t('dashboard.classicRetrying')}</p>}{autoDelay!==null&&<p role='status'>{t('dashboard.recoveryPending')} <button type='button' className='btn' onClick={cancelAutomaticRecovery}>{t('dashboard.cancelBackup')}</button></p>}<button type='button' className='btn btn-primary' disabled={retrying||capturePending||exiting||connectionError==='stop'} onClick={()=>retryClassic()}>{t('dashboard.retryStream')}</button> <button type='button' className='btn' onClick={exportClassicDiagnostics}>{t('dashboard.exportDiagnostics')}</button> <button className='btn' disabled={(retrying&&connectionError!=='stop')||capturePending||exiting} onClick={onDisconnect}>{t(connectionError==='stop'?'dashboard.classicRetryStop':'dashboard.backHint')}</button></div>}
+            { (xPlayer !== undefined) ? <StreamComponent connected={connected&&!connectionError} sessionId={sessionId} activeCap={activeCap} onRestartQuality={cap=>retryClassic(false,cap)} onCapturePending={setCapturePending} onMetrics={recordClassicSample} onExportDiagnostics={exportClassicDiagnostics} onLeave={onDisconnect} onDisconnect={ () => {
                 onDisconnect()
             }} onMenu={ consoleController ? undefined : () => {
                 gamepadSend('nexus')
