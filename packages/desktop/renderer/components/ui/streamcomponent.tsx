@@ -191,7 +191,11 @@ function StreamComponent({
         if(controlsVisible&&focusPin.current){focusPin.current=false;pinButton.current?.focus()}
     },[controlsVisible])
     React.useEffect(()=>{
-        const activity=()=>{lastMovement.current=performance.now();setControlsVisible(true)}
+        const activity=(event:PointerEvent)=>{
+            // Keep the reveal button mounted through pointerdown and click.
+            if(event.target instanceof Element&&event.target.closest('#classic-stream-reveal'))return
+            lastMovement.current=performance.now();setControlsVisible(true)
+        }
         const update=()=>setControlsVisible(classicControlsVisible({
             connected,pinned:controlsPinned,hovered:hovered.current,
             focused:Boolean(toolbar.current?.contains(document.activeElement)),
@@ -554,7 +558,7 @@ function StreamComponent({
                     </Card>
                 </div>
 
-                {!controlsVisible&&<button type='button' className='gl-stream-reveal btn' aria-controls='component_streamcomponent_gamebar' onClick={revealAndPin}>{t('dashboard.showStreamControls')}</button>}
+                {!controlsVisible&&<button id='classic-stream-reveal' type='button' className='gl-stream-reveal btn' aria-controls='component_streamcomponent_gamebar' onClick={revealAndPin}>{t('dashboard.showStreamControls')}</button>}
                 <div id="component_streamcomponent_gamebar" ref={toolbar} className={controlsVisible?'':'hidden'} onPointerEnter={event=>{if(event.pointerType!=='touch'){hovered.current=true;revealControls()}}} onPointerLeave={()=>{hovered.current=false;lastMovement.current=performance.now()}} onFocusCapture={revealControls}>
                     <div id="component_streamcomponent_gamebar_menu">
                         <div style={{
