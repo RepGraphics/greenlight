@@ -25,3 +25,31 @@ test('monitor polls once per interval and stops after provisioning',async()=>{co
 test('monitor terminates after five consecutive API failures',async()=>{const f=monitorFixture(Array.from({length:5},()=>Error('offline')));const id=await f.manager.startStream('home','console') as string;for(let i=0;i<5;i++)await f.tick();assert.equal(f.manager.getSession(id).playerState,'failed');assert.equal(f.callbacks.size,0)})
 test('monitor terminates immediately for missing session',async()=>{const f=monitorFixture([Object.assign(Error('missing'),{status:404})]);const id=await f.manager.startStream('home','console') as string;await f.tick();assert.equal(f.manager.getSession(id).errorDetails?.code,'StreamStateUnavailable');assert.equal(f.callbacks.size,0)})
 test('parallel stop requests share one operation and cancel pending monitoring',async()=>{const f=monitorFixture([]);const id=await f.manager.startStream('home','console') as string;const first=f.manager.stopStream(id);const second=f.manager.stopStream(id);assert.equal(first,second);await Promise.all([first,second]);assert.deepEqual(f.calls,['stop']);assert.equal(f.callbacks.size,0);assert.equal(f.manager.getSession(id),undefined)})
+
+test('already expired remote sessions are treated as stopped for either engine',async()=>{
+    for(const type of ['home','cloud']){
+        for(const status of [404,410]){
+            const {manager}=fixture()
+            const id=await manager.startStream(type,'target') as string
+            let stops=0
+            manager.getApi=()=>({stopStream:async()=>{stops++;throw {status}}}) as any
+            assert.equal(await manager.stopStream(id),true)
+            assert.equal(manager.getSession(id),undefined)
+            assert.equal(await manager.stopStream(id),true)
+            assert.equal(stops,1)
+        }
+    }
+})
+test('failed remote stops retain session ownership and can be retried',async()=>{
+    for(const status of [401,403,429,500]){
+        const {manager}=fixture()
+        const id=await manager.startStream('home','console') as string
+        let stops=0
+        manager.getApi=()=>({stopStream:async()=>{if(++stops===1)throw {status};return true}}) as any
+        await assert.rejects(manager.stopStream(id),error=>(error as {status:number}).status===status)
+        assert.ok(manager.getSession(id))
+        assert.equal(await manager.stopStream(id),true)
+        assert.equal(manager.getSession(id),undefined)
+        assert.equal(stops,2)
+    }
+})
