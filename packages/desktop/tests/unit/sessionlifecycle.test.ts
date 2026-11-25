@@ -65,3 +65,34 @@ test('failed or invalid provisioning permits a subsequent attempt',async()=>{
     await flush();assert.deepEqual(errors,['start','start']);assert.deepEqual(ready,['valid']);assert.equal(callbacks.size,0)
     dispose();await flush()
 })
+
+test('explicit end waits for late provisioning and acknowledged teardown, sharing concurrent exit requests',async()=>{
+    const {lifecycle,callbacks}=fixture(),pending=deferred<string>(),closing=deferred<void>()
+    const calls:string[]=[]
+    const dispose=lifecycle.begin({start:()=>pending.promise,stop:id=>{calls.push(id);return closing.promise},onSession:()=>assert.fail('late session'),onError:()=>assert.fail('unexpected error')})
+    await flush()
+    const end=lifecycle.end();assert.equal(lifecycle.end(),end)
+    let done=false;void end.then(()=>{done=true})
+    await flush();assert.equal(done,false);assert.equal(callbacks.size,0)
+    pending.resolve('late');await flush();assert.deepEqual(calls,['late']);assert.equal(done,false)
+    dispose();closing.resolve();assert.equal(await end,true);await flush();assert.deepEqual(calls,['late'])
+})
+test('explicit exit retains a failed stop and reports success only on a later acknowledgement',async()=>{
+    const {lifecycle}=fixture()
+    let stops=0
+    const dispose=lifecycle.begin({start:async()=> 'owned',stop:async id=>{assert.equal(id,'owned');if(++stops===1)throw Error('offline')},onSession:()=>{},onError:()=>assert.fail('unexpected error')})
+    await flush()
+    assert.equal(await lifecycle.end(),false);assert.equal(stops,1)
+    assert.equal(await lifecycle.end(),true);assert.equal(stops,2)
+    dispose();await flush();assert.equal(stops,2)
+})
+test('explicit exit skips queued provisioning without calling stop',async()=>{
+    const {lifecycle}=fixture()
+    const dispose=lifecycle.begin({start:async()=>assert.fail('cancelled start'),stop:async()=>assert.fail('unexpected stop'),onSession:()=>assert.fail('unexpected session'),onError:()=>assert.fail('unexpected error')})
+    assert.equal(await lifecycle.end(),true);dispose();await flush()
+})
+test('explicit exit after provisioning failure succeeds without a remote session',async()=>{
+    const {lifecycle}=fixture()
+    const dispose=lifecycle.begin({start:async()=>{throw Error('offline')},stop:async()=>assert.fail('unexpected stop'),onSession:()=>assert.fail('unexpected session'),onError:()=>{}})
+    await flush();assert.equal(await lifecycle.end(),true);dispose();await flush()
+})
