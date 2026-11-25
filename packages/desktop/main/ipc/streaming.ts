@@ -1,4 +1,7 @@
 import IpcBase from './base'
+import { powerSaveBlocker, app } from 'electron'
+import { StreamAwake } from '../helpers/streamawake'
+import defaults from '../../shared/settings-defaults.json'
 import Application from '../application'
 import StreamManager from '../helpers/streammanager'
 
@@ -30,11 +33,13 @@ interface getPlayerStateArgs {
 export default class IpcStreaming extends IpcBase {
 
     _streamManager:StreamManager
+    private awake=new StreamAwake(powerSaveBlocker)
 
     constructor(application:Application){
         super(application)
 
         this._streamManager = new StreamManager(application)
+        app.on('before-quit',()=>this.awake.release())
     }
 
     startStream(args:startStreamArgs){
@@ -57,7 +62,17 @@ export default class IpcStreaming extends IpcBase {
         return this._streamManager.startStream(args.type, args.target, args.resolution === 720 ? 720 : 1080)
     }
 
+    setStreamAwake(args:{sessionId:string;enabled:boolean}){
+        if(typeof args.sessionId!=='string'||typeof args.enabled!=='boolean')return false
+        if(!args.enabled){this.awake.release(args.sessionId);return true}
+        const session=this._streamManager.getSession(args.sessionId)
+        const settings=this._application._store.get('settings',defaults) as typeof defaults
+        if(!session||session.type!=='home'||session.playerState!=='started'||settings.stream_keep_awake!==true)return false
+        return this.awake.renew(args.sessionId)
+    }
+
     stopStream(args:stopStreamArgs){
+        this.awake.release(args.sessionId)
         return this._streamManager.stopStream(args.sessionId)
     }
 

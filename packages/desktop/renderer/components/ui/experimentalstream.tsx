@@ -1,3 +1,4 @@
+import { useStreamAwake } from '../../lib/useStreamAwake'
 import React from 'react'
 import { shortcutAction, validateShortcuts } from '../../lib/streamshortcuts'
 import { recoveryDelay } from '../../lib/sessionrecovery'
@@ -67,6 +68,7 @@ export default function ExperimentalStream({ target, onExit }: { target: string;
     const recommendedCap = summary ? recommendLowerBitrate(samples.current,activeCap) : null
     const [session, setSession] = React.useState('')
     const [state, setState] = React.useState('Initializing')
+    useStreamAwake(session,state==='Connected'&&!target.startsWith('xcloud_')&&Boolean(globalSettings.stream_keep_awake))
     const updateStatus = React.useCallback((value: string) => {
         lastState.current = value
         if (value === 'Connected') { recoveredConnection.current=true; if(!connectedAt.current) connectedAt.current=Date.now() }

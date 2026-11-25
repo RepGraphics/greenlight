@@ -12,7 +12,7 @@ const allowed: Record<string, string[]> = {
     settings: ['setSettings', 'getSettings', 'getWebUIStatus', 'getWebUIAccessToken', 'startWebUI', 'stopWebUI', 'setLowResolution'],
     consoles: ['get'],
     xCloud: ['getRecentTitles', 'getTitles', 'filterTitles', 'getNewTitles', 'getTitle'],
-    streaming: ['startStream', 'stopStream', 'sendSdp', 'sendChatSdp', 'sendIce', 'sendKeepalive', 'getPlayerState', 'activeSessions'],
+    streaming: ['startStream', 'stopStream', 'sendSdp', 'sendChatSdp', 'sendIce', 'sendKeepalive', 'getPlayerState', 'activeSessions', 'setStreamAwake'],
 }
 
 export default class IpcBase {

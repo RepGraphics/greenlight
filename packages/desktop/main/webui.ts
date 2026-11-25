@@ -87,7 +87,8 @@ export default class WebUI {
                     const request = JSON.parse(msg.toString())
                     if (!request || typeof request.channel !== 'string' || typeof request.action !== 'string' || !Number.isSafeInteger(request.id)) return
                     if (!Object.prototype.hasOwnProperty.call(this._ipc._channels, request.channel)) return
-                    const denied = request.channel === 'app' && ['quit', 'restart', 'clearData', 'login', 'setForceRegionIp', 'setPreferredGameLanguage', 'debug'].includes(request.action)
+                    const denied = request.channel === 'streaming' && request.action === 'setStreamAwake'
+                        || request.channel === 'app' && ['quit', 'restart', 'clearData', 'login', 'setForceRegionIp', 'setPreferredGameLanguage', 'debug'].includes(request.action)
                         || request.channel === 'settings' && request.action !== 'getSettings' && request.action !== 'getWebUIStatus'
                     const reply = (response) => {
                         if (ws.readyState === 1) ws.send(JSON.stringify({ channel: request.channel, ...response }))

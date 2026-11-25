@@ -1,4 +1,5 @@
 import React from 'react'
+import { useStreamAwake } from '../../lib/useStreamAwake'
 import { configureClassicConsoleController } from '../../lib/classicconsolecontroller'
 import { readConsoleProfiles } from '../../lib/consoleprofiles'
 import { readGameProfiles } from '../../lib/gameprofiles'
@@ -28,10 +29,12 @@ function LegacyStream() {
 
     const [xPlayer, setxPlayer] = React.useState(undefined)
     const [sessionId, setSessionId] = React.useState('')
+    const [connected,setConnected]=React.useState(false)
     const [connectionError,setConnectionError]=React.useState('')
     const intentionalExit=React.useRef(false)
     const [queueTime, setQueueTime] = React.useState(0)
     const activeSession = React.useRef('')
+    useStreamAwake(sessionId,connected&&!connectionError&&!target.startsWith('xcloud_')&&Boolean(settings.stream_keep_awake))
     React.useEffect(() => {
         return () => {
             const id = activeSession.current
@@ -140,6 +143,7 @@ function LegacyStream() {
                 const connStatus = document.getElementById('component_streamcomponent_connectionstatus')
                 if(connStatus !== null){
                     if(event.state === 'connected'){
+                        setConnected(true)
                         connStatus.innerText = t('streamWindow.clientHasBeenDisconnected')
                         document.getElementById('component_streamcomponent_loader').className = 'hidden'
 
@@ -162,6 +166,7 @@ function LegacyStream() {
                         connStatus.innerText = t('streamWindow.connectingToConsole')
 
                     } else if(event.state === 'closed') {
+                        setConnected(false)
                         // Client has been disconnected. Lets return to home.
                         // xPlayer.close()
                         console.log('Client has been disconnected. Returning to prev page.')
