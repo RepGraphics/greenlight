@@ -2,6 +2,7 @@ import { isAllowedWebIpc } from './ipc/policy'
 import { createWebUiRateLimiter, TokenBucket } from './helpers/webuiratelimit'
 import Application from './application'
 import express from 'express'
+import { rateLimit, MemoryStore } from 'express-rate-limit'
 import expressWS from 'express-ws'
 import expressProxy from 'express-http-proxy'
 import path from 'path'
@@ -15,6 +16,7 @@ export default class WebUI {
     _ws:expressWS
     _ipc:Ipc
     _server
+    private rateLimitStore?:MemoryStore
     private accessToken = randomBytes(32).toString('hex')
 
     getAccessToken() { return this.accessToken }
@@ -56,6 +58,9 @@ export default class WebUI {
         // The server binds only to loopback: one bounded budget, no spoofable
         // forwarded-IP headers and no unbounded per-client state.
         this._express.use(createWebUiRateLimiter(new TokenBucket(240,20)))
+        const store=new MemoryStore()
+        this.rateLimitStore=store
+        this._express.use(rateLimit({windowMs:60000,limit:1200,standardHeaders:'draft-7',legacyHeaders:false,keyGenerator:()=> 'loopback',store}))
         const failedAuthBudget = new TokenBucket(8,0.2)
 
         // this._application._events.on('start', () => {
@@ -132,6 +137,8 @@ export default class WebUI {
         })
         this._server.on('error', () => {
             this._application.log('webui', 'Unable to bind WebUI port')
+            store.shutdown()
+            if(this.rateLimitStore===store)this.rateLimitStore=undefined
             this._server = undefined
             this._express = undefined
         })
@@ -139,6 +146,8 @@ export default class WebUI {
 
     stopServer(){
         this._application.log('webui', 'Stopping webserver...')
+        this.rateLimitStore?.shutdown()
+        this.rateLimitStore=undefined
         if(this._express){
             this._ws.getWss().clients.forEach(client => client.close(1001, 'Server stopped'))
             this._server?.close()
