@@ -96,3 +96,24 @@ test('explicit exit after provisioning failure succeeds without a remote session
     const dispose=lifecycle.begin({start:async()=>{throw Error('offline')},stop:async()=>assert.fail('unexpected stop'),onSession:()=>assert.fail('unexpected session'),onError:()=>{}})
     await flush();assert.equal(await lifecycle.end(),true);dispose();await flush()
 })
+
+test('Classic retry after a start timeout cannot provision until the late session is stopped',async()=>{
+    const {lifecycle,expire}=fixture(),pending=deferred<string>(),closing=deferred<void>()
+    const calls:string[]=[]
+    lifecycle.begin({start:()=>pending.promise,stop:id=>{calls.push('stop-'+id);return closing.promise},onSession:()=>assert.fail('expired session'),onError:reason=>calls.push(reason)})
+    await flush();expire()
+    const retry=lifecycle.end().then(stopped=>{assert.equal(stopped,true);return lifecycle.begin({start:async()=>{calls.push('start-replacement');return 'replacement'},stop:async()=>{},onSession:id=>calls.push(id),onError:()=>assert.fail('replacement failure')})})
+    await flush();assert.deepEqual(calls,['start'])
+    pending.resolve('expired');await flush();assert.deepEqual(calls,['start','stop-expired'])
+    closing.resolve();const dispose=await retry;await flush()
+    assert.deepEqual(calls,['start','stop-expired','start-replacement','replacement']);dispose();await flush()
+})
+test('Classic explicit exit after failed remote teardown cannot silently release ownership',async()=>{
+    const {lifecycle}=fixture()
+    let stops=0
+    const pending=deferred<string>()
+    lifecycle.begin({start:()=>pending.promise,stop:async id=>{assert.equal(id,'late');if(++stops===1)throw Error('offline')},onSession:()=>assert.fail('cancelled session'),onError:()=>assert.fail('unexpected failure')})
+    await flush()
+    const exit=lifecycle.end();pending.resolve('late');assert.equal(await exit,false);assert.equal(stops,1)
+    assert.equal(await lifecycle.end(),true);assert.equal(stops,2)
+})
