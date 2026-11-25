@@ -1,12 +1,15 @@
 import React from 'react'
 import { addSession,makeSessionRecord } from '../../lib/sessionhistory'
+import { recoveryBitrate } from '../../lib/bitrateadvisor'
 import {downloadDiagnostics} from '../../lib/streamdiagnostics'
 import type { DiagnosticSample } from '../../lib/streamdiagnostics'
 import { ManualReconnect, ClassicRecoveryBudget } from '../../lib/sessionrecovery'
 import { startHeartbeat } from '../../lib/keepalive'
 import { watchClassicConnection } from '../../lib/classicconnection'
 import { useStreamAwake } from '../../lib/useStreamAwake'
+import { useDiscordPresence } from '../../lib/useDiscordPresence'
 import { configureClassicConsoleController } from '../../lib/classicconsolecontroller'
+import { configureClassicControllerProfile,resolveClassicControllerProfile } from '../../lib/classiccontrollerprofile'
 import { readConsoleProfiles } from '../../lib/consoleprofiles'
 import { readGameProfiles } from '../../lib/gameprofiles'
 import ExperimentalStream from '../../components/ui/experimentalstream'
@@ -27,6 +30,7 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
     const profile = target.startsWith('xcloud_') ? readGameProfiles(globalSettings.v3_game_profiles).find(item => item.titleId === target.slice(7)) : undefined
     const consoleProfile = !target.startsWith('xcloud_') ? readConsoleProfiles(globalSettings.console_profiles).find(item => item.consoleId === target) : undefined
     const settings = {...globalSettings, xhome_resolution:consoleProfile?.resolution ?? globalSettings.xhome_resolution, xcloud_resolution:profile?.resolution ?? globalSettings.xcloud_resolution, xcloud_bitrate:profile?.bitrate ?? globalSettings.xcloud_bitrate, xhome_bitrate:consoleProfile?.bitrate ?? globalSettings.xhome_bitrate}
+    const activeCap=recovery.bitrateOverride??(target.startsWith('xcloud_')?settings.xcloud_bitrate:settings.xhome_bitrate)
     const { t } = useTranslation()
     const [consoleController] = React.useState(()=>!target.startsWith('xcloud_') && Boolean(globalSettings.v3_console_controller))
 
@@ -51,8 +55,9 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
     const historyEnabled=React.useRef(Boolean(settings.v3_session_history))
     const recordHistory=React.useCallback((outcome:'ended'|'failed'|'interrupted')=>{const value=history.current;if(!historyEnabled.current||value.saved||(!value.connectedAt&&outcome!=='failed'))return;value.saved=true;addSession(makeSessionRecord(value.startedAt,value.connectedAt,Date.now(),target.startsWith('xcloud_')?'cloud':'home',outcome,value.samples,'classic'))},[target])
     const recordClassicSample=React.useCallback((sample:DiagnosticSample)=>{const value=history.current;if(value.saved||!value.connectedAt)return;value.samples.push({...sample,elapsedSeconds:(Date.now()-value.startedAt)/1000});if(value.samples.length>300)value.samples.shift()},[])
-    const exportClassicDiagnostics=()=>downloadDiagnostics(history.current.samples,target.startsWith('xcloud_')?'cloud':'home',connectionError?'Error':connected?'Connected':'Initializing','video',[],connectionError,'classic')
+    const exportClassicDiagnostics=()=>downloadDiagnostics(history.current.samples,target.startsWith('xcloud_')?'cloud':'home',connectionError?'Error':connected?'Connected':'Initializing','video',recovery.previousAttempts,connectionError,'classic')
     useStreamAwake(sessionId,connected&&!connectionError&&!target.startsWith('xcloud_')&&Boolean(settings.stream_keep_awake))
+    useDiscordPresence(sessionId,connected&&!connectionError&&settings.discord_presence_enabled===true,settings.discord_application_id)
     React.useEffect(() => {
         return () => {
             reconnect.current.dispose()
@@ -85,11 +90,10 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
             holder.replaceChildren(surface)
             xPlayer.bind()
             if(consoleController && streamType==='home') configureClassicConsoleController(xPlayer)
+            else configureClassicControllerProfile(xPlayer._inputDriver,resolveClassicControllerProfile(globalSettings,profile?.controllerProfile??consoleProfile?.controllerProfile))
 
             // Set bitrates & video codec profiles
-            if(((streamType === 'cloud') ? settings.xcloud_bitrate : settings.xhome_bitrate) > 0){
-                xPlayer.setVideoBitrate((streamType === 'cloud') ? settings.xcloud_bitrate : settings.xhome_bitrate)
-            }
+            if(activeCap>0)xPlayer.setVideoBitrate(activeCap)
 
             if(settings.video_profiles?.length > 0){
                 xPlayer.setCodecPreferences('video/H264', { profiles: settings.video_profiles || [] }) // 4d = high, 42e = mid, 420 = low
@@ -290,9 +294,11 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
         }
     }, [router.isReady, router.query.serverid, sessionId, xPlayer])
 
-    const retryClassic=React.useCallback((automatic=false)=>{
+    const retryClassic=React.useCallback((automatic=false,requestedCap:number|null=null)=>{
         if(intentionalExit.current||reconnect.current.busy||!activeSession.current||capturePending)return
         if(automatic&&cancelRecovery.current)return
+        const lower=automatic&&connectionError==='closed'&&history.current.samples.at(-1)?.peerState==='failed'?recoveryBitrate(history.current.samples,activeCap,'transport',Boolean(globalSettings.v3_adaptive_recovery)):null
+        const cap=requestedCap??lower
         cancelRecovery.current=true
         setRecoveryCancelled(true)
         setRetrying(true);setRetryError(false)
@@ -301,9 +307,12 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
         const id=activeSession.current
         void reconnect.current.run(()=>Ipc.send('streaming','stopStream',{sessionId:id}),()=>{
             activeSession.current='';intentionalExit.current=true
-            recovery.recordRetry(automatic);onRetry()
+            recovery.rememberAttempt(connectionError,history.current.samples)
+            recovery.recordRetry(automatic)
+            if(cap!==null)recovery.applyBitrate(cap)
+            onRetry()
         },()=>{setRetrying(false);setRetryError(true)})
-    },[capturePending,recordHistory,onRetry,recovery])
+    },[capturePending,recordHistory,onRetry,recovery,connectionError,activeCap,globalSettings.v3_adaptive_recovery])
     const autoDelay=recovery.delay(Boolean(globalSettings.v3_auto_reconnect),target.startsWith('xcloud_'),{
         error:connectionError,active:Boolean(activeSession.current),blocked:capturePending||retrying||retryError||recoveryCancelled
     })
@@ -343,7 +352,7 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
             </Head>
 
             {connectionError && <div className='gl-experimental-error gl-classic-error' role='alert'><p>{t('dashboard.classicConnectionLost')}</p><p>{t('dashboard.classicFailure_'+connectionError)}</p>{retryError&&<p role='alert'>{t('dashboard.classicRetryFailed')}</p>}{retrying&&<p role='status'>{t('dashboard.classicRetrying')}</p>}{autoDelay!==null&&<p role='status'>{t('dashboard.recoveryPending')} <button type='button' className='btn' onClick={cancelAutomaticRecovery}>{t('dashboard.cancelBackup')}</button></p>}<button type='button' className='btn btn-primary' disabled={retrying||capturePending} onClick={()=>retryClassic()}>{t('dashboard.retryStream')}</button> <button type='button' className='btn' onClick={exportClassicDiagnostics}>{t('dashboard.exportDiagnostics')}</button> <button className='btn' disabled={retrying||capturePending} onClick={()=>{onDisconnect();void router.replace('/home')}}>{t('dashboard.backHint')}</button></div>}
-            { (xPlayer !== undefined) ? <StreamComponent connected={connected} onCapturePending={setCapturePending} onMetrics={recordClassicSample} onExportDiagnostics={exportClassicDiagnostics} onLeave={()=>{recordHistory('ended');intentionalExit.current=true;activeSession.current='';void router.replace('/home')}} onDisconnect={ () => {
+            { (xPlayer !== undefined) ? <StreamComponent connected={connected} activeCap={activeCap} onRestartQuality={cap=>retryClassic(false,cap)} onCapturePending={setCapturePending} onMetrics={recordClassicSample} onExportDiagnostics={exportClassicDiagnostics} onLeave={()=>{recordHistory('ended');intentionalExit.current=true;activeSession.current='';void router.replace('/home')}} onDisconnect={ () => {
                 onDisconnect()
             }} onMenu={ consoleController ? undefined : () => {
                 gamepadSend('nexus')
