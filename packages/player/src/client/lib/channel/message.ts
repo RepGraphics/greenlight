@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid'
 
 import Channel from './channel'
 import MessageHandler from './message/handler'
+import {streamDimensions} from './message/dimensions'
 
 export default class MessageChannel extends Channel {
     _handshakeCompleted = false
@@ -93,17 +94,9 @@ export default class MessageChannel extends Channel {
         const deviceConfig = JSON.stringify(this.generateMessage('/streaming/characteristics/clientdevicecapabilities', {}))
         this.send(deviceConfig)
 
-        const dimensionsConfig = JSON.stringify(this.generateMessage('/streaming/characteristics/dimensionschanged', {
-            'horizontal': 1920,
-            'vertical': 1080,
-            'preferredWidth': 1920,
-            'preferredHeight': 1080,
-            'safeAreaLeft': 0,
-            'safeAreaTop': 0,
-            'safeAreaRight': 1920,
-            'safeAreaBottom': 1080,
-            'supportsCustomResolution':true,
-        }))
+        // Keep the advertised dimensions consistent with the provisioned
+        // session preference. Actual decoded dimensions are reported separately.
+        const dimensionsConfig = JSON.stringify(this.generateMessage('/streaming/characteristics/dimensionschanged', streamDimensions(this.getPlayer().requestedResolution)))
         this.send(dimensionsConfig)
     }
 
