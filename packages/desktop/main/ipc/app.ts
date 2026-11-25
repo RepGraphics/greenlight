@@ -1,6 +1,7 @@
 import IpcBase from './base'
 import { session } from 'electron'
 import electron from 'electron'
+import { checkForkUpdates } from '../helpers/updater'
 
 interface setForceRegionIpArgs {
     ip:string;
@@ -12,6 +13,10 @@ interface setPreferredGameLanguageArgs {
 
 export default class IpcApp extends IpcBase {
     // _streamingSessions:any = {}
+
+    checkForUpdates(args:{includePrereleases?:boolean}={}){
+        return checkForkUpdates(args?.includePrereleases===true)
+    }
 
     loadCachedUser(){
         return new Promise((resolve) => {
