@@ -24,14 +24,11 @@ function StreamPreload({
     }, [waitingTime])
 
     function streamDisconnect(){
-        window.history.back()
+        onDisconnect?.()
     }
 
     function endStream(){
-        if(confirm(t('streamWindow.endStreamConfirmMessage'))){
-            onDisconnect()
-            window.history.back()
-        }
+        if(confirm(t('streamWindow.endStreamConfirmMessage')))onDisconnect?.()
     }
 
     function formatWaitingTime(rawSeconds: number): string {

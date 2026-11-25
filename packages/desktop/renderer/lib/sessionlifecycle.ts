@@ -9,6 +9,8 @@ interface SessionAttempt {
 // cancelled or timed-out attempt. A failed stop retains ownership for retry.
 export class SessionLifecycle {
     private tail:Promise<void>=Promise.resolve()
+    private cancelCurrent:((cleanup:boolean)=>void)|undefined
+    private ending:Promise<boolean>|undefined
     private active:{id:string;owner:object;stop:SessionAttempt['stop']}|undefined
     constructor(private schedule=setTimeout,private cancel=clearTimeout,private timeoutMs=60000){}
     private enqueue(operation:()=>Promise<void>){
@@ -20,16 +22,30 @@ export class SessionLifecycle {
         await session.stop(session.id)
         if(this.active===session)this.active=undefined
     }
+    // Explicit exit owns teardown even when provisioning has not returned an ID.
+    // It reports failure rather than silently discarding the remote session.
+    end():Promise<boolean>{
+        if(this.ending)return this.ending
+        this.cancelCurrent?.(false)
+        const operation=this.tail.then(()=>this.closeActive()).then(()=>true,()=>false)
+        const result=operation.finally(()=>{if(this.ending===result)this.ending=undefined})
+        this.ending=result
+        this.tail=result.then(()=>{})
+        return result
+    }
     begin(attempt:SessionAttempt){
         const owner={}
         let disposed=false
         let timer:ReturnType<typeof setTimeout>|undefined
         const clear=()=>{if(timer!==undefined){this.cancel(timer);timer=undefined}}
-        const dispose=()=>{
+        const cancelAttempt=(cleanup:boolean)=>{
             if(disposed)return
             disposed=true;clear()
-            this.enqueue(async()=>{if(this.active?.owner===owner)await this.closeActive()})
+            if(this.cancelCurrent===cancelAttempt)this.cancelCurrent=undefined
+            if(cleanup)this.enqueue(async()=>{if(this.active?.owner===owner)await this.closeActive()})
         }
+        this.cancelCurrent=cancelAttempt
+        const dispose=()=>cancelAttempt(true)
         this.enqueue(async()=>{
             if(disposed)return
             try{await this.closeActive()}

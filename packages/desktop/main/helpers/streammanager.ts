@@ -16,6 +16,11 @@ interface streamSession {
     };
 }
 
+// Remote Play should not wait indefinitely for a console to register.
+// Keep the existing V3 cloud queue allowance for both desktop engines.
+export const homeProvisioningDeadlineMs=180000
+export const cloudProvisioningDeadlineMs=30*60*1000
+
 export default class StreamManager {
 
     _application:Application
@@ -23,7 +28,8 @@ export default class StreamManager {
     _sessions:Record<string,streamSession> = Object.create(null)
     private monitorFailures = new Map<string, number>()
     private monitorTimers = new Map<string, ReturnType<typeof setTimeout>>()
-    private monitorInFlight = new Set<string>()
+    private monitorInFlight = new Map<string,streamSession>()
+    private provisioning = new Map<string,{session:streamSession;timer:ReturnType<typeof setTimeout>;authenticated:boolean}>()
     private stopping = new Map<string, Promise<unknown>>()
     
     constructor(application, private schedule:typeof setTimeout=setTimeout, private cancel:typeof clearTimeout=clearTimeout){
@@ -86,7 +92,7 @@ export default class StreamManager {
             if(error?.status===404||error?.status===410)return true
             throw error
         }).then(result=>{
-            if(this.getSession(sessionId)===session){delete this._sessions[sessionId];this.monitorFailures.delete(sessionId)}
+            if(this.getSession(sessionId)===session){this.clearProvisioning(session);if(this.monitorInFlight.get(sessionId)===session)this.monitorInFlight.delete(sessionId);delete this._sessions[sessionId];this.monitorFailures.delete(sessionId)}
             return result
         }).finally(()=>{
             this.stopping.delete(sessionId)
@@ -163,66 +169,90 @@ export default class StreamManager {
         })
     }
 
+    private clearProvisioning(session:streamSession){
+        const id=session.id
+        const operation=this.provisioning.get(id)
+        if(operation?.session!==session)return
+        this.cancel(operation.timer)
+        this.provisioning.delete(id)
+    }
+
     monitorSession(sessionId: string) {
         if(this.monitorTimers.has(sessionId)||this.monitorInFlight.has(sessionId)||this.stopping.has(sessionId))return
-        const initial=this.getSession(sessionId)
-        if(!initial||initial.playerState==='failed'||initial.playerState==='started')return
-        const timer=this.schedule(async () => {
+        const session=this.getSession(sessionId)
+        if(!session||session.playerState==='failed'||session.playerState==='started')return
+        const pending=()=>this.getSession(sessionId)===session&&session.playerState!=='failed'&&session.playerState!=='started'
+        const active=()=>pending()&&!this.stopping.has(sessionId)
+        const fail=(code:string,message:string)=>{
+            if(!pending())return
+            session.errorDetails={code,message}
+            session.playerState='failed'
+            this.monitorFailures.delete(sessionId)
+            const scheduled=this.monitorTimers.get(sessionId)
+            if(scheduled!==undefined)this.cancel(scheduled)
             this.monitorTimers.delete(sessionId)
-            if(this.stopping.has(sessionId))return
-            const session = this.getSession(sessionId)
-            if (!session || session!==initial || session.playerState === 'failed' || session.playerState === 'started') return
-            this.monitorInFlight.add(sessionId)
-            const fail = (code: string, message: string) => {
-                if (this.getSession(sessionId) !== session || this.stopping.has(sessionId)) return
-                session.errorDetails = { code, message }
-                session.playerState = 'failed'
-                this.monitorFailures.delete(sessionId)
-            }
-            try {
-                const api = this.getApi(session.type)
-                const result: any = await api.getStreamState(sessionId)
-                if (this.getSession(sessionId) !== session || this.stopping.has(sessionId)) return
-                session.state = result.state
-                if (result.state === 'Provisioned') {
-                    session.playerState = 'started'
+            this.clearProvisioning(session)
+            // Preserve the session ID for explicit stop or reconnect. A late
+            // response must not revive the expired provisioning attempt.
+            if(this.monitorInFlight.get(sessionId)===session)this.monitorInFlight.delete(sessionId)
+        }
+        let operation=this.provisioning.get(sessionId)
+        if(!operation){
+            const deadline=session.type==='home'?homeProvisioningDeadlineMs:cloudProvisioningDeadlineMs
+            const timer=this.schedule(()=>fail('StreamProvisioningTimeout','The Xbox session did not become ready before the provisioning deadline.'),deadline)
+            operation={session,timer,authenticated:false}
+            this.provisioning.set(sessionId,operation)
+        }
+        const provisioning=operation
+        const timer=this.schedule(async()=>{
+            if(this.monitorTimers.get(sessionId)!==timer)return
+            this.monitorTimers.delete(sessionId)
+            if(!active())return
+            this.monitorInFlight.set(sessionId,session)
+            try{
+                const api=this.getApi(session.type)
+                const result:any=await api.getStreamState(sessionId)
+                if(!active())return
+                session.state=result.state
+                if(result.state==='Provisioned'){
+                    session.playerState='started'
                     this.monitorFailures.delete(sessionId)
+                    this.clearProvisioning(session)
                     return
                 }
-                if (result.state === 'Failed') {
-                    fail(result.errorDetails?.code || 'StreamFailed', result.errorDetails?.message || 'Stream provisioning failed')
+                if(result.state==='Failed'){
+                    fail(result.errorDetails?.code||'StreamFailed',result.errorDetails?.message||'Stream provisioning failed')
                     return
                 }
-                if (result.state === 'ReadyToConnect') {
-                    const token = await this._application._authentication._msal.getMsalToken()
-                    if (this.getSession(sessionId) !== session || this.stopping.has(sessionId)) return
-                    await api.sendMSALAuth(sessionId, token.data.lpt)
-                } else if (result.state === 'WaitingForResources') {
-                    session.playerState = 'queued'
-                    if (!session.waitingTimes) {
-                        try {
-                            const waitingTimes = await api.getWaitingTimes(session.target)
-                            if (this.getSession(sessionId) !== session || this.stopping.has(sessionId)) return
-                            session.waitingTimes = waitingTimes
-                        } catch {
-                            // Queue estimates are optional; continue monitoring the stream.
+                if(result.state==='ReadyToConnect'&&!provisioning.authenticated){
+                    const token=await this._application._authentication._msal.getMsalToken()
+                    if(!active())return
+                    await api.sendMSALAuth(sessionId,token.data.lpt)
+                    if(!active())return
+                    provisioning.authenticated=true
+                }else if(result.state==='WaitingForResources'){
+                    session.playerState='queued'
+                    if(!session.waitingTimes){
+                        try{
+                            const waitingTimes=await api.getWaitingTimes(session.target)
+                            if(!active())return
+                            session.waitingTimes=waitingTimes
+                        }catch{
+                            // Queue estimates are optional.
                         }
                     }
                 }
-                this.monitorFailures.delete(sessionId)
-            } catch (error) {
-                if (this.getSession(sessionId) !== session || this.stopping.has(sessionId)) return
-                const failures = (this.monitorFailures.get(sessionId) || 0) + 1
-                this.monitorFailures.set(sessionId, failures)
-                if (error?.status === 404 || failures >= 5) {
-                    fail('StreamStateUnavailable', 'Unable to retrieve the streaming session. Please reconnect.')
-                    return
-                }
-            } finally {
-                this.monitorInFlight.delete(sessionId)
-                if (this.getSession(sessionId) === session) this.monitorSession(sessionId)
+                if(active())this.monitorFailures.delete(sessionId)
+            }catch(error){
+                if(!active())return
+                const failures=(this.monitorFailures.get(sessionId)||0)+1
+                this.monitorFailures.set(sessionId,failures)
+                if(error?.status===404||error?.status===410||failures>=5)fail('StreamStateUnavailable','Unable to retrieve the streaming session. Please reconnect.')
+            }finally{
+                if(this.monitorInFlight.get(sessionId)===session)this.monitorInFlight.delete(sessionId)
+                if(active())this.monitorSession(sessionId)
             }
-        }, 1000)
+        },1000)
         this.monitorTimers.set(sessionId,timer)
     }
 
