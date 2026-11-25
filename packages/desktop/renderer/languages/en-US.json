@@ -1,5 +1,18 @@
 {
   "translation": {
+    "renderingDiagnostics": {
+      "title": "Rendering capability diagnostics",
+      "notice": "These are browser and display hints only. They do not establish that Xbox is sending HDR, that the decoder supports its HDR profile, or that the renderer preserves HDR.",
+      "displayHdr": "Display HDR hint",
+      "videoHdr": "Video HDR hint",
+      "wideGamut": "Display P3 or wider hint",
+      "webGpu": "WebGPU API exposed",
+      "codecs": "Advertised WebRTC receive codecs",
+      "reported": "Reported",
+      "notReported": "Not reported",
+      "unknown": "Unknown",
+      "refresh": "Refresh capabilities"
+    },
     "languageName": "English",
     "authorOfLocalization": "English Localization by unknownskl",
     "header": {
@@ -247,6 +260,11 @@
       "downloadBtn": "Download",
       "laterBtn": "Later",
       "updateChecker": "Update Checker",
+      "manualCheck": "Check for updates",
+      "includePrereleases": "Include prereleases",
+      "noReleases": "No published versioned releases are available yet.",
+      "releaseNotes": "Release notes",
+      "manualUpdateHint": "Updates are checked against the Greenlight fork only. Review and verify the installer before installing it; automatic installation is not enabled.",
       "closeBtn": "Close"
     },
     "errors": {
@@ -284,6 +302,12 @@
       "lastConsole": "Last selected console",
       "resumeDescription": "Reconnect to your Xbox",
       "connectAgain": "Connect again",
+      "librarySort": "Sort games",
+      "librarySort_default": "Default order",
+      "librarySort_az": "Name (A–Z)",
+      "librarySort_za": "Name (Z–A)",
+      "libraryResultCount_one": "{{count}} game",
+      "libraryResultCount_other": "{{count}} games",
       "searchConsoles": "Search consoles",
       "favourites": "Favourites",
       "consoleCount_one": "{{count}} console",
@@ -551,6 +575,10 @@
       "classicConnectionLost": "Classic stream connection interrupted",
       "classicFailure_closed": "The stream connection failed or did not recover after a network interruption. Retry the stream or return to the dashboard.",
       "classicFailure_keepalive": "Three consecutive session keepalive requests failed. Return to the dashboard and reconnect.",
+      "discordPresence": "Discord Rich Presence",
+      "discordApplicationId": "Discord application ID",
+      "discordPresenceHint": "Optional: show Remote Play or Cloud Gaming and elapsed time in the local Discord desktop client. No Xbox account, console or game identifiers are published. Use an application ID you own from the Discord Developer Portal. No Discord token is required. Discord must be running.",
+      "discordPresenceEnable": "Share streaming activity with Discord",
       "streamKeepAwake": "Prevent local idle disconnects (keep awake)",
       "streamKeepAwakeHint": "Keep this computer and display awake during connected Remote Play sessions in the desktop app. Does not simulate controller input or override Xbox/game inactivity limits. Disabled by default.",
       "captureRename": "Rename capture",

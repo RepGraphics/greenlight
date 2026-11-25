@@ -1,4 +1,5 @@
 import React from 'react'
+import DiscordPresenceSettings from '../../components/settings/discordpresence'
 import { recordingOptions,recordingDurations,recordingBitrates } from '../../lib/streamrecording'
 import Head from 'next/head'
 
@@ -189,6 +190,7 @@ function SettingsStreaming() {
                         })()}
                     </p>
                 </Card>
+                <DiscordPresenceSettings />
             </SettingsSidebar>
 
 

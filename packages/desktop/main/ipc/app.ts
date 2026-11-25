@@ -3,6 +3,7 @@ import { session } from 'electron'
 import electron from 'electron'
 import { exportCaptureFile,validateCaptureExport } from '../helpers/captureexport'
 import { isAbsolute } from 'node:path'
+import { checkForkUpdates } from '../helpers/updater'
 
 interface setForceRegionIpArgs {
     ip:string;
@@ -14,6 +15,7 @@ interface setPreferredGameLanguageArgs {
 
 export default class IpcApp extends IpcBase {
     // _streamingSessions:any = {}
+
     private captureExportBusy=false
 
     getCaptureDirectory(){
@@ -48,6 +50,10 @@ export default class IpcApp extends IpcBase {
         this.captureExportBusy=true
         try{return {name:await exportCaptureFile(directory,capture)}}
         finally{this.captureExportBusy=false}
+    }
+
+    checkForUpdates(args:{includePrereleases?:boolean}={}){
+        return checkForkUpdates(args?.includePrereleases===true)
     }
 
     loadCachedUser(){

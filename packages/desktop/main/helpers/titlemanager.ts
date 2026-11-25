@@ -1,6 +1,7 @@
 import Application from '../application'
 import HTTP from './http'
 import Store from 'electron-store'
+import { filterCloudCatalog } from './cloudcatalog'
 
 interface titleInfoArgs {
     ProductTitle: string;
@@ -21,6 +22,7 @@ interface FilterArgs {
     name: string;
     onlyEntitled?: boolean;
     showNonEntitled?: boolean;
+    sort?: 'default'|'az'|'za';
 }
 
 export default class TitleManager {
@@ -161,26 +163,7 @@ export default class TitleManager {
     }
 
     filterTitles(filter:FilterArgs){
-        const returnTitles = []
-        const query = (filter.name || '').trim().toLowerCase()
-        const onlyEntitled = filter.onlyEntitled !== false
-
-        for(const title in this._xCloudTitles){
-            const titleObj = this._xCloudTitles[title]
-            if(onlyEntitled && titleObj.hasEntitlement !== true){
-                continue
-            }
-
-            if(query === ''){
-                returnTitles.push(titleObj.titleId)
-            } else if(titleObj.catalogDetails !== undefined && titleObj.catalogDetails.ProductTitle){
-                if(titleObj.catalogDetails.ProductTitle.toLowerCase().includes(query)){
-                    returnTitles.push(titleObj.titleId)
-                }
-            }
-        }
-
-        return returnTitles
+        return filterCloudCatalog(Object.values(this._xCloudTitles),filter)
     }
 }
 

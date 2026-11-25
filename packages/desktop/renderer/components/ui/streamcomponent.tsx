@@ -7,7 +7,9 @@ import { recordingMimeType,startStreamRecording,downloadRecording } from '../../
 import { startInstantReplay,replayDuration } from '../../lib/instantreplay'
 import { canCapture, captureScreenshotBlob, saveStreamScreenshot, toggleStreamPictureInPicture } from '../../lib/streamcapture'
 import { storeCapture } from '../../lib/capturelibrary'
-import {sanitizeSample} from '../../lib/streamdiagnostics'
+import {sanitizeSample,summarizeDiagnostics} from '../../lib/streamdiagnostics'
+import {recommendLowerBitrate} from '../../lib/bitrateadvisor'
+import {ClassicMetricsSampler} from '../../lib/classicmetrics'
 import type {DiagnosticSample} from '../../lib/streamdiagnostics'
 import { useSettings } from '../../context/userContext'
 import Button from './button'
@@ -21,6 +23,8 @@ import { useTranslation } from 'react-i18next'
 
 interface StreamComponentProps {
     connected?:boolean;
+    activeCap?:number;
+    onRestartQuality?:(cap:number)=>void;
     onCapturePending?:(pending:boolean)=>void;
     onDisconnect?: () => void;
     onLeave?: () => void;
@@ -32,6 +36,8 @@ interface StreamComponentProps {
 
 function StreamComponent({
     connected=false,
+    activeCap=0,
+    onRestartQuality,
     onCapturePending,
     onDisconnect,
     onLeave,
@@ -85,7 +91,7 @@ function StreamComponent({
     const [replayReady,setReplayReady]=React.useState(false)
     const [clip,setClip]=React.useState<Blob|null>(null)
     const [clipBusy,setClipBusy]=React.useState(false)
-    const protectedCapture=recordingActive||Boolean(clip)||clipBusy
+    const protectedCapture=recordingActive||Boolean(clip)||clipBusy||captureBusy
     React.useEffect(()=>{onCapturePending?.(protectedCapture)},[onCapturePending,protectedCapture])
     React.useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;recording.current?.stop();replay.current?.dispose()}},[])
     React.useEffect(()=>{if(!connected||!settings.video_enabled){recording.current?.stop();replay.current?.dispose();replay.current=null;setReplayActive(false);setReplayReady(false)}},[connected,settings.video_enabled])
@@ -109,35 +115,40 @@ function StreamComponent({
         try{const blob=await replay.current.save();if(mounted.current){setClip(blob);setCaptureMessage(blob?'replaySaved':'replayFailed')}}catch{if(mounted.current)setCaptureMessage('replayFailed')}finally{saving.current=false;if(mounted.current)setClipBusy(false)}
     }
     const saveClip=async()=>{if(!clip||saving.current)return;saving.current=true;setClipBusy(true);try{await storeCapture('clip',clip);if(mounted.current){setClip(null);setCaptureMessage('captureLibrarySaved')}}catch{if(mounted.current)setCaptureMessage('captureLibraryFailed')}finally{saving.current=false;if(mounted.current)setClipBusy(false)}}
-    const canLeave=()=>{if(recording.current||saving.current||clip){setCaptureMessage('saveClipBeforeExit');return false}return true}
+    const canLeave=()=>{if(recording.current||saving.current||captureLock.current||clip){setCaptureMessage('saveClipBeforeExit');return false}return true}
     const [hud, setHud] = React.useState(settings.stream_performance_hud)
-    const [metrics, setMetrics] = React.useState<{ fps?: number; width?: number; height?: number; jitter?: number; loss?: number; bitrate?: number }>({})
-    React.useEffect(() => {
-        if (!hud&&!onMetrics) return
-        let disposed = false, busy = false
-        let previous: { bytes: number; time: number; id:string } | undefined
-        const sample = async () => {
-            if (busy || disposed || !xPlayer._webrtcClient) return
-            busy = true
-            try {
-                const stats = await xPlayer._webrtcClient.getStats()
-                if (disposed) return
-                let rtt=0
-                stats.forEach(report=>{if(report.type==='transport'&&report.selectedCandidatePairId){const pair=stats.get(report.selectedCandidatePairId);if(typeof pair?.currentRoundTripTime==='number')rtt=pair.currentRoundTripTime*1000}})
-                stats.forEach(report => {
-                    if (report.type !== 'inbound-rtp' || report.kind !== 'video') return
-                    const bytes = report.bytesReceived, time = report.timestamp
-                    const bitrate = previous && previous.id===report.id && time > previous.time && bytes >= previous.bytes ? (bytes - previous.bytes) * 8 / (time - previous.time) / 1000 : undefined
-                    if (typeof bytes === 'number' && typeof time === 'number') previous = { bytes, time, id:report.id }
-                    onMetrics?.(sanitizeSample({fps:report.framesPerSecond??0,width:report.frameWidth??0,height:report.frameHeight??0,jitter:typeof report.jitter==='number'?report.jitter*1000:0,loss:report.packetsLost??0,bitrate:bitrate??0,rtt,statsFresh:bitrate!==undefined,peerState:xPlayer._webrtcClient.connectionState,iceState:xPlayer._webrtcClient.iceConnectionState,signalingState:xPlayer._webrtcClient.signalingState},0))
-                    if(hud)setMetrics({ fps: report.framesPerSecond, width: report.frameWidth, height: report.frameHeight, jitter: typeof report.jitter === 'number' ? report.jitter * 1000 : undefined, loss: report.packetsLost, bitrate })
-                })
-            } catch { /* stats may be unavailable during disconnect */ } finally { busy = false }
+    const [metrics,setMetrics]=React.useState<Partial<DiagnosticSample>>({})
+    const [showQuality,setShowQuality]=React.useState(false)
+    const [qualityCap,setQualityCap]=React.useState<number|null>(null)
+    const [qualitySamples,setQualitySamples]=React.useState<DiagnosticSample[]>([])
+    const recentSamples=React.useRef<DiagnosticSample[]>([])
+    React.useEffect(()=>{
+        let disposed=false,busy=false
+        const sampler=new ClassicMetricsSampler()
+        const started=performance.now()
+        recentSamples.current=[];setQualitySamples([]);setMetrics({})
+        const sample=async()=>{
+            if(busy||disposed||!connected||!xPlayer._webrtcClient)return
+            busy=true
+            try{
+                const peer=xPlayer._webrtcClient
+                const stats=await peer.getStats()
+                if(disposed)return
+                const result=sampler.sample(stats,performance.now(),{peerState:peer.connectionState,iceState:peer.iceConnectionState,signalingState:peer.signalingState})
+                const value=sanitizeSample(result,(performance.now()-started)/1000)
+                onMetrics?.(value)
+                recentSamples.current=[...recentSamples.current.slice(-29),value]
+                setQualitySamples(recentSamples.current)
+                setMetrics(value.statsFresh===false?{}:value)
+            }catch{
+                if(!disposed){const value=sanitizeSample({width:0,height:0,fps:0,bitrate:0,jitter:0,rtt:0,loss:0,statsFresh:false},(performance.now()-started)/1000);recentSamples.current=[...recentSamples.current.slice(-29),value];setQualitySamples(recentSamples.current);setMetrics({});onMetrics?.(value)}
+            }finally{busy=false}
         }
-        void sample()
-        const interval = setInterval(sample, 1000)
-        return () => { disposed = true; clearInterval(interval) }
-    }, [hud, xPlayer,onMetrics])
+        void sample();const interval=setInterval(sample,1000)
+        return()=>{disposed=true;clearInterval(interval)}
+    },[connected,xPlayer,onMetrics])
+    const quality=summarizeDiagnostics(qualitySamples)
+    const suggestedCap=connected?recommendLowerBitrate(qualitySamples,activeCap):null
 
     const refreshVideo = React.useCallback(()=>{
         const video=document.querySelector<HTMLVideoElement>('#streamComponentHolder video')
@@ -497,6 +508,8 @@ function StreamComponent({
         <React.Fragment>
             <div>
                 {hud && <div className='gl-performance-hud' aria-label={t('dashboard.performanceHud')}><span>{metrics.width && metrics.height ? metrics.width + '×' + metrics.height : '—'}</span><span>{metrics.fps != null ? Math.round(metrics.fps) : '—'} FPS</span><span>{metrics.bitrate != null ? metrics.bitrate.toFixed(1) : '—'} Mbps</span><span>{metrics.jitter != null ? metrics.jitter.toFixed(1) : '—'} ms {t('dashboard.jitter')}</span><span>{metrics.loss ?? '—'} {t('dashboard.packetsLost')}</span></div>}
+                {showQuality&&<div className='gl-performance-hud gl-quality-advice' style={{top:'auto',bottom:100}}><span>{t('dashboard.connectionQuality')}: {t('dashboard.quality_'+quality.quality)}</span><span>RTT p95: {quality.rtt95??'—'} ms</span><span>Jitter p95: {quality.jitter95??'—'} ms</span><span>{t('dashboard.averageBitrate')}: {quality.averageBitrate??'—'} Mbps</span><span>{t('dashboard.currentBitrateCap')}: {activeCap?Math.round(activeCap/1000)+' Mbps':t('settings.streaming.unlimitedLabel')}</span><span>{t('dashboard.qualityHint_'+quality.quality)}</span>{suggestedCap!==null&&onRestartQuality&&<button type='button' className='btn' disabled={protectedCapture} style={{pointerEvents:'auto'}} onClick={()=>setQualityCap(suggestedCap)}>{t('dashboard.lowerBitrateSuggestion',{bitrate:Math.round(suggestedCap/1000)})}</button>}</div>}
+                {qualityCap!==null&&<div className='gl-live-video-panel' role='dialog' aria-label={t('dashboard.restartQuality')}><h2>{t('dashboard.restartQuality')}</h2><p>{t('dashboard.restartQualityWarning',{bitrate:Math.round(qualityCap/1000)})}</p><button type='button' className='btn btn-primary' disabled={protectedCapture||!connected} onClick={()=>{const cap=qualityCap;setQualityCap(null);onRestartQuality?.(cap)}}>{t('dashboard.retryStream')}</button> <button type='button' className='btn' onClick={()=>setQualityCap(null)}>{t('dashboard.cancelBackup')}</button></div>}
                 {captureMessage&&!clip&&<div className='gl-recording-result' role='status'>{t('dashboard.'+captureMessage)} <button type='button' className='btn' onClick={()=>setCaptureMessage('')}>{t('dashboard.dismiss')}</button></div>}
                 {recordingActive&&<div className='gl-recording-indicator' role='status'><span/>REC {Math.floor(recordingElapsed/60)}:{String(recordingElapsed%60).padStart(2,'0')}</div>}
                 {replayActive&&<div className='gl-replay-indicator' role='status'>{t(replayReady?'dashboard.replayReady':'dashboard.replayBuffering',{seconds:replayDuration(settings.v3_replay_seconds)})}</div>}
@@ -569,6 +582,7 @@ function StreamComponent({
                             width: '25%',
                             textAlign: 'right',
                         }}>
+                            <button type='button' className='btn' aria-label={t('dashboard.connectionQuality')} title={t('dashboard.connectionQuality')} aria-pressed={showQuality} onClick={()=>setShowQuality(value=>!value)}><i className='fa-solid fa-signal' aria-hidden='true'/></button>
                             <button type='button' className='btn' aria-label={t('dashboard.videoFilters')} title={t('dashboard.videoFilters')} aria-pressed={showFilters} onClick={()=>setShowFilters(value=>!value)}><i className='fa-solid fa-sliders' aria-hidden='true'/></button>
                             <button type='button' className='btn' title={t('dashboard.refreshVideo')} onClick={refreshVideo}><i className='fa-solid fa-rotate' aria-hidden='true'/></button>{onExportDiagnostics&&<button type='button' className='btn' title={t('dashboard.exportDiagnostics')} aria-label={t('dashboard.exportDiagnostics')} onClick={onExportDiagnostics}><i className='fa-solid fa-file-arrow-down' aria-hidden='true'/></button>}<button type='button' className='btn' aria-label={t('dashboard.performanceHud')} aria-pressed={hud} onClick={() => setHud(value => !value)}><i className='fa-solid fa-chart-line' aria-hidden='true' /></button>
                             <button type='button' className='btn' disabled={!captureReady||captureBusy} title={t('dashboard.screenshot')} aria-label={t('dashboard.screenshot')} onClick={()=>void capture('download')}><i className='fa-solid fa-camera' aria-hidden='true'/></button>
