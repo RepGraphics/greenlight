@@ -1,6 +1,7 @@
 import IpcBase from './base'
 import { powerSaveBlocker, app } from 'electron'
 import { StreamAwake } from '../helpers/streamawake'
+import { DiscordPresence,validDiscordApplicationId } from '../helpers/discordpresence'
 import defaults from '../../shared/settings-defaults.json'
 import Application from '../application'
 import StreamManager from '../helpers/streammanager'
@@ -34,12 +35,18 @@ export default class IpcStreaming extends IpcBase {
 
     _streamManager:StreamManager
     private awake=new StreamAwake(powerSaveBlocker)
+    private presence=new DiscordPresence()
+    private startingHome=new Set<string>()
+
+    hasHomeStream(target:string){
+        return this.startingHome.has(target)||Object.values(this._streamManager._sessions).some(session=>session.type==='home'&&session.target===target&&session.playerState!=='failed')
+    }
 
     constructor(application:Application){
         super(application)
 
         this._streamManager = new StreamManager(application)
-        app.on('before-quit',()=>this.awake.release())
+        app.on('before-quit',()=>{this.awake.release();this.presence.release()})
     }
 
     startStream(args:startStreamArgs){
@@ -48,7 +55,11 @@ export default class IpcStreaming extends IpcBase {
         }
 
         if(args.type === 'home'){
-            this._application._ipc._channels.consoles._consolesLastUpdate = 0
+            const consoles=this._application._ipc._channels.consoles
+            if(consoles.isPowerPending(args.target)||this.startingHome.has(args.target))return Promise.reject(new Error('Console operation already pending'))
+            consoles._consolesLastUpdate = 0
+            this.startingHome.add(args.target)
+            return Promise.resolve().then(()=>this._streamManager.startStream(args.type,args.target,args.resolution===720?720:1080)).finally(()=>this.startingHome.delete(args.target))
         } else {
             const title = this._application._ipc._channels.xCloud._titleManager.findTitle(args.target)
             if(title?.hasEntitlement === false){
@@ -71,7 +82,18 @@ export default class IpcStreaming extends IpcBase {
         return this.awake.renew(args.sessionId)
     }
 
+    setDiscordPresence(args:{sessionId:string;enabled:boolean}){
+        if(typeof args?.sessionId!=='string'||typeof args.enabled!=='boolean')return false
+        if(!args.enabled){this.presence.release(args.sessionId);return true}
+        const session=this._streamManager.getSession(args.sessionId)
+        const settings=this._application._store.get('settings',defaults) as typeof defaults
+        if(settings.discord_presence_enabled!==true||!validDiscordApplicationId(settings.discord_application_id)||!session||session.playerState!=='started'||(session.type!=='home'&&session.type!=='cloud')){this.presence.release(args.sessionId);return false}
+        this.presence.renew(args.sessionId,settings.discord_application_id,session.type)
+        return true
+    }
+
     stopStream(args:stopStreamArgs){
+        this.presence.release(args.sessionId)
         this.awake.release(args.sessionId)
         return this._streamManager.stopStream(args.sessionId)
     }

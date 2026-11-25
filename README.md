@@ -29,7 +29,7 @@ An independently maintained fork of [Greenlight](https://github.com/unknownskl/g
 | Bitrate presets and requested display resolution | Yes | Yes |
 | Standard video playback | Yes | Yes |
 | WebGPU rendering | — | Experimental |
-| Controller profiles, remapping and calibration | — | Yes |
+| Controller profiles, remapping and calibration | Yes | Yes |
 | Console-paired controller mode | Yes | Yes |
 | Touch gamepad and native mouse/keyboard | — | Experimental |
 | Video filters and sharpening | Yes | Yes |

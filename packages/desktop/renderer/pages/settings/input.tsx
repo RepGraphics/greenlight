@@ -240,16 +240,16 @@ function SettingsInput() {
                 <Card hidden={settings.streaming_engine !== 'experimental'}><h1>{t('dashboard.multiController')}</h1><p>{t('dashboard.multiControllerDescription')}</p><label><input type='checkbox' checked={settings.v3_multi_controller} onChange={event=>setSettings({...settings,v3_multi_controller:event.target.checked})}/> {t('dashboard.multiController')}</label></Card>
                 <ControllerTest />
                 <Card><h1>{t('dashboard.streamShortcuts')}</h1><p>{t('dashboard.streamShortcutsHint')}</p>{(Object.keys(shortcutDefaults) as StreamAction[]).map(action=><p key={action}><label htmlFor={'stream-key-'+action}>{t('dashboard.shortcut_'+action)}</label><select id={'stream-key-'+action} value={validateShortcuts(settings.v3_stream_shortcuts)[action]} onChange={event=>setSettings({...settings,v3_stream_shortcuts:assignShortcut(settings.v3_stream_shortcuts,action,event.target.value)})}>{shortcutKeys.map(key=><option key={key} value={key}>{key||t('settings.input.disabledLabel')}</option>)}</select></p>)}<button className='btn' type='button' onClick={()=>setSettings({...settings,v3_stream_shortcuts:{...shortcutDefaults}})}>{t('dashboard.resetShortcuts')}</button></Card>
-                <Card hidden={settings.streaming_engine !== 'experimental'}>
+                <Card>
                     <h1>{t('dashboard.advancedInput')}</h1>
                     <p><label htmlFor='v3-deadzone'>{t('dashboard.deadzone')}</label><input id='v3-deadzone' type='range' min='0' max='0.5' step='0.01' value={settings.v3_deadzone} onChange={e => setSettings({...settings, v3_deadzone:Number(e.target.value)})} /> {Math.round(settings.v3_deadzone*100)}%</p>
                     <p><label htmlFor='v3-invert-y'>{t('dashboard.invertY')}</label><input id='v3-invert-y' type='checkbox' checked={settings.v3_invert_y} onChange={e => setSettings({...settings, v3_invert_y:e.target.checked})} /></p>
                     <p><label htmlFor='v3-swap-sticks'>{t('dashboard.swapSticks')}</label><input id='v3-swap-sticks' type='checkbox' checked={settings.v3_swap_sticks} onChange={e => setSettings({...settings, v3_swap_sticks:e.target.checked})} /></p>
-                    <p><label htmlFor='v3-sensitivity'>{t('dashboard.mouseSensitivity')}</label><input id='v3-sensitivity' type='range' min='0.25' max='4' step='0.25' value={settings.v3_mouse_sensitivity} onChange={e => setSettings({...settings,v3_mouse_sensitivity:Number(e.target.value)})} /> {settings.v3_mouse_sensitivity}×</p>
+                    {settings.streaming_engine==='experimental'&&<p><label htmlFor='v3-sensitivity'>{t('dashboard.mouseSensitivity')}</label><input id='v3-sensitivity' type='range' min='0.25' max='4' step='0.25' value={settings.v3_mouse_sensitivity} onChange={e => setSettings({...settings,v3_mouse_sensitivity:Number(e.target.value)})} /> {settings.v3_mouse_sensitivity}×</p>}
                     <button type='button' className='btn' onClick={() => setSettings({...settings,v3_deadzone:0.08,v3_invert_y:false,v3_swap_sticks:false,v3_mouse_sensitivity:1})}>{t('dashboard.resetInput')}</button>
                     <p>{t('dashboard.inputNextStream')}</p>
                 </Card>
-                <Card hidden={settings.streaming_engine !== 'experimental'}>
+                <Card>
                     <h1>{t('dashboard.controllerProfiles')}</h1>
                     <p>{t('dashboard.profileDescription')}</p>
                     <div className='gl-console-toolbar'>{Object.entries(controllerPresets).map(([key,profile]) => <button type='button' key={key} className='btn' onClick={() => applyProfile(profile)}>{t('dashboard.controllerPreset_'+key)}</button>)}</div>
