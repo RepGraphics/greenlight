@@ -1,6 +1,6 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {classicDisconnectGraceMs,watchClassicConnection} from '../../renderer/lib/classicconnection'
+import {classicDisconnectGraceMs,classicHandshakeDeadlineMs,watchClassicConnection} from '../../renderer/lib/classicconnection'
 
 function clock(){
     let next:(()=>void)|undefined
@@ -47,4 +47,41 @@ test('disposing Classic watcher prevents a pending timeout from failing a replac
     const watch=watchClassicConnection(()=>assert.fail('late failure'),time.schedule,time.cancel)
     watch.update('disconnected');watch.dispose();time.run();watch.update('failed')
     assert.equal(time.pending,false);assert.equal(watch.failed,false)
+})
+
+function handshakeClock(){
+    let id=0
+    const timers=new Map<number,{callback:()=>void;delay:number}>()
+    const schedule=((callback:()=>void,delay:number)=>{timers.set(++id,{callback,delay});return id}) as unknown as typeof setTimeout
+    const cancel=((id:number)=>timers.delete(id)) as unknown as typeof clearTimeout
+    return {schedule,cancel,timers,expire(delay:number){for(const [id,entry] of [...timers])if(entry.delay===delay){timers.delete(id);entry.callback()}}}
+}
+test('Classic handshake is bounded even when connecting events never settle',()=>{
+    const time=handshakeClock();let failures=0
+    const watch=watchClassicConnection(()=>failures++,time.schedule,time.cancel)
+    watch.begin();watch.begin();watch.update('new');watch.update('connecting')
+    assert.equal(time.timers.size,1)
+    time.expire(classicHandshakeDeadlineMs)
+    assert.equal(failures,1);assert.equal(watch.failed,true)
+    watch.update('connected');watch.begin();assert.equal(time.timers.size,0)
+})
+test('successful connection clears the initial handshake timer and does not restart it',()=>{
+    const time=handshakeClock()
+    const watch=watchClassicConnection(()=>assert.fail('late handshake failure'),time.schedule,time.cancel)
+    watch.begin();watch.update('connected');watch.begin()
+    assert.equal(time.timers.size,0)
+    time.expire(classicHandshakeDeadlineMs)
+    watch.update('disconnected');assert.equal([...time.timers.values()][0].delay,classicDisconnectGraceMs)
+    watch.dispose();assert.equal(time.timers.size,0)
+})
+test('failed or disposed handshake clears both watchdog deadlines',()=>{
+    const time=handshakeClock();let failures=0
+    const watch=watchClassicConnection(()=>failures++,time.schedule,time.cancel)
+    watch.begin();watch.update('disconnected')
+    assert.equal(time.timers.size,2)
+    time.expire(classicDisconnectGraceMs)
+    assert.equal(failures,1);assert.equal(time.timers.size,0)
+    const replacement=watchClassicConnection(()=>assert.fail('disposed handshake'),time.schedule,time.cancel)
+    replacement.begin();replacement.dispose();time.expire(classicHandshakeDeadlineMs)
+    assert.equal(time.timers.size,0)
 })

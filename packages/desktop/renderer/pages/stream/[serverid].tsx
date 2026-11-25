@@ -51,6 +51,7 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
     const cancelAutomaticRecovery=()=>{cancelRecovery.current=true;setRecoveryCancelled(true)}
     const [queueTime, setQueueTime] = React.useState(0)
     const activeSession = React.useRef('')
+    const startupFailed=React.useRef(false)
     const history=React.useRef({startedAt:Date.now(),connectedAt:0,saved:false,samples:[] as DiagnosticSample[]})
     const historyEnabled=React.useRef(Boolean(settings.v3_session_history))
     const recordHistory=React.useCallback((outcome:'ended'|'failed'|'interrupted')=>{const value=history.current;if(!historyEnabled.current||value.saved||(!value.connectedAt&&outcome!=='failed'))return;value.saved=true;addSession(makeSessionRecord(value.startedAt,value.connectedAt,Date.now(),target.startsWith('xcloud_')?'cloud':'home',outcome,value.samples,'classic'))},[target])
@@ -110,29 +111,32 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
             }
             const watcher=watchClassicConnection(failConnection)
             disposeConnection=watcher.dispose
+            watcher.begin()
+            const canSignal=()=>!cancelled&&!intentionalExit.current&&!reconnect.current.busy&&!watcher.failed
             xPlayer.setSdpHandler((client, offer) => {
-                if(cancelled||intentionalExit.current||reconnect.current.busy)return
+                if(!canSignal())return
                 Ipc.send('streaming', 'sendChatSdp', {
                     sessionId: sessionId,
                     sdp: offer.sdp,
                 }).then((sdpResponse) => {
-                    if(cancelled||intentionalExit.current||reconnect.current.busy)return
+                    if(!canSignal())return
                     xPlayer.setRemoteOffer(sdpResponse.sdp)
 
                 }).catch((error) => {
-                    if(cancelled||intentionalExit.current||reconnect.current.busy)return
+                    if(!canSignal())return
                     console.log('ChatSDP Exchange error:', error)
                     alert(t('errors.chatSDPExchangeError') + ' ' + JSON.stringify(error))
                 })
             })
 
-            Promise.resolve().then(()=>xPlayer.createOffer()).then((offer:any) => {
-                if(cancelled||intentionalExit.current||reconnect.current.busy)return
+            Promise.resolve().then(()=>canSignal()?xPlayer.createOffer():undefined).then((offer:any) => {
+                if(!canSignal())return
+                if(typeof offer?.sdp!=='string')throw Error('Missing SDP offer')
                 return Ipc.send('streaming', 'sendSdp', {
                     sessionId: sessionId,
                     sdp: offer.sdp,
                 }).then((sdpResult:any) => {
-                    if (cancelled||intentionalExit.current||reconnect.current.busy) return
+                    if(!canSignal())return
                     xPlayer.setRemoteOffer(sdpResult.sdp)
 
                     // Gather candidates
@@ -150,20 +154,20 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
                         sessionId: sessionId,
                         ice: candidates,
                     }).then((iceResult:any) => {
-                        if (cancelled||intentionalExit.current||reconnect.current.busy) return
+                        if(!canSignal())return
                         xPlayer.setIceCandidates(iceResult)
 
                         // All done. Waiting for the event 'connectionstate' to be triggered
 
                     }).catch((error) => {
-                        if(cancelled||intentionalExit.current||reconnect.current.busy)return
+                        if(!canSignal())return
                         console.warn('ICE Exchange error:', error)
                         watcher.update('failed')
                     })
 
                 })
             }).catch((error)=>{
-                if(cancelled||intentionalExit.current||reconnect.current.busy)return
+                if(!canSignal())return
                 console.warn('SDP Exchange error:', error)
                 watcher.update('failed')
             })
@@ -211,22 +215,26 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
                 target: serverId,
             }).then((result:string) => {
                 console.log('StartStream session:', result)
-                if (cancelled) { void Ipc.send('streaming', 'stopStream', { sessionId: result }).catch(() => {}); return }
+                if(typeof result!=='string'||!result)throw Error('Invalid session identifier')
+                if(cancelled||intentionalExit.current){void Ipc.send('streaming','stopStream',{sessionId:result}).catch(()=>{});return}
                 activeSession.current = result
                 setSessionId(result)
 
-            }).catch((error) => {
-                alert(t('errors.failedToStartStream') + '\n' + JSON.stringify(error))
+            }).catch(() => {
+                if(cancelled||intentionalExit.current)return
+                startupFailed.current=true
+                recordHistory('failed')
+                setConnectionError('start')
             })
         } else {
 
             streamStateInterval.current = setInterval(() => {
-                if (polling || cancelled) return
+                if(polling||cancelled||intentionalExit.current||reconnect.current.busy)return
                 polling = true
                 Ipc.send('streaming', 'getPlayerState', {
                     sessionId: sessionId,
                 }).then((session:any) => {
-                    if (cancelled) return
+                    if(cancelled||intentionalExit.current||reconnect.current.busy)return
                     if (!session) { clearInterval(streamStateInterval.current); recordHistory('failed'); setConnectionError('provisioning'); return }
                     console.log('Player state:', session)
 
@@ -273,7 +281,7 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
                     }
 
                 }).catch((error) => {
-                    if (!cancelled) { clearInterval(streamStateInterval.current); recordHistory('failed'); setConnectionError('provisioning') }
+                    if(!cancelled&&!intentionalExit.current&&!reconnect.current.busy){clearInterval(streamStateInterval.current);recordHistory('failed');setConnectionError('provisioning')}
                 }).finally(() => { polling = false })
             }, 1000)
         }
@@ -295,8 +303,14 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
     }, [router.isReady, router.query.serverid, sessionId, xPlayer])
 
     const retryClassic=React.useCallback((automatic=false,requestedCap:number|null=null)=>{
-        if(intentionalExit.current||reconnect.current.busy||!activeSession.current||capturePending)return
+        if(intentionalExit.current||reconnect.current.busy||capturePending)return
         if(automatic&&cancelRecovery.current)return
+        if(!activeSession.current){
+            if(automatic||!startupFailed.current)return
+            startupFailed.current=false;intentionalExit.current=true
+            recovery.rememberAttempt(connectionError,history.current.samples);recovery.recordRetry(false);onRetry()
+            return
+        }
         const lower=automatic&&connectionError==='closed'&&history.current.samples.at(-1)?.peerState==='failed'?recoveryBitrate(history.current.samples,activeCap,'transport',Boolean(globalSettings.v3_adaptive_recovery)):null
         const cap=requestedCap??lower
         cancelRecovery.current=true

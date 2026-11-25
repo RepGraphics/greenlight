@@ -601,6 +601,7 @@
       "compare_averageBitrate": "Average bitrate",
       "compare_rtt95": "RTT p95",
       "compare_jitter95": "Jitter p95",
+      "classicFailure_start": "The Xbox session could not be started. Retry the connection.",
       "classicFailure_provisioning": "The Xbox session could not be provisioned or stopped responding. Retry the connection.",
       "classicFailure_unavailable": "The console is not registered with Xbox services. Check that it is online and Remote Play is enabled.",
       "classicRetryFailed": "The previous session could not be stopped. Retry or return to the dashboard.",
