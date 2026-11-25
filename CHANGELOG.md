@@ -6,6 +6,8 @@ Changes on `main-v2` are development changes, not a new numbered release. See [c
 
 ### Added
 
+- Configurable 30–300 second diagnostics graph windows with visible gaps for missing samples; protected retry actions while captures are unsaved.
+
 - Capture-library filename search and sorting; mocked provisioning, retry and duplicate-stop tests.
 
 - Rename saved captures with portable filename validation; mocked session API and recording lifecycle tests.

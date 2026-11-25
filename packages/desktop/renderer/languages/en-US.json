@@ -534,7 +534,9 @@
       "captureSort_newest": "Newest first",
       "captureSort_oldest": "Oldest first",
       "captureSort_largest": "Largest first",
-      "captureSort_name": "Name"
+      "captureSort_name": "Name",
+      "graphWindow": "Graph time window",
+      "graphGapHint": "Gaps indicate missing or stale samples. The latest value is hidden when statistics are unavailable."
     }
   }
 }
