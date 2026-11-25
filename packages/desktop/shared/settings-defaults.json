@@ -74,5 +74,7 @@
     "v3_replay_seconds": 30,
     "recording_seconds": 300,
     "recording_bitrate": 3000000,
+    "discord_presence_enabled": false,
+    "discord_application_id": "",
     "stream_keep_awake": false
 }

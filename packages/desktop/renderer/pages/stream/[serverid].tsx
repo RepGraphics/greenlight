@@ -7,6 +7,7 @@ import { ManualReconnect, ClassicRecoveryBudget } from '../../lib/sessionrecover
 import { startHeartbeat } from '../../lib/keepalive'
 import { watchClassicConnection } from '../../lib/classicconnection'
 import { useStreamAwake } from '../../lib/useStreamAwake'
+import { useDiscordPresence } from '../../lib/useDiscordPresence'
 import { configureClassicConsoleController } from '../../lib/classicconsolecontroller'
 import { configureClassicControllerProfile,resolveClassicControllerProfile } from '../../lib/classiccontrollerprofile'
 import { readConsoleProfiles } from '../../lib/consoleprofiles'
@@ -56,6 +57,7 @@ function LegacyStream({onRetry,recovery}:{onRetry:()=>void;recovery:ClassicRecov
     const recordClassicSample=React.useCallback((sample:DiagnosticSample)=>{const value=history.current;if(value.saved||!value.connectedAt)return;value.samples.push({...sample,elapsedSeconds:(Date.now()-value.startedAt)/1000});if(value.samples.length>300)value.samples.shift()},[])
     const exportClassicDiagnostics=()=>downloadDiagnostics(history.current.samples,target.startsWith('xcloud_')?'cloud':'home',connectionError?'Error':connected?'Connected':'Initializing','video',recovery.previousAttempts,connectionError,'classic')
     useStreamAwake(sessionId,connected&&!connectionError&&!target.startsWith('xcloud_')&&Boolean(settings.stream_keep_awake))
+    useDiscordPresence(sessionId,connected&&!connectionError&&settings.discord_presence_enabled===true,settings.discord_application_id)
     React.useEffect(() => {
         return () => {
             reconnect.current.dispose()

@@ -1,6 +1,7 @@
 import IpcBase from './base'
 import { powerSaveBlocker, app } from 'electron'
 import { StreamAwake } from '../helpers/streamawake'
+import { DiscordPresence,validDiscordApplicationId } from '../helpers/discordpresence'
 import defaults from '../../shared/settings-defaults.json'
 import Application from '../application'
 import StreamManager from '../helpers/streammanager'
@@ -34,6 +35,7 @@ export default class IpcStreaming extends IpcBase {
 
     _streamManager:StreamManager
     private awake=new StreamAwake(powerSaveBlocker)
+    private presence=new DiscordPresence()
     private startingHome=new Set<string>()
 
     hasHomeStream(target:string){
@@ -44,7 +46,7 @@ export default class IpcStreaming extends IpcBase {
         super(application)
 
         this._streamManager = new StreamManager(application)
-        app.on('before-quit',()=>this.awake.release())
+        app.on('before-quit',()=>{this.awake.release();this.presence.release()})
     }
 
     startStream(args:startStreamArgs){
@@ -80,7 +82,18 @@ export default class IpcStreaming extends IpcBase {
         return this.awake.renew(args.sessionId)
     }
 
+    setDiscordPresence(args:{sessionId:string;enabled:boolean}){
+        if(typeof args?.sessionId!=='string'||typeof args.enabled!=='boolean')return false
+        if(!args.enabled){this.presence.release(args.sessionId);return true}
+        const session=this._streamManager.getSession(args.sessionId)
+        const settings=this._application._store.get('settings',defaults) as typeof defaults
+        if(settings.discord_presence_enabled!==true||!validDiscordApplicationId(settings.discord_application_id)||!session||session.playerState!=='started'||(session.type!=='home'&&session.type!=='cloud')){this.presence.release(args.sessionId);return false}
+        this.presence.renew(args.sessionId,settings.discord_application_id,session.type)
+        return true
+    }
+
     stopStream(args:stopStreamArgs){
+        this.presence.release(args.sessionId)
         this.awake.release(args.sessionId)
         return this._streamManager.stopStream(args.sessionId)
     }
