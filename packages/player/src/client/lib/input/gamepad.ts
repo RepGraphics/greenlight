@@ -33,6 +33,7 @@ export default class Gamepad {
     private _physicalGamepadId = -1
     private neutralPending = false
     private virtualAxes: Record<string, number> = {}
+    private virtualReleasePending=false
     private keyboardState=new KeyboardGamepadState()
     private get observesFocus(){return !this._options.gamepad_force_capture}
     private onVisibility=()=>{if(document.hidden)this.onWindowBlur();else if(document.hasFocus())this.onWindowFocus()}
@@ -152,6 +153,7 @@ export default class Gamepad {
         this._physicalGamepadId = -1
         this._gamepadOverride.buttons = {}
         this.virtualAxes = {}
+        this.virtualReleasePending=false
         this.keyboardState.clear()
         this._player = undefined
 
@@ -176,30 +178,29 @@ export default class Gamepad {
     }
 
     setVirtualStick(side: 'Left' | 'Right', x: number, y: number) {
-        this.virtualAxes[side + 'ThumbXAxis'] = Math.max(-1, Math.min(1, x))
-        this.virtualAxes[side + 'ThumbYAxis'] = Math.max(-1, Math.min(1, y))
+        if(!this._player||!this._isFocused)return
+        const clamp=(n:number)=>Number.isFinite(n)?Math.max(-1,Math.min(1,n)):0
+        this.virtualAxes[side+'ThumbXAxis']=clamp(x)
+        this.virtualAxes[side+'ThumbYAxis']=clamp(y)
     }
 
     releaseVirtualStick(side: 'Left' | 'Right') {
-        delete this.virtualAxes[side + 'ThumbXAxis']
-        delete this.virtualAxes[side + 'ThumbYAxis']
-        this.neutralPending = true
+        const x=side+'ThumbXAxis',y=side+'ThumbYAxis'
+        if(x in this.virtualAxes||y in this.virtualAxes)this.virtualReleasePending=true
+        delete this.virtualAxes[x]
+        delete this.virtualAxes[y]
     }
 
-    sendButtonState(button, value){
-        if(this._player === undefined){
-            console.log('[Gamepad] Player is not attached. this._player is:', this._player)
-            return
+    sendButtonState(button:string,value:number){
+        if(!this._player||!this._isFocused)return
+        if(!Object.prototype.hasOwnProperty.call(this._options.gamepad_mapping,button))return
+        if(!Number.isFinite(value))return
+        const strength=Math.max(0,Math.min(1,value))
+        if(strength>0)this._gamepadOverride.buttons[button]=strength
+        else if(Object.prototype.hasOwnProperty.call(this._gamepadOverride.buttons,button)){
+            delete this._gamepadOverride.buttons[button]
+            this.virtualReleasePending=true
         }
-
-        if(! (button in this.getDefaultFamepadFrame())){
-            console.log('[Gamepad] Invalid button:', button)
-            return
-        }
-
-        const buttonPreset = this.getDefaultFamepadFrame()
-        buttonPreset.GamepadIndex = this._index
-        this._gamepadOverride.buttons[button] = value
     }
 
     onKeyDown(event:KeyboardEvent){
@@ -220,6 +221,7 @@ export default class Gamepad {
         this._isFocused = false
         this._gamepadOverride.buttons = {}
         this.virtualAxes = {}
+        this.virtualReleasePending=false
         this.keyboardState.clear()
         this.neutralPending = true
     }
@@ -282,7 +284,7 @@ export default class Gamepad {
     }
 
     hasOverrideButtons(){
-        return Object.keys(this._gamepadOverride.buttons).length > 0 || Object.keys(this.virtualAxes).length > 0 || this.keyboardState.pending
+        return Object.keys(this._gamepadOverride.buttons).length > 0 || Object.keys(this.virtualAxes).length > 0 || this.virtualReleasePending || this.keyboardState.pending
     }
 
     getGamepadState(){
@@ -313,45 +315,14 @@ export default class Gamepad {
             }
         }
 
-        // Check for button overrides from the keyboard
-        // for(const button in this._gamepadOverride.buttons){
-        //     frame[button] = this._gamepadOverride.buttons[button]
-
-        //     // Clean up existing keys if they are 0
-        //     if(this._gamepadOverride.buttons[button] === 0){
-        //         // Remove key from override
-        //         const newOverrideButtons = {}
-        //         for(const oButton in this._gamepadOverride.buttons){
-        //             if(this._gamepadOverride.buttons[oButton] !== 0){
-        //                 newOverrideButtons[oButton] = this._gamepadOverride.buttons[oButton]
-        //             }
-        //         }
-        //         this._gamepadOverride.buttons = newOverrideButtons
-        //     }
-        // }
-
-        // Check for button overrides from the keyboard
-        for(const button in this._gamepadOverride.buttons){
-            frame[button] = this._gamepadOverride.buttons[button]
+        // Virtual sources augment physical buttons. Releasing one source
+        // must not overwrite another source's held input with zero.
+        for(const button of Object.keys(this._gamepadOverride.buttons)){
+            frame[button]=Math.max(frame[button],this._gamepadOverride.buttons[button])
         }
-
-        // Keyboard and touch are separate input sources. A keyboard release
-        // must not erase a held physical or touch button.
         for(const button of this.keyboardState.read())frame[button]=1
-        for (const axis of Object.keys(this.virtualAxes)) frame[axis] = this.virtualAxes[axis]
-
-        // Clean up released buttons in a separate pass
-        const buttonsToRemove = []
-        for(const button in this._gamepadOverride.buttons){
-            if(this._gamepadOverride.buttons[button] === 0){
-                buttonsToRemove.push(button)
-            }
-        }
-
-        // Delete released buttons instead of recreating the object
-        for(const button of buttonsToRemove){
-            delete this._gamepadOverride.buttons[button]
-        }
+        for(const axis of Object.keys(this.virtualAxes))frame[axis]=this.virtualAxes[axis]
+        this.virtualReleasePending=false
 
         // Start + Select Nexus menu workaround
         if(frame.View > 0 && frame.Menu > 0){

@@ -79,8 +79,39 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
         statusCallback.current = onStatusChanged;
         const controller = useRef<Gamepad | undefined>(undefined);
         const pressed = useRef(new Map<number, string>());
-        const releaseTouch = () => { pressed.current.forEach(button => controller.current?.sendButtonState(button, 0)); pressed.current.clear(); controller.current?.releaseVirtualStick('Left'); controller.current?.releaseVirtualStick('Right') };
-        useEffect(() => { if (!touchControls) releaseTouch(); window.addEventListener('blur', releaseTouch); return () => { window.removeEventListener('blur', releaseTouch); releaseTouch() } }, [touchControls]);
+        const stickOwners=useRef(new Map<'Left'|'Right',number>());
+        const [touchEpoch,setTouchEpoch]=useState(0);
+        const releaseTouch = () => {
+            for(const button of new Set(pressed.current.values()))controller.current?.sendButtonState(button,0);
+            const hadInput=pressed.current.size>0||stickOwners.current.size>0;
+            pressed.current.clear();stickOwners.current.clear();
+            controller.current?.releaseVirtualStick('Left');controller.current?.releaseVirtualStick('Right');
+            if(hadInput)setTouchEpoch(epoch=>epoch+1);
+        };
+        useEffect(() => {
+            if (!touchControls) releaseTouch();
+            const hidden=()=>{if(document.hidden)releaseTouch()};
+            window.addEventListener('blur',releaseTouch);document.addEventListener('visibilitychange',hidden);
+            return()=>{window.removeEventListener('blur',releaseTouch);document.removeEventListener('visibilitychange',hidden);releaseTouch()};
+        },[touchControls]);
+        const releaseButton=(pointer:number)=>{
+            const button=pressed.current.get(pointer);
+            if(!button)return;
+            pressed.current.delete(pointer);
+            if(!Array.from(pressed.current.values()).includes(button))controller.current?.sendButtonState(button,0);
+        };
+        const startStick=(side:'Left'|'Right',pointer:number)=>{
+            if(!controller.current||document.hidden||!document.hasFocus()||stickOwners.current.has(side))return false;
+            stickOwners.current.set(side,pointer);return true;
+        };
+        const moveStick=(side:'Left'|'Right',pointer:number,x:number,y:number)=>{
+            if(stickOwners.current.get(side)!==pointer)return;
+            controller.current?.setVirtualStick(side,x,y);
+        };
+        const releaseStick=(side:'Left'|'Right',pointer:number)=>{
+            if(stickOwners.current.get(side)!==pointer)return;
+            stickOwners.current.delete(side);controller.current?.releaseVirtualStick(side);
+        };
         const inputs = useRef<Array<{ detach: () => void }>>([]);
         const [playerState, setPlayerState] = useState<string>('Initializing');
 
@@ -139,16 +170,17 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
         }, [player, playerState, microphone]);
         useEffect(() => {
             if (!player || consoleController || !nativeMouseKeyboard || playerState !== 'Connected') return;
-            let input: MouseKeyboard | undefined;
+            const input = new MouseKeyboard(0, mouseSensitivity);
             let surface: HTMLElement | undefined;
             const sync = () => {
-                const element = player.getVideoElement();
-                if (!element || element === surface) return;
-                input?.detach();
-                input = new MouseKeyboard(0, mouseSensitivity); input.attach(player); surface = element;
+                const candidate = player.getVideoElement();
+                const element = candidate?.isConnected ? candidate : undefined;
+                if (element === surface) return;
+                input.detach(); surface = element;
+                if(element)input.attach(player);
             };
             sync(); const timer = setInterval(sync, 500);
-            return () => { clearInterval(timer); input?.detach() };
+            return () => { clearInterval(timer); input.detach() };
         }, [player, consoleController, nativeMouseKeyboard, playerState, mouseSensitivity]);
         useEffect(()=>{
             if(!player||consoleController||!directTouch||playerState!=='Connected'||useWebGpu)return;
@@ -313,32 +345,40 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             };
         }, [communicationHandler.getSessionPath()]);
 
-        const touchButton = (button: string, label: string) => <button key={button} type="button" aria-label={button} onPointerDown={event => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); pressed.current.set(event.pointerId, button); controller.current?.sendButtonState(button, 1) }} onLostPointerCapture={event => { const released = pressed.current.get(event.pointerId); if (released) { pressed.current.delete(event.pointerId); if (!Array.from(pressed.current.values()).includes(released)) controller.current?.sendButtonState(released, 0) } }}>{label}</button>;
+        const touchButton=(button:string,label:string)=><button key={button} type="button" aria-label={button} onPointerDown={event=>{
+            if(event.button!==0||!controller.current||document.hidden||!document.hasFocus()||pressed.current.has(event.pointerId))return;
+            event.preventDefault();
+            try{event.currentTarget.setPointerCapture(event.pointerId)}catch{return}
+            pressed.current.set(event.pointerId,button);controller.current.sendButtonState(button,1);
+        }} onPointerUp={event=>releaseButton(event.pointerId)} onPointerCancel={event=>releaseButton(event.pointerId)} onLostPointerCapture={event=>releaseButton(event.pointerId)}>{label}</button>;
         return (
             <div ref={playerInstance}>
                 <div id="playerContainer"></div>
-                {!consoleController && touchControls && playerState === 'Connected' && <div className="gl-touch-overlay"><div className="gl-touch-shoulders">{touchButton('LeftTrigger','LT')}{touchButton('LeftShoulder','LB')}{touchButton('View','▣')}{touchButton('Nexus','Xbox')}{touchButton('Menu','☰')}{touchButton('RightShoulder','RB')}{touchButton('RightTrigger','RT')}</div><div className="gl-touch-dpad">{touchButton('DPadUp','↑')}{touchButton('DPadLeft','←')}{touchButton('DPadRight','→')}{touchButton('DPadDown','↓')}</div><VirtualStick side="Left" onMove={(x,y) => controller.current?.setVirtualStick('Left', x,y)} onRelease={() => controller.current?.releaseVirtualStick('Left')} /><VirtualStick side="Right" onMove={(x,y) => controller.current?.setVirtualStick('Right', x,y)} onRelease={() => controller.current?.releaseVirtualStick('Right')} /><div className="gl-touch-abxy">{touchButton('Y','Y')}{touchButton('X','X')}{touchButton('B','B')}{touchButton('A','A')}</div></div>}
+                {!consoleController && touchControls && playerState === 'Connected' && <div key={touchEpoch} className="gl-touch-overlay"><div className="gl-touch-shoulders">{touchButton('LeftTrigger','LT')}{touchButton('LeftShoulder','LB')}{touchButton('View','▣')}{touchButton('Nexus','Xbox')}{touchButton('Menu','☰')}{touchButton('RightShoulder','RB')}{touchButton('RightTrigger','RT')}</div><div className="gl-touch-dpad">{touchButton('DPadUp','↑')}{touchButton('DPadLeft','←')}{touchButton('DPadRight','→')}{touchButton('DPadDown','↓')}</div><VirtualStick side="Left" onStart={id=>startStick('Left',id)} onMove={(id,x,y)=>moveStick('Left',id,x,y)} onRelease={id=>releaseStick('Left',id)}/><VirtualStick side="Right" onStart={id=>startStick('Right',id)} onMove={(id,x,y)=>moveStick('Right',id,x,y)} onRelease={id=>releaseStick('Right',id)}/><div className="gl-touch-abxy">{touchButton('Y','Y')}{touchButton('X','X')}{touchButton('B','B')}{touchButton('A','A')}</div></div>}
                 {showStats && <div className="gl-performance-hud"><span>{metrics.width ? metrics.width + '×' + metrics.height : '—'}</span><span>{Math.round(metrics.fps)} FPS</span><span>{metrics.bitrate.toFixed(1)} Mbps</span><span>{metrics.jitter.toFixed(1)} ms jitter</span><span>{metrics.loss} packets lost</span></div>}
             </div>
         );
     }
 );
 
-function VirtualStick({ side, onMove, onRelease }: { side: 'Left' | 'Right'; onMove: (x:number,y:number) => void; onRelease: () => void }) {
-    const pointer = useRef<number | null>(null);
-    const [position, setPosition] = useState({ x:0, y:0 });
-    const release = () => { pointer.current = null; setPosition({ x:0, y:0 }); onRelease() };
-    const move = (event: React.PointerEvent<HTMLDivElement>) => {
-        if (pointer.current !== event.pointerId) return;
-        const rect = event.currentTarget.getBoundingClientRect();
-        const radius = Math.max(1, rect.width / 2);
-        let x = (event.clientX - rect.left - radius) / radius;
-        let y = (event.clientY - rect.top - rect.height / 2) / radius;
-        const length = Math.max(1, Math.hypot(x,y));
-        x /= length; y /= length;
-        setPosition({ x,y }); onMove(x,y);
+function VirtualStick({side,onStart,onMove,onRelease}:{side:'Left'|'Right';onStart:(id:number)=>boolean;onMove:(id:number,x:number,y:number)=>void;onRelease:(id:number)=>void}){
+    const pointer=useRef<number|null>(null);
+    const [position,setPosition]=useState({x:0,y:0});
+    const release=(id:number)=>{if(pointer.current!==id)return;pointer.current=null;setPosition({x:0,y:0});onRelease(id)};
+    const move=(event:React.PointerEvent<HTMLDivElement>)=>{
+        if(pointer.current!==event.pointerId)return;
+        const rect=event.currentTarget.getBoundingClientRect(),radius=Math.max(1,rect.width/2);
+        let x=(event.clientX-rect.left-rect.width/2)/radius,y=(event.clientY-rect.top-rect.height/2)/radius;
+        if(!Number.isFinite(x)||!Number.isFinite(y)){x=0;y=0}
+        const length=Math.max(1,Math.hypot(x,y));x/=length;y/=length;
+        setPosition({x,y});onMove(event.pointerId,x,y);
     };
-    return <div className={'gl-virtual-stick gl-stick-' + side.toLowerCase()} aria-label={side + ' analogue stick'} onPointerDown={event => { if (pointer.current !== null) return; event.preventDefault(); pointer.current = event.pointerId; event.currentTarget.setPointerCapture(event.pointerId); move(event) }} onPointerMove={move} onLostPointerCapture={event => { if (pointer.current === event.pointerId) release() }}><span style={{ transform: 'translate(' + position.x * 55 + '%, ' + position.y * 55 + '%)' }} /></div>
+    return <div className={'gl-virtual-stick gl-stick-'+side.toLowerCase()} aria-label={side+' analogue stick'} onPointerDown={event=>{
+        if(pointer.current!==null||event.button!==0||!onStart(event.pointerId))return;
+        event.preventDefault();
+        try{event.currentTarget.setPointerCapture(event.pointerId)}catch{onRelease(event.pointerId);return}
+        pointer.current=event.pointerId;move(event);
+    }} onPointerMove={move} onPointerUp={event=>release(event.pointerId)} onPointerCancel={event=>release(event.pointerId)} onLostPointerCapture={event=>release(event.pointerId)}><span style={{transform:'translate('+position.x*55+'%, '+position.y*55+'%)'}}/></div>
 }
 
 // CONTROLS
