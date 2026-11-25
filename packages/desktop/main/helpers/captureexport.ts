@@ -7,9 +7,9 @@ export function validateCaptureExport(value:unknown):CaptureExport{
     const {name,kind,bytes}=value as Partial<CaptureExport>
     if(kind!=='screenshot'&&kind!=='clip')throw Error('Invalid capture type')
     const ext=kind==='screenshot'?'.png':'.webm'
-    if(typeof name!=='string'||name.length>85||basename(name)!==name||extname(name).toLowerCase()!==ext)throw Error('Invalid capture filename')
+    if(typeof name!=='string'||name.length>85||Buffer.byteLength(name,'utf8')>240||basename(name)!==name||extname(name).toLowerCase()!==ext)throw Error('Invalid capture filename')
     const base=name.slice(0,-ext.length)
-    if(!base.trim()||/[\\/:*?"<>|\x00-\x1f]/.test(base)||/[. ]$/.test(base)||/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(base))throw Error('Invalid capture filename')
+    if(!base.trim()||/[\\/:*?"<>|\x00-\x1f]/.test(base)||/[. ]$/.test(base)||/^(con|prn|aux|nul|conin\$|conout\$|com[1-9¹²³]|lpt[1-9¹²³])(?:\.|$)/i.test(base))throw Error('Invalid capture filename')
     if(!(bytes instanceof Uint8Array)||bytes.byteLength>captureExportLimit)throw Error('Invalid capture size')
     const signature=kind==='screenshot'?[137,80,78,71,13,10,26,10]:[26,69,223,163]
     if(bytes.byteLength<signature.length||signature.some((byte,index)=>bytes[index]!==byte))throw Error('Unsupported capture format')

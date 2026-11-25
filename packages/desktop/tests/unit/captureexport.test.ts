@@ -43,3 +43,8 @@ test('capture folder access and export are desktop-only IPC operations',()=>{
         assert.equal(isAllowedWebIpc('app',action),false)
     }
 })
+
+test('capture exports reject overlong UTF-8 filenames and additional Windows devices',()=>{
+    for(const name of ['界'.repeat(80)+'.png','CONIN$.png','CONOUT$.png','COM¹.png','LPT².png'])assert.throws(()=>validateCaptureExport({...capture,name}))
+    assert.equal(validateCaptureExport({...capture,name:'游戏.png'}).name,'游戏.png')
+})
