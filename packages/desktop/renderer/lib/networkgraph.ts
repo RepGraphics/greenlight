@@ -18,3 +18,13 @@ export function graphData(samples:DiagnosticSample[],metric:GraphMetric,seconds:
     const last=recent[recent.length-1]
     return {max,segments:segments.map(s=>s.join(' ')),last:last&&valid(last)?last[metric]:undefined}
 }
+
+// Bound graph history by time and sample count, preserving unavailable samples
+// as gaps. Reset if an elapsed clock restarts (e.g. a new stream attempt).
+export function appendGraphSample(samples:DiagnosticSample[],sample:DiagnosticSample){
+    if(!Number.isFinite(sample.elapsedSeconds)||sample.elapsedSeconds<0)return samples
+    const last=samples.at(-1)
+    if(last&&sample.elapsedSeconds<last.elapsedSeconds)return [sample]
+    const next=last&&last.elapsedSeconds===sample.elapsedSeconds?samples.slice(0,-1):samples
+    return [...next.filter(item=>item.elapsedSeconds>=sample.elapsedSeconds-300).slice(-299),sample]
+}

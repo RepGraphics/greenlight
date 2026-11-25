@@ -10,6 +10,8 @@ import { storeCapture } from '../../lib/capturelibrary'
 import {sanitizeSample,summarizeDiagnostics} from '../../lib/streamdiagnostics'
 import {recommendLowerBitrate} from '../../lib/bitrateadvisor'
 import {ClassicMetricsSampler} from '../../lib/classicmetrics'
+import NetworkGraphs from './networkgraphs'
+import { appendGraphSample } from '../../lib/networkgraph'
 import type {DiagnosticSample} from '../../lib/streamdiagnostics'
 import { useSettings } from '../../context/userContext'
 import Button from './button'
@@ -119,6 +121,7 @@ function StreamComponent({
     const [hud, setHud] = React.useState(settings.stream_performance_hud)
     const [metrics,setMetrics]=React.useState<Partial<DiagnosticSample>>({})
     const [showQuality,setShowQuality]=React.useState(false)
+    const [showGraphs,setShowGraphs]=React.useState(false)
     const [qualityCap,setQualityCap]=React.useState<number|null>(null)
     const [qualitySamples,setQualitySamples]=React.useState<DiagnosticSample[]>([])
     const recentSamples=React.useRef<DiagnosticSample[]>([])
@@ -137,17 +140,17 @@ function StreamComponent({
                 const result=sampler.sample(stats,performance.now(),{peerState:peer.connectionState,iceState:peer.iceConnectionState,signalingState:peer.signalingState})
                 const value=sanitizeSample(result,(performance.now()-started)/1000)
                 onMetrics?.(value)
-                recentSamples.current=[...recentSamples.current.slice(-29),value]
+                recentSamples.current=appendGraphSample(recentSamples.current,value)
                 setQualitySamples(recentSamples.current)
                 setMetrics(value.statsFresh===false?{}:value)
             }catch{
-                if(!disposed){const value=sanitizeSample({width:0,height:0,fps:0,bitrate:0,jitter:0,rtt:0,loss:0,statsFresh:false},(performance.now()-started)/1000);recentSamples.current=[...recentSamples.current.slice(-29),value];setQualitySamples(recentSamples.current);setMetrics({});onMetrics?.(value)}
+                if(!disposed){const value=sanitizeSample({width:0,height:0,fps:0,bitrate:0,jitter:0,rtt:0,loss:0,statsFresh:false},(performance.now()-started)/1000);recentSamples.current=appendGraphSample(recentSamples.current,value);setQualitySamples(recentSamples.current);setMetrics({});onMetrics?.(value)}
             }finally{busy=false}
         }
         void sample();const interval=setInterval(sample,1000)
         return()=>{disposed=true;clearInterval(interval)}
     },[connected,xPlayer,onMetrics])
-    const quality=summarizeDiagnostics(qualitySamples)
+    const quality=summarizeDiagnostics(qualitySamples.slice(-30))
     const suggestedCap=connected?recommendLowerBitrate(qualitySamples,activeCap):null
 
     const refreshVideo = React.useCallback(()=>{
@@ -425,7 +428,7 @@ function StreamComponent({
         else if(action==='fullscreen')void toggleFullscreen()
         else if(action==='mute')toggleMute()
         else if(action==='hud')setHud(value=>!value)
-        else if(action==='graphs')toggleDebug()
+        else if(action==='graphs')setShowGraphs(value=>!value)
         else if(action==='screenshot'&&captureReady)void capture('download')
         else if(action==='recording')toggleRecording()
         else if(action==='replay')void saveReplay()
@@ -508,6 +511,7 @@ function StreamComponent({
         <React.Fragment>
             <div>
                 {hud && <div className='gl-performance-hud' aria-label={t('dashboard.performanceHud')}><span>{metrics.width && metrics.height ? metrics.width + '×' + metrics.height : '—'}</span><span>{metrics.fps != null ? Math.round(metrics.fps) : '—'} FPS</span><span>{metrics.bitrate != null ? metrics.bitrate.toFixed(1) : '—'} Mbps</span><span>{metrics.jitter != null ? metrics.jitter.toFixed(1) : '—'} ms {t('dashboard.jitter')}</span><span>{metrics.loss ?? '—'} {t('dashboard.packetsLost')}</span></div>}
+                {showGraphs&&<NetworkGraphs samples={qualitySamples} onClose={()=>setShowGraphs(false)}/>}
                 {showQuality&&<div className='gl-performance-hud gl-quality-advice' style={{top:'auto',bottom:100}}><span>{t('dashboard.connectionQuality')}: {t('dashboard.quality_'+quality.quality)}</span><span>RTT p95: {quality.rtt95??'—'} ms</span><span>Jitter p95: {quality.jitter95??'—'} ms</span><span>{t('dashboard.averageBitrate')}: {quality.averageBitrate??'—'} Mbps</span><span>{t('dashboard.currentBitrateCap')}: {activeCap?Math.round(activeCap/1000)+' Mbps':t('settings.streaming.unlimitedLabel')}</span><span>{t('dashboard.qualityHint_'+quality.quality)}</span>{suggestedCap!==null&&onRestartQuality&&<button type='button' className='btn' disabled={protectedCapture} style={{pointerEvents:'auto'}} onClick={()=>setQualityCap(suggestedCap)}>{t('dashboard.lowerBitrateSuggestion',{bitrate:Math.round(suggestedCap/1000)})}</button>}</div>}
                 {qualityCap!==null&&<div className='gl-live-video-panel' role='dialog' aria-label={t('dashboard.restartQuality')}><h2>{t('dashboard.restartQuality')}</h2><p>{t('dashboard.restartQualityWarning',{bitrate:Math.round(qualityCap/1000)})}</p><button type='button' className='btn btn-primary' disabled={protectedCapture||!connected} onClick={()=>{const cap=qualityCap;setQualityCap(null);onRestartQuality?.(cap)}}>{t('dashboard.retryStream')}</button> <button type='button' className='btn' onClick={()=>setQualityCap(null)}>{t('dashboard.cancelBackup')}</button></div>}
                 {captureMessage&&!clip&&<div className='gl-recording-result' role='status'>{t('dashboard.'+captureMessage)} <button type='button' className='btn' onClick={()=>setCaptureMessage('')}>{t('dashboard.dismiss')}</button></div>}
@@ -582,6 +586,7 @@ function StreamComponent({
                             width: '25%',
                             textAlign: 'right',
                         }}>
+                            <button type='button' className='btn' aria-label={t('dashboard.networkGraphs')} title={t('dashboard.networkGraphs')} aria-pressed={showGraphs} onClick={()=>setShowGraphs(value=>!value)}><i className='fa-solid fa-chart-area' aria-hidden='true'/></button>
                             <button type='button' className='btn' aria-label={t('dashboard.connectionQuality')} title={t('dashboard.connectionQuality')} aria-pressed={showQuality} onClick={()=>setShowQuality(value=>!value)}><i className='fa-solid fa-signal' aria-hidden='true'/></button>
                             <button type='button' className='btn' aria-label={t('dashboard.videoFilters')} title={t('dashboard.videoFilters')} aria-pressed={showFilters} onClick={()=>setShowFilters(value=>!value)}><i className='fa-solid fa-sliders' aria-hidden='true'/></button>
                             <button type='button' className='btn' title={t('dashboard.refreshVideo')} onClick={refreshVideo}><i className='fa-solid fa-rotate' aria-hidden='true'/></button>{onExportDiagnostics&&<button type='button' className='btn' title={t('dashboard.exportDiagnostics')} aria-label={t('dashboard.exportDiagnostics')} onClick={onExportDiagnostics}><i className='fa-solid fa-file-arrow-down' aria-hidden='true'/></button>}<button type='button' className='btn' aria-label={t('dashboard.performanceHud')} aria-pressed={hud} onClick={() => setHud(value => !value)}><i className='fa-solid fa-chart-line' aria-hidden='true' /></button>
