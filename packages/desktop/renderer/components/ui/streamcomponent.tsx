@@ -1,4 +1,6 @@
 import React from 'react'
+import {sanitizeSample} from '../../lib/streamdiagnostics'
+import type {DiagnosticSample} from '../../lib/streamdiagnostics'
 import { useSettings } from '../../context/userContext'
 import Button from './button'
 import Slider from './slider'
@@ -12,6 +14,7 @@ import { useTranslation } from 'react-i18next'
 interface StreamComponentProps {
     onDisconnect?: () => void;
     onLeave?: () => void;
+    onMetrics?: (sample:DiagnosticSample)=>void;
     onMenu?: () => void;
     xPlayer: xPlayer;
 }
@@ -19,6 +22,7 @@ interface StreamComponentProps {
 function StreamComponent({
     onDisconnect,
     onLeave,
+    onMetrics,
     onMenu,
     xPlayer,
 }: StreamComponentProps) {
@@ -27,7 +31,7 @@ function StreamComponent({
     const [hud, setHud] = React.useState(settings.stream_performance_hud)
     const [metrics, setMetrics] = React.useState<{ fps?: number; width?: number; height?: number; jitter?: number; loss?: number; bitrate?: number }>({})
     React.useEffect(() => {
-        if (!hud) return
+        if (!hud&&!onMetrics) return
         let disposed = false, busy = false
         let previous: { bytes: number; time: number } | undefined
         const sample = async () => {
@@ -36,19 +40,22 @@ function StreamComponent({
             try {
                 const stats = await xPlayer._webrtcClient.getStats()
                 if (disposed) return
+                let rtt=0
+                stats.forEach(report=>{if(report.type==='transport'&&report.selectedCandidatePairId){const pair=stats.get(report.selectedCandidatePairId);if(typeof pair?.currentRoundTripTime==='number')rtt=pair.currentRoundTripTime*1000}})
                 stats.forEach(report => {
                     if (report.type !== 'inbound-rtp' || report.kind !== 'video') return
                     const bytes = report.bytesReceived, time = report.timestamp
                     const bitrate = previous && time > previous.time && bytes >= previous.bytes ? (bytes - previous.bytes) * 8 / (time - previous.time) / 1000 : undefined
                     if (typeof bytes === 'number' && typeof time === 'number') previous = { bytes, time }
-                    setMetrics({ fps: report.framesPerSecond, width: report.frameWidth, height: report.frameHeight, jitter: typeof report.jitter === 'number' ? report.jitter * 1000 : undefined, loss: report.packetsLost, bitrate })
+                    onMetrics?.(sanitizeSample({fps:report.framesPerSecond??0,width:report.frameWidth??0,height:report.frameHeight??0,jitter:typeof report.jitter==='number'?report.jitter*1000:0,loss:report.packetsLost??0,bitrate:bitrate??0,rtt,statsFresh:bitrate!==undefined},0))
+                    if(hud)setMetrics({ fps: report.framesPerSecond, width: report.frameWidth, height: report.frameHeight, jitter: typeof report.jitter === 'number' ? report.jitter * 1000 : undefined, loss: report.packetsLost, bitrate })
                 })
             } catch { /* stats may be unavailable during disconnect */ } finally { busy = false }
         }
         void sample()
         const interval = setInterval(sample, 1000)
         return () => { disposed = true; clearInterval(interval) }
-    }, [hud, xPlayer])
+    }, [hud, xPlayer,onMetrics])
 
     const refreshVideo = React.useCallback(()=>{
         const video=document.querySelector<HTMLVideoElement>('#streamComponentHolder video')

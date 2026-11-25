@@ -65,7 +65,8 @@ test('session history records connected duration without target identifiers',()=
  const record=makeSessionRecord(1000,3000,63000,'home','ended',[])
  assert.equal(record.durationSeconds,60)
  assert.equal(record.quality,'insufficient')
- assert.equal(Object.keys(record).length,8)
+ assert.equal(Object.keys(record).length,9)
+ assert.equal(record.engine,'v3')
  assert.equal(makeSessionRecord(1000,0,5000,'cloud','failed',[]).durationSeconds,0)
 })
 

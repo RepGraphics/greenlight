@@ -395,8 +395,8 @@
       "backupRestored": "Settings restored. Restart the app for all changes to take effect.",
       "backupFailed": "Could not save restored settings.",
       "sessionHistory": "Session history",
-      "historyDescription": "Optional local history for V3 streaming attempts. Keeps up to 100 records with duration, outcome and recent connection statistics. No console, game, account or network identifiers are stored.",
-      "recordHistory": "Record future V3 sessions",
+      "historyDescription": "Optional local history for Classic and V3 streaming attempts. Keeps up to 100 records with duration, outcome and recent connection statistics. No console, game, account or network identifiers are stored.",
+      "recordHistory": "Record future streaming sessions",
       "historyFilter": "Streaming mode",
       "historyAll": "All sessions",
       "historyTotals": "{{count}} sessions · {{minutes}} minutes connected",
@@ -536,7 +536,9 @@
       "captureSort_largest": "Largest first",
       "captureSort_name": "Name",
       "graphWindow": "Graph time window",
-      "graphGapHint": "Gaps indicate missing or stale samples. The latest value is hidden when statistics are unavailable."
+      "graphGapHint": "Gaps indicate missing or stale samples. The latest value is hidden when statistics are unavailable.",
+      "historyBreakdown": "{{ended}} ended · {{failed}} failed · {{interrupted}} interrupted",
+      "historyExport": "Export filtered history (CSV)"
     }
   }
 }

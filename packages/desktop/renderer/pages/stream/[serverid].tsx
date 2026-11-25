@@ -1,4 +1,6 @@
 import React from 'react'
+import { addSession,makeSessionRecord } from '../../lib/sessionhistory'
+import type { DiagnosticSample } from '../../lib/streamdiagnostics'
 import { startHeartbeat } from '../../lib/keepalive'
 import { useStreamAwake } from '../../lib/useStreamAwake'
 import { configureClassicConsoleController } from '../../lib/classicconsolecontroller'
@@ -35,9 +37,14 @@ function LegacyStream() {
     const intentionalExit=React.useRef(false)
     const [queueTime, setQueueTime] = React.useState(0)
     const activeSession = React.useRef('')
+    const history=React.useRef({startedAt:Date.now(),connectedAt:0,saved:false,samples:[] as DiagnosticSample[]})
+    const historyEnabled=React.useRef(Boolean(settings.v3_session_history))
+    const recordHistory=React.useCallback((outcome:'ended'|'failed'|'interrupted')=>{const value=history.current;if(!historyEnabled.current||value.saved||(!value.connectedAt&&outcome!=='failed'))return;value.saved=true;addSession(makeSessionRecord(value.startedAt,value.connectedAt,Date.now(),target.startsWith('xcloud_')?'cloud':'home',outcome,value.samples,'classic'))},[target])
+    const recordClassicSample=React.useCallback((sample:DiagnosticSample)=>{const value=history.current;if(!historyEnabled.current||value.saved||!value.connectedAt)return;value.samples.push({...sample,elapsedSeconds:(Date.now()-value.startedAt)/1000});if(value.samples.length>300)value.samples.shift()},[])
     useStreamAwake(sessionId,connected&&!connectionError&&!target.startsWith('xcloud_')&&Boolean(settings.stream_keep_awake))
     React.useEffect(() => {
         return () => {
+            recordHistory('interrupted')
             const id = activeSession.current
             activeSession.current = ''
             if (id) void Ipc.send('streaming', 'stopStream', { sessionId: id }).catch(() => {})
@@ -137,6 +144,7 @@ function LegacyStream() {
                 if(connStatus !== null){
                     if(event.state === 'connected'){
                         setConnected(true)
+                        if(!history.current.connectedAt)history.current.connectedAt=Date.now()
                         connStatus.innerText = t('streamWindow.clientHasBeenDisconnected')
                         document.getElementById('component_streamcomponent_loader').className = 'hidden'
 
@@ -160,6 +168,7 @@ function LegacyStream() {
 
                     } else if(event.state === 'closed') {
                         setConnected(false)
+                        recordHistory(intentionalExit.current?'ended':'failed')
                         stopHeartbeat.current?.();stopHeartbeat.current=undefined
                         // Client has been disconnected. Lets return to home.
                         // xPlayer.close()
@@ -228,6 +237,7 @@ function LegacyStream() {
                             } else {
                                 alert(t('errors.streamErrorResult') + ' ' + session.state + '\n' + t('errors.details') + ' [' + session.errorDetails?.code + '] ' + session.errorDetails?.message)
                             }
+                            recordHistory('failed')
                             console.log('Full stream error:', session.errorDetails)
                             onDisconnect()
                             void router.replace('/home')
@@ -272,6 +282,7 @@ function LegacyStream() {
     }
 
     function onDisconnect(){
+        recordHistory('ended')
         intentionalExit.current=true
         stopHeartbeat.current?.();stopHeartbeat.current=undefined
         if (!sessionId) { void router.replace('/home'); return }
@@ -294,7 +305,7 @@ function LegacyStream() {
             </Head>
 
             {connectionError && <div className='gl-experimental-error' role='alert'><p>{t('dashboard.classicConnectionLost')}</p><p>{t('dashboard.classicFailure_'+connectionError)}</p><button className='btn btn-primary' onClick={()=>{onDisconnect();void router.replace('/home')}}>{t('dashboard.backHint')}</button></div>}
-            { (xPlayer !== undefined) ? <StreamComponent onLeave={()=>{intentionalExit.current=true;activeSession.current='';void router.replace('/home')}} onDisconnect={ () => {
+            { (xPlayer !== undefined) ? <StreamComponent onMetrics={historyEnabled.current?recordClassicSample:undefined} onLeave={()=>{recordHistory('ended');intentionalExit.current=true;activeSession.current='';void router.replace('/home')}} onDisconnect={ () => {
                 onDisconnect()
             }} onMenu={ consoleController ? undefined : () => {
                 gamepadSend('nexus')
