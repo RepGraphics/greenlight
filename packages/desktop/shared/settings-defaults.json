@@ -72,5 +72,7 @@
     "v3_multi_controller": false,
     "v3_adaptive_recovery": false,
     "v3_replay_seconds": 30,
+    "appearance_theme": "graphite",
+    "appearance_accent": "green",
     "stream_keep_awake": false
 }
