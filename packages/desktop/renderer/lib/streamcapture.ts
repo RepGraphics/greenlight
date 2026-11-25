@@ -7,7 +7,7 @@ export function currentVideo(): HTMLVideoElement | null {
 }
 
 export function canCapture(video: HTMLVideoElement | null): video is HTMLVideoElement {
-    return Boolean(video && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0)
+    return Boolean(video && video.readyState >= 2 && Number.isSafeInteger(video.videoWidth) && Number.isSafeInteger(video.videoHeight) && video.videoWidth > 0 && video.videoHeight > 0 && video.videoWidth*video.videoHeight<=16777216)
 }
 
 // Capture only decoded game video; never capture other windows or UI.

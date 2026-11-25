@@ -6,6 +6,8 @@ Changes on `main-v2` are development changes, not a new numbered release. See [c
 
 ### Added
 
+- Classic screenshot download, screenshot library storage and picture-in-picture controls, with bounded decoded-frame validation.
+
 - Classic diagnostics export from the stream toolbar and connection failure screen; local viewer supports Classic and V3 reports.
 
 - Classic session history, engine and outcome filters, and local CSV export of filtered session records.

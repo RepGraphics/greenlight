@@ -1,4 +1,6 @@
 import React from 'react'
+import { canCapture, captureScreenshotBlob, saveStreamScreenshot, toggleStreamPictureInPicture } from '../../lib/streamcapture'
+import { storeCapture } from '../../lib/capturelibrary'
 import {sanitizeSample} from '../../lib/streamdiagnostics'
 import type {DiagnosticSample} from '../../lib/streamdiagnostics'
 import { useSettings } from '../../context/userContext'
@@ -30,6 +32,28 @@ function StreamComponent({
 }: StreamComponentProps) {
     const { t } = useTranslation()
     const { settings } = useSettings()
+    const [captureReady,setCaptureReady]=React.useState(false)
+    const [captureBusy,setCaptureBusy]=React.useState(false)
+    const [captureMessage,setCaptureMessage]=React.useState('')
+    const [pipActive,setPipActive]=React.useState(false)
+    const captureLock=React.useRef(false)
+    const currentClassicVideo=()=>document.querySelector<HTMLVideoElement>('#streamComponentHolder video')
+    React.useEffect(()=>{
+        const update=()=>{const video=currentClassicVideo();setCaptureReady(Boolean(settings.video_enabled&&canCapture(video)));setPipActive(Boolean(video&&document.pictureInPictureElement===video))}
+        update();const timer=setInterval(update,500)
+        return()=>{clearInterval(timer);const video=currentClassicVideo();if(video&&document.pictureInPictureElement===video)void document.exitPictureInPicture().catch(()=>{})}
+    },[xPlayer,settings.video_enabled])
+    const capture=async(action:'download'|'library'|'pip')=>{
+        if(captureLock.current)return
+        const video=currentClassicVideo()
+        if(!settings.video_enabled||!canCapture(video))return
+        captureLock.current=true;setCaptureBusy(true);setCaptureMessage('')
+        try{
+            if(action==='download'){await saveStreamScreenshot(video);setCaptureMessage('classicScreenshotSaved')}
+            else if(action==='library'){await storeCapture('screenshot',await captureScreenshotBlob(video));setCaptureMessage('captureLibrarySaved')}
+            else {await toggleStreamPictureInPicture(video);setPipActive(document.pictureInPictureElement===video)}
+        }catch{setCaptureMessage(action==='pip'?'classicPipFailed':'classicScreenshotFailed')}finally{captureLock.current=false;setCaptureBusy(false)}
+    }
     const [hud, setHud] = React.useState(settings.stream_performance_hud)
     const [metrics, setMetrics] = React.useState<{ fps?: number; width?: number; height?: number; jitter?: number; loss?: number; bitrate?: number }>({})
     React.useEffect(() => {
@@ -412,6 +436,7 @@ function StreamComponent({
         <React.Fragment>
             <div>
                 {hud && <div className='gl-performance-hud' aria-label={t('dashboard.performanceHud')}><span>{metrics.width && metrics.height ? metrics.width + '×' + metrics.height : '—'}</span><span>{metrics.fps != null ? Math.round(metrics.fps) : '—'} FPS</span><span>{metrics.bitrate != null ? metrics.bitrate.toFixed(1) : '—'} Mbps</span><span>{metrics.jitter != null ? metrics.jitter.toFixed(1) : '—'} ms {t('dashboard.jitter')}</span><span>{metrics.loss ?? '—'} {t('dashboard.packetsLost')}</span></div>}
+                {captureMessage&&<div className='gl-recording-result' role='status'>{t('dashboard.'+captureMessage)} <button type='button' className='btn' onClick={()=>setCaptureMessage('')}>{t('dashboard.dismiss')}</button></div>}
                 <div id="streamComponentHolder">
                 </div>
 
@@ -470,6 +495,9 @@ function StreamComponent({
                             textAlign: 'right',
                         }}>
                             <button type='button' className='btn' title={t('dashboard.refreshVideo')} onClick={refreshVideo}><i className='fa-solid fa-rotate' aria-hidden='true'/></button>{onExportDiagnostics&&<button type='button' className='btn' title={t('dashboard.exportDiagnostics')} aria-label={t('dashboard.exportDiagnostics')} onClick={onExportDiagnostics}><i className='fa-solid fa-file-arrow-down' aria-hidden='true'/></button>}<button type='button' className='btn' aria-label={t('dashboard.performanceHud')} aria-pressed={hud} onClick={() => setHud(value => !value)}><i className='fa-solid fa-chart-line' aria-hidden='true' /></button>
+                            <button type='button' className='btn' disabled={!captureReady||captureBusy} title={t('dashboard.screenshot')} aria-label={t('dashboard.screenshot')} onClick={()=>void capture('download')}><i className='fa-solid fa-camera' aria-hidden='true'/></button>
+                            <button type='button' className='btn' disabled={!captureReady||captureBusy} title={t('dashboard.saveToLibrary')} aria-label={t('dashboard.saveToLibrary')} onClick={()=>void capture('library')}><i className='fa-solid fa-floppy-disk' aria-hidden='true'/></button>
+                            <button type='button' className='btn' disabled={!captureReady||captureBusy} aria-pressed={pipActive} title={t('dashboard.classicPip')} aria-label={t('dashboard.classicPip')} onClick={()=>void capture('pip')}><i className='fa-solid fa-window-restore' aria-hidden='true'/></button>
                             <button type='button' className='btn' aria-pressed={controlsPinned} title={t('dashboard.pinControls')} onClick={togglePin}><i className='fa-solid fa-thumbtack' aria-hidden='true' /></button>
                             <button type='button' className='btn' aria-label={t('dashboard.fullscreen')} aria-pressed={fullscreen} onClick={() => { void toggleFullscreen() }}><i className={'fa-solid ' + (fullscreen ? 'fa-compress' : 'fa-expand')} aria-hidden='true' /></button>
                             <Button label={<i className="fa-solid fa-bug"></i>} title={t("streamWindow.debugTitle")} onClick={(e) => {

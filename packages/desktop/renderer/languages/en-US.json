@@ -540,7 +540,11 @@
       "historyBreakdown": "{{ended}} ended · {{failed}} failed · {{interrupted}} interrupted",
       "historyExport": "Export filtered history (CSV)",
       "failure_closed": "The Classic streaming input channel closed unexpectedly.",
-      "failure_keepalive": "Classic session keepalive requests failed."
+      "failure_keepalive": "Classic session keepalive requests failed.",
+      "classicScreenshotSaved": "Screenshot downloaded.",
+      "classicScreenshotFailed": "Could not capture or save this video frame.",
+      "classicPip": "Picture-in-picture",
+      "classicPipFailed": "Picture-in-picture is unavailable for this video."
     }
   }
 }
