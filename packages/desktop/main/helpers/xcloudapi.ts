@@ -1,4 +1,5 @@
 import https from 'https'
+import { requestXboxJson } from './xboxrequest'
 import { requestedDisplay } from './streamresolution'
 import Application from '../application'
 import { Address6 } from 'ip-address'
@@ -38,117 +39,33 @@ export default class xCloudApi {
         this._type = type
     }
 
-    get(url: string, method = 'GET', deadline = Date.now() + 45000) {
-        return new Promise((resolve, reject) => {
-            let responseData = ''
-
-            const req = https.request({
-                host: this._host,
-                path: url,
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer '+this._token,
-                },
-            }, (response:any) => {
-                response.on('data', (data:any) => {
-                    responseData += data
-                })
-
-                response.on('end', () => {
-                    if(response.statusCode >= 200 && response.statusCode <= 299){
-                        this._application.log('xCloudApi', 'get('+url+', '+method+') resolve:', response.statusCode)
-                        let returnData = responseData
-                        try {
-                            returnData = JSON.parse(responseData)
-                        } catch(error){
-                            // Data is not JSON..
-                        }
-
-                        if(response.statusCode === 204 && method === 'GET' && /\/(sdp|ice)$/.test(url)){
-                            if (Date.now() + 750 >= deadline) { reject(new Error('Streaming handshake timed out')); return }
-                            // We have to retry..
-                            setTimeout(() => {
-                                this.get(url, method, deadline).then((result) => {
-                                    resolve(result)
-
-                                }).catch((error) => {
-                                    reject(error)
-                                })
-                            }, 750)
-                        } else {
-                            resolve(response.statusCode === 204 ? {} : returnData)
-                        }
-                    } else {
-                        this._application.log('xCloudApi', 'get('+url+') reject:', response.statusCode)
-                        reject({
-                            url: url,
-                            status: response.statusCode,
-                            body: responseData,
-                        })
-                    }
-                })
-            })
-
-            req.setTimeout(15000, () => req.destroy(new Error('Xbox API request timed out')))
-            req.on('error', (error) => {
-                reject(error)
-            })
-            req.end()
-        })
+    async get(url: string, method = 'GET', deadline = Date.now() + 45000) {
+        for(;;){
+            const remaining=deadline-Date.now()
+            if(remaining<=0)throw Error('Streaming handshake timed out')
+            const response=await requestXboxJson(https.request,{
+                host:this._host,path:url,method,
+                headers:{'Content-Type':'application/json','Authorization':'Bearer '+this._token},
+            },undefined,Math.min(15000,remaining))
+            this._application.log('xCloudApi','get('+url+', '+method+') response:',response.status)
+            if(response.status<200||response.status>299)throw {url,status:response.status,body:response.body}
+            if(response.status===204&&method==='GET'&&/\/(sdp|ice)$/.test(url)){
+                if(Date.now()+750>=deadline)throw Error('Streaming handshake timed out')
+                await new Promise<void>(resolve=>setTimeout(resolve,750))
+                continue
+            }
+            return response.status===204?{}:response.data
+        }
     }
 
-    post(url: string, postData = {}, headers = {}) {
-        return new Promise((resolve, reject) => {
-            let responseData = ''
-            const mergedHeaders = Object.assign({}, {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer '+this._token,
-            }, headers)
-
-            const req = https.request({
-                host: this._host,
-                path: url,
-                method: 'POST',
-                headers: mergedHeaders,
-            }, (response:any) => {
-
-                response.on('data', (data:any) => {
-                    responseData += data
-                })
-
-                response.on('end', () => {
-                    if(response.statusCode >= 200 && response.statusCode <= 299){
-                        this._application.log('xCloudApi', 'post('+url+') resolve:', response.statusCode)
-
-                        let returnData = responseData
-                        try {
-                            returnData = JSON.parse(responseData)
-                        } catch(error){
-                            // Data is not JSON..
-                        }
-                        
-                        resolve(returnData)
-                    } else {
-                        this._application.log('xCloudApi', 'post('+url+') reject:', response.statusCode)
-                        reject({
-                            url: url,
-                            status: response.statusCode,
-                            body: responseData,
-                        })
-                    }
-                })
-            })
-
-            req.on('error', (error) => {
-                reject(error)
-            })
-
-            req.setTimeout(15000, () => req.destroy(new Error('Xbox API request timed out')))
-            req.write(JSON.stringify(postData))
-
-            req.end()
-        })
+    async post(url: string, postData = {}, headers = {}) {
+        const response=await requestXboxJson(https.request,{
+            host:this._host,path:url,method:'POST',
+            headers:Object.assign({'Content-Type':'application/json','Authorization':'Bearer '+this._token},headers),
+        },JSON.stringify(postData))
+        this._application.log('xCloudApi','post('+url+') response:',response.status)
+        if(response.status<200||response.status>299)throw {url,status:response.status,body:response.body}
+        return response.data
     }
 
     getWaitingTimes(titleId){

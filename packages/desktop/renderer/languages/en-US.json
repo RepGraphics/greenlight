@@ -605,6 +605,7 @@
       "diagnosticSamples": "Valid samples",
       "diagnosticLoss": "Packets lost during sample window",
       "classicConnectionLost": "Classic stream connection interrupted",
+      "classicFailure_stats": "Incoming video statistics stopped advancing for 15 seconds. The stream may be stalled. Retry the connection or return to the dashboard.",
       "classicFailure_closed": "The stream connection failed or did not recover after a network interruption. Retry the stream or return to the dashboard.",
       "classicFailure_keepalive": "Three consecutive session keepalive requests failed. Return to the dashboard and reconnect.",
       "discordPresence": "Discord Rich Presence",

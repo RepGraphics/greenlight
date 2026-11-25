@@ -2,6 +2,7 @@ import xCloudPlayer from '../player'
 import { validateButtonMapping } from './mapping'
 import { selectPhysicalGamepad } from './slots'
 import { VibrationFrame } from '../channel/input'
+import { resolveRumbleEffect, type RumbleActuator } from './rumble'
 import { KeyboardGamepadState, isEditableGamepadTarget } from './keyboardstate'
 
 export interface GamepadOptions {
@@ -215,6 +216,7 @@ export default class Gamepad {
     }
 
     onWindowBlur(){
+        this.stopRumble()
         this._isFocused = false
         this._gamepadOverride.buttons = {}
         this.virtualAxes = {}
@@ -387,48 +389,29 @@ export default class Gamepad {
             return
         }
 
-        const rumbleData = {
-            startDelay: 0,
-            duration: report.durationMs,
-            weakMagnitude: report.rightMotorPercent,
-            strongMagnitude: report.leftMotorPercent,
-
-            leftTrigger: report.leftTriggerMotorPercent,
-            rightTrigger: report.rightTriggerMotorPercent,
+        if(!this._isFocused)return
+        this.stopRumble()
+        const actuator=gamepad.vibrationActuator as unknown as RumbleActuator|undefined
+        const effect=resolveRumbleEffect(actuator,report)
+        if(!effect)return
+        const physicalId=this._physicalGamepadId
+        const play=()=>{
+            const current=this.getGamepad(physicalId)
+            if(!this._player||!this._isFocused||this._physicalGamepadId!==physicalId||!current?.vibrationActuator)return false
+            try{
+                const output=current.vibrationActuator as unknown as RumbleActuator
+                const resolved=resolveRumbleEffect(output,report)
+                if(!resolved)return false
+                void Promise.resolve(output.playEffect(resolved.type,resolved.parameters)).catch(()=>{})
+            }catch{return false}
+            return true
         }
-        
-        // @ts-expect-error - dual-rumble is not in the types
-        if(gamepad.vibrationActuator?.type === 'dual-rumble') {
-            const intensityRumble = report.rightMotorPercent < .6 ? (.6 - report.rightMotorPercent) / 2 : 0
-            const intensityRumbleTriggers = (report.leftTriggerMotorPercent + report.rightTriggerMotorPercent) / 4
-            const endIntensity = Math.min(intensityRumble, intensityRumbleTriggers)
-            
-            rumbleData.weakMagnitude = Math.min(1, report.rightMotorPercent + endIntensity)
-
-            // Set triggers to 0 as dual-rumble does not support Triggers
-            // @TODO: Check if we can improve rumble: https://github.com/MicrosoftEdge/MSEdgeExplainers/blob/main/GamepadHapticsActuatorTriggerRumble/explainer.md
-            rumbleData.leftTrigger = 0
-            rumbleData.rightTrigger = 0
-
-            const physicalId=this._physicalGamepadId
-            const play=()=>{
-                const current=this.getGamepad(physicalId)
-                if(!this._player||this._physicalGamepadId!==physicalId||!current?.vibrationActuator)return false
-                try{void current.vibrationActuator.playEffect('dual-rumble',rumbleData).catch(()=>{})}catch{return false}
-                return true
-            }
-            this.stopRumble()
-            if(!play())return
-            if(report.repeat > 0) {
-                let repeatCount = report.repeat
-                this._rumbleInterval = setInterval(() => {
-                    if(repeatCount<=0||!play()){this.stopRumble();return}
-                    if(--repeatCount===0)this.stopRumble()
-                }, Math.max(1,report.delayMs + report.durationMs))
-            }
-        } else {
-            console.log('[Gamepad] Unknown vibration type:', (gamepad.vibrationActuator as any)?.type)
-        }
+        if(!play())return
+        let repeats=effect.repeat
+        if(repeats>0)this._rumbleInterval=setInterval(()=>{
+            if(repeats<=0||!play()){this.stopRumble();return}
+            if(--repeats===0)this.stopRumble()
+        },effect.intervalMs)
     }
 
     normaliseAxis(value:number) {
