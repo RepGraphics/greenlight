@@ -9,7 +9,7 @@ import Stats from './stats'
 
 import VideoComponent from './render/video'
 import WebGpuComponent from './render/webgpu'
-import AudioComponent from './render/audio'
+import AudioComponent, {normalizePlayback} from './render/audio'
 
 export default class xCloudPlayer {
 
@@ -30,15 +30,17 @@ export default class xCloudPlayer {
 
     private _videoComponent: VideoComponent | WebGpuComponent | undefined
     private _audioComponent: AudioComponent | undefined
+    private playback=normalizePlayback(1,false)
     private videoWatchdog: ReturnType<typeof setInterval> | undefined
     private lastVideoRecovery = 0
     private videoReceivedAt = 0
     private videoStream: MediaStream | undefined
 
-    constructor(elementId: string, useWebGpu = true, private videoBitrate = 0, profiles: string[] = [], public consoleController = false) {
+    constructor(elementId: string, useWebGpu = true, private videoBitrate = 0, profiles: string[] = [], public consoleController = false, volume=1, muted=false) {
         console.log('xCloudPlayer constructing...');
 
         this._elementId = elementId;
+        this.playback=normalizePlayback(volume,muted)
         this._peerConnection.addTransceiver('audio', { direction: 'sendrecv' })
         const videoTransceiver = this._peerConnection.addTransceiver('video', { direction: 'recvonly' })
         const codecs = this._sdpHelper.getDefaultCodecPreferences(profiles)
@@ -67,7 +69,7 @@ export default class xCloudPlayer {
 
             } else if(event.track.kind === 'audio'){
                 this._audioComponent?.destroy()
-                this._audioComponent = new AudioComponent(this)
+                this._audioComponent = new AudioComponent(this,this.playback.volume,this.playback.muted)
                 this._audioComponent.create(event.streams[0] || new MediaStream([event.track]))
 
             } else {
@@ -132,6 +134,11 @@ export default class xCloudPlayer {
         } else {
             return undefined
         }
+    }
+
+    setPlayback(volume:number,muted:boolean){
+        this.playback=normalizePlayback(volume,muted)
+        this._audioComponent?.setPlayback(this.playback.volume,this.playback.muted)
     }
 
     getAudioElement() {
