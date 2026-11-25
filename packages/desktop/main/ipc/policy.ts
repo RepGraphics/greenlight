@@ -1,5 +1,5 @@
 const allowed: Record<string, string[]> = {
-    app: ['loadCachedUser', 'getAuthState', 'login', 'quit', 'restart', 'clearData', 'getOnlineFriends', 'getFriends', 'getAchievementGames', 'getGameAchievements', 'onUiShown', 'setForceRegionIp', 'setPreferredGameLanguage', 'debug'],
+    app: ['loadCachedUser', 'getAuthState', 'login', 'quit', 'restart', 'clearData', 'getOnlineFriends', 'getFriends', 'getAchievementGames', 'getGameAchievements', 'onUiShown', 'setForceRegionIp', 'setPreferredGameLanguage', 'debug', 'checkForUpdates'],
     settings: ['setSettings', 'getSettings', 'getWebUIStatus', 'getWebUIAccessToken', 'startWebUI', 'stopWebUI', 'setLowResolution'],
     consoles: ['get'],
     xCloud: ['getRecentTitles', 'getTitles', 'filterTitles', 'getNewTitles', 'getTitle'],
@@ -12,7 +12,7 @@ export function isAllowedIpc(channel:unknown,action:unknown):boolean {
 export function isAllowedWebIpc(channel:unknown,action:unknown):boolean{
     if(!isAllowedIpc(channel,action))return false
     if(channel==='streaming'&&action==='setStreamAwake')return false
-    if(channel==='app'&&['quit','restart','clearData','login','setForceRegionIp','setPreferredGameLanguage','debug'].includes(action as string))return false
+    if(channel==='app'&&['quit','restart','clearData','login','setForceRegionIp','setPreferredGameLanguage','debug','checkForUpdates'].includes(action as string))return false
     if(channel==='settings'&&action!=='getSettings'&&action!=='getWebUIStatus')return false
     return true
 }

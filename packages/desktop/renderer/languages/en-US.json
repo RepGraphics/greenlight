@@ -247,6 +247,11 @@
       "downloadBtn": "Download",
       "laterBtn": "Later",
       "updateChecker": "Update Checker",
+      "manualCheck": "Check for updates",
+      "includePrereleases": "Include prereleases",
+      "noReleases": "No published versioned releases are available yet.",
+      "releaseNotes": "Release notes",
+      "manualUpdateHint": "Updates are checked against the Greenlight fork only. Review and verify the installer before installing it; automatic installation is not enabled.",
       "closeBtn": "Close"
     },
     "errors": {
