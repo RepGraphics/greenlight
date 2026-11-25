@@ -1,4 +1,5 @@
 import type {DiagnosticSample} from './streamdiagnostics'
+import {validSessionBitrate} from './sessionquality'
 
 // Only retry console sessions automatically after a previously established connection.
 export function recoveryDelay(enabled:boolean, cloud:boolean, connected:boolean, failures:number):number|null {
@@ -28,7 +29,7 @@ export class ClassicRecoveryBudget {
     private history:Array<{state:string;reason:string;samples:DiagnosticSample[]}>=[]
     get bitrateOverride(){return this.cap}
     get previousAttempts(){return this.history}
-    applyBitrate(cap:number){if(Number.isFinite(cap)&&cap>=2048&&cap<=40960)this.cap=cap}
+    applyBitrate(cap:number){if(validSessionBitrate(cap))this.cap=cap}
     rememberAttempt(reason:string,samples:DiagnosticSample[]){this.history=[...this.history.slice(-2),{state:reason?'Error':'Connected',reason,samples:samples.slice(-300).map(sample=>({...sample}))}]}
     markConnected(){this.connected=true}
     recordRetry(automatic:boolean){
