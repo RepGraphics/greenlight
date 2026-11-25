@@ -32,7 +32,7 @@ An independently maintained fork of [Greenlight](https://github.com/unknownskl/g
 | Controller profiles, remapping and calibration | — | Yes |
 | Console-paired controller mode | Yes | Yes |
 | Touch gamepad and native mouse/keyboard | — | Experimental |
-| Video filters and sharpening | — | Yes |
+| Video filters and sharpening | Yes | Yes |
 | Screenshots and picture-in-picture | Yes | Standard video only |
 | Local clips | Yes | Standard video only |
 | Live network graphs and diagnostic exports | — | Yes |
@@ -72,6 +72,8 @@ The original [Flathub package](https://flathub.org/apps/details/io.github.unknow
 Select V3 under **Settings → Streaming → Streaming engine**. Begin with standard video rendering, automatic bitrate and automatic H.264 profile selection. Return to Classic if you encounter stability or compatibility issues.
 
 If your controller is paired directly to the Xbox, enable **Controller connected to Xbox** under **Settings → Input** before opening the stream. This prevents either player from registering a virtual controller or forwarding local input during Remote Play. The setting is saved between sessions.
+
+Both engines support live brightness, contrast, saturation, sharpening, presets and display scaling. Use the video filters button in the streaming toolbar; save defaults explicitly to apply them to future sessions. Capture files remain unfiltered.
 
 Press **F8** (default) to pin the streaming toolbar. Configure additional streaming shortcuts under Settings → Input. Use it to access network graphs, video adjustments, screenshots, clips and recovery controls.
 
