@@ -2,6 +2,7 @@ import { useStreamAwake } from '../../lib/useStreamAwake'
 import React from 'react'
 import { shortcutAction, validateShortcuts } from '../../lib/streamshortcuts'
 import { recoveryDelay } from '../../lib/sessionrecovery'
+import { SessionLifecycle } from '../../lib/sessionlifecycle'
 import { startInstantReplay, replayDuration } from '../../lib/instantreplay'
 import { startStreamRecording, recordingMimeType, downloadRecording } from '../../lib/streamrecording'
 import { storeCapture } from '../../lib/capturelibrary'
@@ -57,7 +58,7 @@ export default function ExperimentalStream({ target, onExit }: { target: string;
     const [attempt, setAttempt] = React.useState(0)
     const autoRecover=Boolean(globalSettings.v3_auto_reconnect)
     const [failureReason,setFailureReason]=React.useState('')
-    const stopBarrier=React.useRef<Promise<unknown>>(Promise.resolve())
+    const lifecycle=React.useRef(new SessionLifecycle())
     const recoveryCount=React.useRef(0)
     const recoveredConnection=React.useRef(false)
     const [recoveryPending,setRecoveryPending]=React.useState(false)
@@ -166,30 +167,28 @@ export default function ExperimentalStream({ target, onExit }: { target: string;
     const id = cloud ? target.slice(7) : target
     React.useEffect(()=>{
         setRecoveryPending(false)
-        if(state!=='Error'||recoveryCancelled||recordingActive||recordedClip||replaySaving)return
+        if(state!=='Error'||recoveryCancelled||recordingActive||recordedClip||replaySaving||libraryBusy)return
         const delay=recoveryDelay(autoRecover,cloud,recoveredConnection.current,recoveryCount.current)
         if(delay===null)return
         setRecoveryPending(true)
         const timer=setTimeout(()=>{const lower=recoveryBitrate(samples.current,activeCap,failureRef.current,Boolean(globalSettings.v3_adaptive_recovery));if(lower!==null)setBitrateOverride(lower);recoveryCount.current++;setRecoveryPending(false);setAttempt(value=>value+1)},delay)
         return()=>clearTimeout(timer)
-    },[state,autoRecover,cloud,recoveryCancelled,recordingActive,recordedClip,replaySaving,attempt,activeCap,globalSettings.v3_adaptive_recovery])
+    },[state,autoRecover,cloud,recoveryCancelled,recordingActive,recordedClip,replaySaving,libraryBusy,attempt,activeCap,globalSettings.v3_adaptive_recovery])
     const resolution:720|1080 = (cloud?settings.xcloud_resolution:settings.xhome_resolution)===720?720:1080
     const consoleController = !cloud && Boolean(globalSettings.v3_console_controller)
     React.useEffect(() => {
-        let disposed = false
-        let active = ''
         if(samples.current.length){failedAttempts.current.push({state:lastState.current,reason:failureRef.current,samples:[...samples.current]});if(failedAttempts.current.length>3)failedAttempts.current.shift()}
         failureRef.current=''
         samples.current = []; sampleCount.current = 0; started.current = Date.now(); connectedAt.current = 0; outcome.current = 'interrupted'; lastState.current = 'Initializing'; setSummary(null); setGraphSamples([])
         setSession(''); setFailureReason(''); setState('Initializing'); setMic(false); setMicBusy(false); setMicActive(false); setMicError(false)
-        const startTimer=setTimeout(()=>{if(!disposed){disposed=true;updateStatus('Error')}},60000)
-        stopBarrier.current.catch(()=>{}).then(()=>{if(disposed)return '';return Ipc.send('streaming', 'startStream', { type: cloud ? 'cloud' : 'home', target: id, resolution })}).then((result: string) => {
-            clearTimeout(startTimer)
-            if(typeof result!=='string'||!result){if(!disposed)updateStatus('Error');return}
-            if (disposed) { void Ipc.send('streaming', 'stopStream', { sessionId: result }).catch(() => {}); return }
-            active = result; setSession(result)
-        }).catch(() => { clearTimeout(startTimer); if (!disposed) updateStatus('Error') })
-        return () => { clearTimeout(startTimer); disposed = true; if (settings.v3_session_history && (connectedAt.current || lastState.current === 'Error')) addSession(makeSessionRecord(started.current,connectedAt.current,Date.now(),cloud?'cloud':'home',outcome.current,samples.current)); if (active) stopBarrier.current=Ipc.send('streaming', 'stopStream', { sessionId: active }).catch(() => {}) }
+        const dispose=lifecycle.current.begin({
+            start:()=>Ipc.send('streaming','startStream',{type:cloud?'cloud':'home',target:id,resolution}),
+            stop:sessionId=>Ipc.send('streaming','stopStream',{sessionId}),
+            onSession:setSession,
+            onError:reason=>{noteFailure(reason);updateStatus('Error')}
+        })
+        return ()=>{dispose();if(settings.v3_session_history&&(connectedAt.current||lastState.current==='Error'))addSession(makeSessionRecord(started.current,connectedAt.current,Date.now(),cloud?'cloud':'home',outcome.current,samples.current))}
+
     }, [target, attempt])
     const shortcuts=validateShortcuts(globalSettings.v3_stream_shortcuts)
     const shortcutHandler=React.useRef<(event:KeyboardEvent)=>void>(()=>{})
