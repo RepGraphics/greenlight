@@ -4,6 +4,8 @@ import {useAuth} from '../contexts/AuthContext'
 import {useTRPCClient} from '../utils/trpc'
 import {createRemoteSession,selectStreamCredentials,type WebStreamTarget} from '../utils/remotesession'
 import {SessionLifecycle} from '../../../desktop/renderer/lib/sessionlifecycle'
+import {parseSessionBitrate,sessionBitrates,sessionBitrateLabel} from '../../../desktop/renderer/lib/sessionquality'
+import {webSessionInputOptions} from '../utils/sessionoptions'
 import type {communicationHandler} from '@greenlight/player/client'
 
 const SharedPlayer=dynamic(()=>import('@greenlight/player/client').then(module=>module.StreamPlayer),{ssr:false})
@@ -20,8 +22,13 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     const [status,setStatus]=useState('Initializing')
     const [adapter,setAdapter]=useState<communicationHandler|null>(null)
     const [resolution,setResolution]=useState<720|1080>(1080)
+    const [bitrate,setBitrate]=useState(0)
+    const [consolePaired,setConsolePaired]=useState(false)
+    const [multipleControllers,setMultipleControllers]=useState(true)
+    const [keyframe,setKeyframe]=useState(0)
     const [muted,setMuted]=useState(false)
     const [touch,setTouch]=useState(false)
+    const inputOptions=webSessionInputOptions(target.type,consolePaired,multipleControllers,touch)
     const [guide,setGuide]=useState(0)
     const [guideMissing,setGuideMissing]=useState(false)
     const transition=(value:Phase)=>{phaseRef.current=value;if(mounted.current)setPhase(value)}
@@ -84,6 +91,10 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         <p className="text-sm text-white/60 my-2">Use a trusted private experimental backend. End the stream before leaving; closing the browser cannot guarantee remote cleanup.</p>
         {phase==='idle'&&<div className="flex flex-wrap gap-3 my-4">
             <label>Resolution <select className="bg-[#202020] rounded p-2" value={resolution} onChange={event=>setResolution(event.target.value==='720'?720:1080)}><option value="720">720p</option><option value="1080">1080p</option></select></label>
+            <label>Requested bitrate <select className="bg-[#202020] rounded p-2" value={bitrate} onChange={event=>{const value=parseSessionBitrate(event.target.value);if(value!==null)setBitrate(value)}}>{sessionBitrates.map(cap=><option key={cap} value={cap}>{sessionBitrateLabel(cap,'Automatic')}</option>)}</select></label>
+            {!cloud&&<label className="flex items-center gap-2"><input type="checkbox" checked={consolePaired} onChange={event=>{setConsolePaired(event.target.checked);if(event.target.checked)setTouch(false)}}/> Controller connected directly to Xbox</label>}
+            {!inputOptions.consoleController&&<label className="flex items-center gap-2"><input type="checkbox" checked={multipleControllers} onChange={event=>setMultipleControllers(event.target.checked)}/> Multiple local controllers (experimental)</label>}
+            <p className="w-full text-sm text-white/60">Resolution and bitrate are requested at connection time, not guaranteed or adjusted live. Local multiplayer depends on Xbox service and game support.</p>
             <button type="button" className={button} onClick={start}>Start {mode}</button>
             <button type="button" className={button} onClick={()=>void end()}>Back to {cloud?'library':'consoles'}</button>
         </div>}
@@ -93,11 +104,12 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         {phase==='startFailed'&&<p role="alert">Unable to start. If the provisioning response was lost, check for an existing Xbox session before retrying.</p>}
         {phase==='stopping'&&<p role="status">Waiting for Xbox to acknowledge session termination…</p>}
         {phase==='stopFailed'&&<p role="alert">Xbox did not acknowledge termination. Retry before leaving.</p>}
-        {phase==='playing'&&adapter&&status!=='Error'&&<div className="web-remote-player"><SharedPlayer communicationHandler={adapter} onStatusChanged={setStatus} useWebGpu={false} autoGamepad multiController touchControls={touch} muted={muted} showStats guideRequest={guide} onGuideUnavailable={()=>setGuideMissing(true)}/></div>}
+        {phase==='playing'&&adapter&&status!=='Error'&&<div className="web-remote-player"><SharedPlayer communicationHandler={adapter} onStatusChanged={setStatus} useWebGpu={false} {...inputOptions} videoBitrate={bitrate} muted={muted} showStats keyframeRequest={keyframe} guideRequest={guide} onGuideUnavailable={()=>setGuideMissing(true)}/></div>}
         {phase==='playing'&&status==='Connected'&&<div className="flex flex-wrap gap-3 my-3">
-            <button type="button" className={button} aria-pressed={touch} onClick={()=>setTouch(value=>!value)}>Touch controller</button>
+            {!inputOptions.consoleController&&<button type="button" className={button} aria-pressed={touch} onClick={()=>setTouch(value=>!value)}>Touch controller</button>}
             <button type="button" className={button} aria-pressed={muted} onClick={()=>setMuted(value=>!value)}>Mute</button>
-            <button type="button" className={button} onClick={()=>{setGuideMissing(false);setGuide(value=>value+1)}} >Xbox guide</button>
+            {!inputOptions.consoleController&&<button type="button" className={button} onClick={()=>{setGuideMissing(false);setGuide(value=>value+1)}}>Xbox guide</button>}
+            <button type="button" className={button} onClick={()=>setKeyframe(value=>value+1)}>Request video refresh</button>
         </div>}
         {guideMissing&&<p role='status'>Connect a controller or enable touch controls to open the guide.</p>}
         {phase!=='idle'&&<button type="button" className={button} disabled={phase==='stopping'} onClick={()=>void end()}>{phase==='stopFailed'?'Retry ending session':phase==='starting'?'Cancel and end session':'End session'}</button>}
