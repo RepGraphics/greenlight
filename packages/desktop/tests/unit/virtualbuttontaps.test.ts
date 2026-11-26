@@ -1,0 +1,66 @@
+import {test} from 'node:test'
+import assert from 'node:assert/strict'
+import {VirtualButtonState} from '../../../player/src/client/lib/input/virtualbuttons'
+import Gamepad from '../../../player/src/client/lib/input/gamepad'
+
+test('quick virtual taps survive one sample followed by a release',()=>{
+    const buttons=new VirtualButtonState()
+    buttons.set('A',1);buttons.set('A',0)
+    assert.equal(buttons.pending,true)
+    assert.deepEqual([...buttons.read()],[['A',1]])
+    assert.equal(buttons.pending,true)
+    assert.deepEqual([...buttons.read()],[])
+    assert.equal(buttons.pending,false)
+})
+test('sampled held buttons release without replay and independent taps are preserved',()=>{
+    const buttons=new VirtualButtonState()
+    buttons.set('B',1);buttons.read()
+    buttons.set('A',1);buttons.set('A',0)
+    buttons.set('X',1);buttons.set('X',0)
+    assert.deepEqual(Object.fromEntries(buttons.read()),{A:1,X:1,B:1})
+    assert.deepEqual(Object.fromEntries(buttons.read()),{B:1})
+    buttons.set('B',0)
+    assert.equal(buttons.pending,true);assert.equal(buttons.read().size,0);assert.equal(buttons.pending,false)
+})
+test('analog taps retain peak strength while sampled holds reflect current strength',()=>{
+    const buttons=new VirtualButtonState()
+    buttons.set('LeftTrigger',.8);buttons.set('LeftTrigger',.2);buttons.set('LeftTrigger',0)
+    assert.equal(buttons.read().get('LeftTrigger'),.8)
+    buttons.read()
+    buttons.set('RightTrigger',2);buttons.set('RightTrigger',.3)
+    assert.equal(buttons.read().get('RightTrigger'),.3)
+    buttons.set('RightTrigger',NaN);assert.equal(buttons.read().get('RightTrigger'),.3)
+    buttons.set('RightTrigger',0);assert.equal(buttons.read().size,0)
+})
+test('cancelled and cleared touches never replay unsampled presses',()=>{
+    const buttons=new VirtualButtonState()
+    buttons.set('A',1);buttons.set('A',0,false)
+    assert.equal(buttons.read().size,0)
+    buttons.set('B',1);buttons.set('B',0);buttons.clear()
+    assert.equal(buttons.pending,false);assert.equal(buttons.read().size,0)
+})
+test('Gamepad emits virtual tap then neutral, preserves keyboard hold and discards cancelled touches',()=>{
+    const saved=['navigator','window','document'].map(name=>[name,Object.getOwnPropertyDescriptor(globalThis,name)] as const)
+    Object.defineProperty(globalThis,'navigator',{configurable:true,value:{getGamepads:()=>[]}})
+    Object.defineProperty(globalThis,'window',{configurable:true,value:{addEventListener(){},removeEventListener(){}}})
+    Object.defineProperty(globalThis,'document',{configurable:true,value:{hidden:false,hasFocus:()=>true,addEventListener(){},removeEventListener(){}}})
+    const controller=new Gamepad(0,{enable_gamepad:false,enable_keyboard:true})
+    try{
+        controller.attach({_channels:{control:{sendGamepadState(){},getGamepadHandlers:()=>({})}}} as any)
+        controller.sendButtonState('A',1);controller.sendButtonState('A',0)
+        assert.equal(controller.getGamepadState()?.A,1)
+        assert.equal(controller.getGamepadState()?.A,0)
+        assert.equal(controller.getGamepadState(),undefined)
+        controller.onKeyDown({key:'Enter',code:'Enter',preventDefault(){}} as KeyboardEvent)
+        controller.sendButtonState('A',1);controller.sendButtonState('A',0,false)
+        assert.equal(controller.getGamepadState()?.A,1)
+        controller.onKeyUp({key:'Enter',code:'Enter',preventDefault(){}} as KeyboardEvent)
+        assert.equal(controller.getGamepadState()?.A,0)
+        controller.sendButtonState('B',1);controller.sendButtonState('B',0)
+        controller.cancelVirtualButtons()
+        assert.equal(controller.getGamepadState()?.B,0)
+        controller.sendButtonState('X',1);controller.sendButtonState('X',0)
+        controller.onWindowBlur();assert.equal(controller.getGamepadState()?.X,0)
+        controller.onWindowFocus();assert.equal(controller.getGamepadState(),undefined)
+    }finally{controller.detach();for(const [name,d] of saved){if(d)Object.defineProperty(globalThis,name,d);else Reflect.deleteProperty(globalThis,name)}}
+})
