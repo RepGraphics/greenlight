@@ -2,7 +2,7 @@ import xCloudPlayer from '../player'
 import { validateButtonMapping } from './mapping'
 import { selectPhysicalGamepad } from './slots'
 import { VibrationFrame } from '../channel/input'
-import { resolveRumbleEffect, type RumbleActuator } from './rumble'
+import { RumblePlayback, type RumbleActuator } from './rumble'
 import { KeyboardGamepadState, isEditableGamepadTarget } from './keyboardstate'
 import { GuidePulse } from './guidepulse'
 
@@ -39,7 +39,7 @@ export default class Gamepad {
     private keyboardState=new KeyboardGamepadState()
     private get observesFocus(){return !this._options.gamepad_force_capture}
     private onVisibility=()=>{if(document.hidden)this.onWindowBlur();else if(document.hasFocus())this.onWindowFocus()}
-    private _rumbleInterval
+    private rumblePlayback=new RumblePlayback()
     private _isFocused = true
     private _gamepadOverride = {
         buttons: {},
@@ -259,8 +259,7 @@ export default class Gamepad {
     }
 
     private stopRumble(){
-        clearInterval(this._rumbleInterval)
-        this._rumbleInterval=undefined
+        this.rumblePlayback.stop()
     }
 
     detectActiveGamepad(){
@@ -370,28 +369,12 @@ export default class Gamepad {
         }
 
         if(!this._isFocused)return
-        this.stopRumble()
         const actuator=gamepad.vibrationActuator as unknown as RumbleActuator|undefined
-        const effect=resolveRumbleEffect(actuator,report)
-        if(!effect)return
         const physicalId=this._physicalGamepadId
-        const play=()=>{
-            const current=this.getGamepad(physicalId)
-            if(!this._player||!this._isFocused||this._physicalGamepadId!==physicalId||!current?.vibrationActuator)return false
-            try{
-                const output=current.vibrationActuator as unknown as RumbleActuator
-                const resolved=resolveRumbleEffect(output,report)
-                if(!resolved)return false
-                void Promise.resolve(output.playEffect(resolved.type,resolved.parameters)).catch(()=>{})
-            }catch{return false}
-            return true
-        }
-        if(!play())return
-        let repeats=effect.repeat
-        if(repeats>0)this._rumbleInterval=setInterval(()=>{
-            if(repeats<=0||!play()){this.stopRumble();return}
-            if(--repeats===0)this.stopRumble()
-        },effect.intervalMs)
+        this.rumblePlayback.start(actuator,report,()=>Boolean(
+            this._player&&this._isFocused&&this._physicalGamepadId===physicalId&&
+            this.getGamepad(physicalId)?.vibrationActuator===actuator
+        ))
     }
 
     normaliseAxis(value:number) {
