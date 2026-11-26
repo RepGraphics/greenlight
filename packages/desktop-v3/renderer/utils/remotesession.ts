@@ -8,6 +8,7 @@ export interface RemoteRpc{
     stop(input:SessionRequest):Promise<unknown>
     status(input:SessionRequest):Promise<unknown>
     sdp(input:SessionRequest&{sdpOffer:RTCSessionDescriptionInit}):Promise<unknown>
+    chat?(input:SessionRequest&{offer:RTCSessionDescriptionInit}):Promise<unknown>
     ice(input:SessionRequest&{candidates:unknown[]}):Promise<unknown>
     connect(input:SessionRequest&{refreshToken:string}):Promise<unknown>
     keepalive(input:SessionRequest):Promise<unknown>
@@ -118,6 +119,12 @@ export function createRemoteSession(rpc:RemoteRpc,config:xCloudStreamConfig,toke
                     return result
                 }),
                 sendSDPOffer:sdpOffer=>operate(sessionPath,()=>rpc.sdp({...input,sdpOffer})),
+                ...(rpc.chat?{sendChatSDP:(offer:RTCSessionDescriptionInit)=>operate(sessionPath,async()=>{
+                    if(offer.type!=='offer'||typeof offer.sdp!=='string'||!offer.sdp.trim()||offer.sdp.length>262144)throw Error('Invalid chat SDP offer')
+                    const answer=await rpc.chat!({...input,offer})
+                    if(typeof answer!=='string'||!answer.trim()||answer.length>262144)throw Error('Invalid chat SDP answer')
+                    return answer
+                })}:{}),
                 sendICECandidates:candidates=>{
                     const parsed=candidates.map(candidate=>{
                     const value=typeof candidate==='string'?JSON.parse(candidate):candidate
