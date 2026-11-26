@@ -8,12 +8,15 @@ This separate V3 frontend supports Xbox Remote Play and Cloud Gaming through the
 - Console discovery, cloud game browsing, entitlement filtering and session launch.
 - 720p/1080p resolution preferences and requested bitrate caps.
 - Physical and on-screen controllers, keyboard controller emulation, experimental direct touchscreen input and multiple-controller support, plus Remote Play console-paired mode.
-- Audio mute, Xbox guide, streaming statistics, video refresh requests and acknowledged session termination.
+- Physical controller presets, stick deadzone, Y-axis inversion, stick swapping and optional vibration.
+- Audio mute and volume, Xbox guide, toggleable streaming statistics, video refresh requests and acknowledged session termination.
 - Experimental local PNG screenshots and bounded WebM clips in compatible browsers.
 
 During playback, choose either the on-screen controller or experimental direct touch for compatible Xbox titles. Keyboard controller emulation uses arrow keys for the D-pad, Enter/Backspace for A/B and the remaining bindings shown in the player. It is opt-in and is not native mouse/keyboard support. Console-paired mode disables local input.
 
 Local captures contain decoded game video, not the desktop or web UI. WebM clips use available remote audio and are limited to 60 seconds or the shared recorder size limit. Save the capture explicitly before leaving, reconnecting or starting another capture. Nothing is uploaded. Android WebView does not currently support saving these downloads.
+
+Before starting a session, expand Advanced physical controller options to select Standard, Southpaw, Inverted or Alternate face buttons and adjust the deadzone and axes. Settings apply to the selected session only; they are not stored across reloads. Console-paired mode bypasses local controller input. During playback, adjust volume independently of mute or toggle streaming statistics. Browser and hardware support determine vibration availability.
 
 Resolution and bitrate are negotiated when connecting, not guaranteed or adjusted live. Xbox services, browser support and individual games determine actual compatibility.
 
