@@ -7,6 +7,7 @@ import {createRemoteSession,selectStreamCredentials,type WebStreamTarget} from '
 import {SessionLifecycle} from '../../../desktop/renderer/lib/sessionlifecycle'
 import {parseSessionBitrate,sessionBitrates,sessionBitrateLabel} from '../../../desktop/renderer/lib/sessionquality'
 import {webSessionInputOptions,type WebTouchMode} from '../utils/sessionoptions'
+import {webControllerPresets,selectWebControllerPreset,parseWebDeadzone,parseWebVolume,webControllerOptions} from '../utils/controlleroptions'
 import type {communicationHandler} from '@greenlight/player/client'
 
 const SharedPlayer=dynamic(()=>import('@greenlight/player/client').then(module=>module.StreamPlayer),{ssr:false})
@@ -29,9 +30,15 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     const [multipleControllers,setMultipleControllers]=useState(true)
     const [keyframe,setKeyframe]=useState(0)
     const [muted,setMuted]=useState(false)
+    const [volume,setVolume]=useState(1)
+    const [showStats,setShowStats]=useState(true)
+    const [profile,setProfile]=useState(()=>selectWebControllerPreset('standard'))
+    const [preset,setPreset]=useState('standard')
+    const [vibration,setVibration]=useState(true)
     const [touch,setTouch]=useState<WebTouchMode>('off')
     const [keyboard,setKeyboard]=useState(false)
     const inputOptions=webSessionInputOptions(target.type,consolePaired,multipleControllers,touch,keyboard)
+    const controllerOptions=webControllerOptions(profile,vibration,inputOptions.consoleController)
     const [guide,setGuide]=useState(0)
     const [guideMissing,setGuideMissing]=useState(false)
     const transition=(value:Phase)=>{phaseRef.current=value;if(mounted.current)setPhase(value)}
@@ -98,6 +105,15 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
             {!cloud&&<label className="flex items-center gap-2"><input type="checkbox" checked={consolePaired} onChange={event=>{setConsolePaired(event.target.checked);if(event.target.checked){setTouch('off');setKeyboard(false)}}}/> Controller connected directly to Xbox</label>}
             {!inputOptions.consoleController&&<label className="flex items-center gap-2"><input type="checkbox" checked={multipleControllers} onChange={event=>setMultipleControllers(event.target.checked)}/> Multiple local controllers (experimental)</label>}
             {!inputOptions.consoleController&&<label className="flex items-center gap-2"><input type="checkbox" checked={keyboard} onChange={event=>setKeyboard(event.target.checked)}/> Keyboard controller emulation</label>}
+            {!inputOptions.consoleController&&<details className="w-full rounded border border-white/10 p-3"><summary className="cursor-pointer">Advanced physical controller options</summary><div className="flex flex-wrap gap-3 mt-3 items-center">
+                <label>Preset <select className="bg-[#202020] rounded p-2" value={preset} onChange={event=>{if(event.target.value==='custom')return;setProfile(selectWebControllerPreset(event.target.value));setPreset(event.target.value)}}>{Object.entries(webControllerPresets).map(([id,item])=><option key={id} value={id}>{item.name}</option>)}{preset==='custom'&&<option value="custom">Custom</option>}</select></label>
+                <label>Stick deadzone: {Math.round(profile.v3_deadzone*100)}% <input type="range" min="0" max="50" step="1" value={Math.round(profile.v3_deadzone*100)} onChange={event=>{const value=parseWebDeadzone(event.target.value);if(value!==null){setProfile(previous=>({...previous,v3_deadzone:value}));setPreset('custom')}}}/></label>
+                <label><input type="checkbox" checked={profile.v3_invert_y} onChange={event=>{setProfile(previous=>({...previous,v3_invert_y:event.target.checked}));setPreset('custom')}}/> Invert Y axes</label>
+                <label><input type="checkbox" checked={profile.v3_swap_sticks} onChange={event=>{setProfile(previous=>({...previous,v3_swap_sticks:event.target.checked}));setPreset('custom')}}/> Swap sticks</label>
+                <label><input type="checkbox" checked={vibration} onChange={event=>setVibration(event.target.checked)}/> Controller vibration</label>
+                <button type="button" className={button} onClick={()=>{setProfile(selectWebControllerPreset('standard'));setPreset('standard');setVibration(true)}}>Reset controller options</button>
+                <p className="w-full text-sm text-white/60">These options apply to local physical controllers for this session. Vibration requires compatible browser and hardware support.</p>
+            </div></details>}
             <p className="w-full text-sm text-white/60">Resolution and bitrate are requested at connection time, not guaranteed or adjusted live. Local multiplayer depends on Xbox service and game support.</p>
             <button type="button" className={button} onClick={start}>Start {mode}</button>
             <button type="button" className={button} onClick={()=>void end()}>Back to {cloud?'library':'consoles'}</button>
@@ -108,10 +124,12 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         {phase==='startFailed'&&<p role="alert">Unable to start. If the provisioning response was lost, check for an existing Xbox session before retrying.</p>}
         {phase==='stopping'&&<p role="status">Waiting for Xbox to acknowledge session termination…</p>}
         {phase==='stopFailed'&&<p role="alert">Xbox termination is not confirmed. A previous request may still be pending. Retry before leaving.</p>}
-        {phase==='playing'&&adapter&&status!=='Error'&&<div ref={playerSurface} className="web-remote-player"><SharedPlayer communicationHandler={adapter} onStatusChanged={setStatus} useWebGpu={false} {...inputOptions} videoBitrate={bitrate} muted={muted} showStats keyframeRequest={keyframe} guideRequest={guide} onGuideUnavailable={()=>setGuideMissing(true)}/></div>}
+        {phase==='playing'&&adapter&&status!=='Error'&&<div ref={playerSurface} className="web-remote-player"><SharedPlayer communicationHandler={adapter} onStatusChanged={setStatus} useWebGpu={false} {...inputOptions} {...controllerOptions} videoBitrate={bitrate} volume={volume} muted={muted} showStats={showStats} keyframeRequest={keyframe} guideRequest={guide} onGuideUnavailable={()=>setGuideMissing(true)}/></div>}
         {phase==='playing'&&status==='Connected'&&<div className="flex flex-wrap gap-3 my-3">
             {!inputOptions.consoleController&&<><label>Touch input <select className="bg-[#202020] rounded p-2" value={touch} onChange={event=>{const value=event.target.value;setTouch(value==='direct'||value==='controller'?value:'off');setGuideMissing(false)}}><option value="off">Off</option><option value="controller">On-screen controller</option><option value="direct">Direct touch (experimental)</option></select></label><button type="button" className={button} aria-pressed={keyboard} onClick={()=>{setKeyboard(value=>!value);setGuideMissing(false)}}>Keyboard controller</button></>}
             <button type="button" className={button} aria-pressed={muted} onClick={()=>setMuted(value=>!value)}>Mute</button>
+            <label>Volume: {Math.round(volume*100)}% <input type="range" min="0" max="100" step="1" value={Math.round(volume*100)} onChange={event=>{const value=parseWebVolume(event.target.value);if(value!==null)setVolume(value)}}/></label>
+            <button type="button" className={button} aria-pressed={showStats} onClick={()=>setShowStats(value=>!value)}>Streaming statistics</button>
             {!inputOptions.consoleController&&<button type="button" className={button} onClick={()=>{setGuideMissing(false);setGuide(value=>value+1)}}>Xbox guide</button>}
             <button type="button" className={button} onClick={()=>setKeyframe(value=>value+1)}>Request video refresh</button>
         </div>}
