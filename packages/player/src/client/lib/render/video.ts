@@ -56,6 +56,7 @@ export default class VideoComponent {
     }
 
     private scheduleFrame(element:HTMLVideoElement){
+        this.callbackActive=false
         if(typeof element.requestVideoFrameCallback!=='function'||typeof element.cancelVideoFrameCallback!=='function')return
         try{
             this.frameCallback=element.requestVideoFrameCallback((_timestamp,data)=>{
