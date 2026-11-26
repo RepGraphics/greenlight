@@ -1,6 +1,7 @@
 import type { xStreamToken, xCloudStreamConfig, SDPResponse, startStreamResponse, StatusResponse, ErrorResponse } from '../types/index';
 export type { xStreamToken, startStreamResponse, SDPResponse, xCloudStreamConfig, StatusResponse, ErrorResponse };
 import {streamOrigin,playPath,sessionEndpoint} from './requestpolicy';
+import {readStreamingResponse,streamingResponseLimit,transferTokenResponseLimit} from './response';
 
 export const ping = () => 'pong';
 
@@ -102,9 +103,12 @@ export const sendMsalToken = async (xStreamToken:xStreamToken, xCloudStreamConfi
         refresh_token: userRefreshToken,
       }),
     })
-    if (!tokenData.ok) throw new Error('Unable to retrieve console transfer token');
-    const token = await tokenData.json();
-    if (typeof token.access_token !== 'string') throw new Error('Invalid console transfer token');
+    if (!tokenData.ok) {
+        await tokenData.body?.cancel().catch(()=>{});
+        throw new Error('Unable to retrieve console transfer token');
+    }
+    const token = await readStreamingResponse(tokenData,transferTokenResponseLimit) as {access_token?:unknown}|null;
+    if (typeof token?.access_token !== 'string' || !token.access_token.trim()) throw new Error('Invalid console transfer token');
 
     return await httpPost<StatusResponse>(xStreamToken, xCloudStreamConfig, sessionEndpoint(xCloudStreamConfig.type,sessionPath,'connect'), JSON.stringify({
         userToken: token.access_token
@@ -153,12 +157,13 @@ async function httpRequest<T>(token:xStreamToken,config:xCloudStreamConfig,path:
         ...(body===undefined?{}:{body}),
     })
     if(!response.ok){
-        await response.body?.cancel()
+        await response.body?.cancel().catch(()=>{})
         // Never serialize response bodies, Request objects or credentials in RPC errors.
         throw {error:{status:response.status}} as ErrorResponse
     }
-    try{return await response.json() as T}
-    catch{return {status:response.status}}
+    const value=await readStreamingResponse(response,streamingResponseLimit)
+    if(value===undefined)return {status:response.status}
+    return value as T
 }
 const httpGet=<T>(token:xStreamToken,config:xCloudStreamConfig,path:string,headers={})=>httpRequest<T>(token,config,path,'GET',undefined,headers)
 const httpPost=<T>(token:xStreamToken,config:xCloudStreamConfig,path:string,body:string,headers={})=>httpRequest<T>(token,config,path,'POST',body,headers)
