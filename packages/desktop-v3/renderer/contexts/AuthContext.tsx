@@ -1,7 +1,8 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 // import { trpc } from '../trpc';
 import { useQueryClient } from "@tanstack/react-query";
-import { useTRPC, RouterOutputs } from "../utils/trpc";
+import { useTRPCClient, RouterOutputs } from "../utils/trpc";
+import {AuthAttempt,clearLegacyUserToken} from "./authattempt";
 
 interface AuthContextType {
   startAuth: () => Promise<RouterOutputs["auth_msal_start"] | undefined>;
@@ -23,7 +24,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const trpc = useTRPC();
+  const trpc = useTRPCClient();
   const queryClient = useQueryClient();
 
   const [authState, setAuthState] = useState<{
@@ -37,111 +38,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [isAuthenticating, setIsAuthenticating] = useState<boolean>(false);
-  const [hasLoadedFromStorage, setHasLoadedFromStorage] = useState<boolean>(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(true);
+  const attempts = useRef(new AuthAttempt());
+  const active = useRef<ReturnType<AuthAttempt['begin']>|null>(null);
+  const verifying = useRef(false);
 
-  // Load saved auth state from localStorage on mount
   useEffect(() => {
-    const loadAuthState = async () => {
-      setIsAuthenticating(true);
-      const savedUserToken = localStorage.getItem('userToken');
-      if (savedUserToken) {
-        try {
-          const userToken = JSON.parse(savedUserToken);
-          
-          // Fetch fresh web and streaming tokens (don't load from storage)
-          try {
-            const [webToken, streamingTokens] = await Promise.all([
-              queryClient.fetchQuery(trpc.auth_get_webtoken.queryOptions(userToken)),
-              queryClient.fetchQuery(trpc.auth_get_streamingtokens.queryOptions(userToken)),
-            ]);
-            
-            setAuthState({
-              userToken,
-              webToken: webToken,
-              streamingTokens,
-            });
-            
-            setIsAuthenticated(true);
-          } catch (error) {
-            console.error('Failed to fetch tokens:', error);
-
-            // Check if we can refresh the tokens
-            // const refreshedToken = await queryClient.fetchQuery(trpc.auth_msal_refresh.queryOptions(userToken.refresh_token))
-
-            // Clear invalid userToken only on auth failure
-            // localStorage.removeItem('userToken');
-
-            // setAuthState({
-            //   userToken: null,
-            //   webToken: null,
-            //   streamingTokens: null,
-            // });
-            // setIsAuthenticated(false);
-          }
-        } catch (e) {
-          console.error('Failed to parse saved user token', e);
-        }
-      }
-      setHasLoadedFromStorage(true);
-      setIsAuthenticating(false);
-    };
-    
-    loadAuthState();
+    // The experimental web frontend must not persist bearer or refresh tokens.
+    clearLegacyUserToken(()=>window.localStorage);
+    setIsAuthenticating(false);
+    return () => { attempts.current.cancel(); active.current=null; };
   }, []);
 
-  // Save only userToken to localStorage (not web/streaming tokens)
-  // Only save after we've loaded from storage to avoid removing on initial render
-  useEffect(() => {
-    if (!hasLoadedFromStorage) return;
-    
-    if (authState.userToken) {
-      localStorage.setItem('userToken', JSON.stringify(authState.userToken));
-    }
-  }, [authState.userToken, hasLoadedFromStorage]);
-
   const startAuth = async () => {
-    const result = await queryClient.fetchQuery(trpc.auth_msal_start.queryOptions());
-    return result;
+    const attempt=attempts.current.begin();
+    active.current=attempt;
+    verifying.current=false;
+    const flow=await trpc.auth_msal_start.query(undefined,{signal:attempt.signal});
+    return attempt.current()?flow:undefined;
   };
 
   const verifyCode = async (code: string) => {
-    // setIsAuthenticating(true);
+    const attempt=active.current;
+    if(!attempt?.current()||verifying.current)return;
+    verifying.current=true;
     try {
-      const userToken = await queryClient.fetchQuery(trpc.auth_msal_verify.queryOptions(code));
-      console.log('User token obtained:', userToken);
-      
-      // Save userToken immediately to localStorage
-      localStorage.setItem('userToken', JSON.stringify(userToken));
-      
-      // Fetch web token and streaming tokens using the userToken
-      const [webToken, streamingTokens] = await Promise.all([
-        queryClient.fetchQuery(trpc.auth_get_webtoken.queryOptions(userToken)),
-        queryClient.fetchQuery(trpc.auth_get_streamingtokens.queryOptions(userToken)),
+      const userToken=await trpc.auth_msal_verify.query(code,{signal:attempt.signal});
+      if(!attempt.current())return;
+      const [webToken,streamingTokens]=await Promise.all([
+        trpc.auth_get_webtoken.query(userToken,{signal:attempt.signal}),
+        trpc.auth_get_streamingtokens.query(userToken,{signal:attempt.signal}),
       ]);
-      
-      setAuthState({
-        userToken,
-        webToken,
-        streamingTokens,
-      });
-      
+      if(!attempt.current())return;
+      setAuthState({userToken,webToken,streamingTokens});
       setIsAuthenticated(true);
-      
       return userToken;
     } finally {
-      setIsAuthenticating(false);
+      if(attempt.current())verifying.current=false;
     }
   };
 
   const logout = () => {
-    setAuthState({
-      userToken: null,
-      webToken: null,
-      streamingTokens: null,
-    });
+    attempts.current.cancel();
+    active.current=null;
+    verifying.current=false;
+    setAuthState({userToken:null,webToken:null,streamingTokens:null});
     setIsAuthenticated(false);
-    localStorage.removeItem('userToken');
+    setIsAuthenticating(false);
+    queryClient.clear();
+    clearLegacyUserToken(()=>window.localStorage);
   };
 
   const getBrowserLanguage = () => {

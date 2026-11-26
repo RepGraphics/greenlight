@@ -1,5 +1,5 @@
-import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query';
-import { httpBatchLink, createTRPCClient, TRPCClientError } from '@trpc/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { httpBatchLink, createTRPCClient } from '@trpc/client';
 import { useState, ReactNode } from 'react';
 import { TRPCProvider } from '../utils/trpc';
 import { appRouter } from '@greenlight/platform';
@@ -14,50 +14,11 @@ function makeQueryClient() {
         staleTime: 1000 * 5,
       },
     },
-    queryCache: new QueryCache({
-      onError: (error) => {
-        const message = getTrpcErrorMessage(error);
-        // showErrorToast(message);
-        console.log("Query Error:", message);
-      },
-    }),
-    mutationCache: new MutationCache({
-      onError: (error) => {
-        const message = getTrpcErrorMessage(error);
-        // showErrorToast(message);
-        console.log("Mutation Error:", message);
-      },
-    }),
   });
 }
 
-function getTrpcErrorMessage(error: unknown): string {
-  if (error instanceof TRPCClientError) {
-    return error.message;
-  }
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return "An unknown error occurred.";
-}
-
-function getQueryClient() {
-    return makeQueryClient();
-}
-// function createWebsocketUrl() {
-//     let wsPort = 5050
-//     let wsHost = 'localhost'
-//     let wsProtocol = 'ws'
-
-//     if (typeof window !== "undefined") {
-//       wsPort = Number(localStorage.getItem('ws_port')) || 5050
-//       wsHost = localStorage.getItem('ws_host') || 'localhost'
-//       wsProtocol = localStorage.getItem('ws_protocol') || 'ws'
-//     }
-//     return `${wsProtocol}://${wsHost}:${wsPort}`;
-// }
 export const TrpcProviderComponent = ({ children }: { children: ReactNode }) => {
-  const queryClient = getQueryClient();
+  const [queryClient] = useState(makeQueryClient);
   const [trpcClient] = useState(() =>
     createTRPCClient<typeof appRouter>({
       links: [
@@ -66,6 +27,8 @@ export const TrpcProviderComponent = ({ children }: { children: ReactNode }) => 
           ? ipcLink<typeof appRouter>()
           : httpBatchLink({
               url: '/trpc',
+              methodOverride: 'POST',
+              fetch: (input,init)=>fetch(input,{...init,cache:'no-store'}),
             }),
       ],
     }),

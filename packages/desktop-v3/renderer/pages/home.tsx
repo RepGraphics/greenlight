@@ -6,7 +6,7 @@ import Sidebar from '../components/sidebar'
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useTRPC } from "../utils/trpc";
-import { useAuth } from '../contexts/AuthContext';
+
 
 export default function HomePage() {
   const trpc = useTRPC();
@@ -14,9 +14,7 @@ export default function HomePage() {
 
 
 
-const { isAuthenticated, isAuthenticating, authState } = useAuth();
 
-console.log('Authentication status in _app:', { isAuthenticated, isAuthenticating, authState });
 
 
 
@@ -68,7 +66,7 @@ console.log('Authentication status in _app:', { isAuthenticated, isAuthenticatin
                     <button onClick={getVersion}>getVersion</button>
 
 
-                    <pre>{ JSON.stringify(authState, null, 2) }</pre>
+
                   </div>
                 </div>
               </div>
