@@ -1,6 +1,7 @@
 import {useEffect,useRef,useState,type CSSProperties} from 'react'
 import dynamic from 'next/dynamic'
 import CaptureControls from './capturecontrols'
+import PictureInPictureControl from './pictureinpicturecontrol'
 import VideoAppearance from './videoappearance'
 import {selectWebVideoPreset,webVideoPresentation} from '../utils/videoappearance'
 import {useAuth} from '../contexts/AuthContext'
@@ -152,6 +153,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         {phase==='playing'&&status==='Connected'&&inputOptions.directTouch&&<p className="text-sm text-white/60">Direct touch requires compatible Xbox titles and is experimental. Switch to the on-screen controller for other games.</p>}
         {phase==='playing'&&status==='Connected'&&inputOptions.keyboardMapping&&<p className="text-sm text-white/60">Click the video to move focus away from controls. Arrow keys: D-pad · Enter/Backspace: A/B · X/Y: X/Y · M/V/N: Menu/View/Guide · [ / ]: shoulders · L/R: stick buttons · - / =: triggers.</p>}
         {phase==='playing'&&status==='Connected'&&<VideoAppearance value={filters} onChange={setFilters}/>}
+        {phase==='playing'&&status==='Connected'&&<PictureInPictureControl surface={()=>playerSurface.current}/>}
         {phase==='playing'&&status==='Connected'&&<CaptureControls surface={()=>playerSurface.current}/>}
         {guideMissing&&<p role='status'>Connect a controller or enable the on-screen or keyboard controller to open the guide.</p>}
         {phase!=='idle'&&<button type="button" className={button} disabled={phase==='stopping'} onClick={()=>void end()}>{phase==='stopFailed'?'Retry ending session':phase==='starting'?'Cancel and end session':'End session'}</button>}
