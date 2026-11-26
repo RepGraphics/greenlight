@@ -9,6 +9,7 @@ import {createRemoteSession,selectStreamCredentials,type WebStreamTarget} from '
 import {SessionLifecycle} from '../../../desktop/renderer/lib/sessionlifecycle'
 import {parseSessionBitrate,sessionBitrates,sessionBitrateLabel} from '../../../desktop/renderer/lib/sessionquality'
 import {webSessionInputOptions,type WebTouchMode} from '../utils/sessionoptions'
+import ControllerBindings from './controllerbindings'
 import {webControllerPresets,selectWebControllerPreset,parseWebDeadzone,parseWebVolume,webControllerOptions} from '../utils/controlleroptions'
 import {webMicrophoneSupported,microphoneRequested,toggleWebMicrophone,webMicrophoneResult,type WebMicrophoneState} from '../utils/microphoneoptions'
 import type {communicationHandler} from '@greenlight/player/client'
@@ -121,6 +122,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
                 <label><input type="checkbox" checked={profile.v3_swap_sticks} onChange={event=>{setProfile(previous=>({...previous,v3_swap_sticks:event.target.checked}));setPreset('custom')}}/> Swap sticks</label>
                 <label><input type="checkbox" checked={vibration} onChange={event=>setVibration(event.target.checked)}/> Controller vibration</label>
                 <button type="button" className={button} onClick={()=>{setProfile(selectWebControllerPreset('standard'));setPreset('standard');setVibration(true)}}>Reset controller options</button>
+                <ControllerBindings mapping={profile.v3_button_mapping} onChange={mapping=>{setProfile(previous=>({...previous,v3_button_mapping:mapping}));setPreset('custom')}}/>
                 <p className="w-full text-sm text-white/60">These options apply to local physical controllers for this session. Vibration requires compatible browser and hardware support.</p>
             </div></details>}
             <p className="w-full text-sm text-white/60">Resolution and bitrate are requested at connection time, not guaranteed or adjusted live. Local multiplayer depends on Xbox service and game support.</p>
