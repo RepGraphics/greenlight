@@ -1,7 +1,7 @@
 import {createConnection} from 'node:net'
 import type {Socket} from 'node:net'
 import {randomUUID} from 'node:crypto'
-import {isAbsolute,join} from 'node:path'
+import {posix} from 'node:path'
 
 export const discordLeaseMs=45000
 const maxFrameBytes=65536
@@ -42,9 +42,9 @@ function activityFrame(activity:ReturnType<typeof discordActivity>|null){
 export function discordSocketPaths(platform=process.platform,env=process.env){
     if(platform==='win32')return Array.from({length:10},(_,i)=>'\\\\?\\pipe\\discord-ipc-'+i)
     if(platform!=='linux'&&platform!=='darwin')return []
-    const root=[env.XDG_RUNTIME_DIR,env.TMPDIR,env.TMP,env.TEMP,'/tmp'].find(value=>typeof value==='string'&&isAbsolute(value))||'/tmp'
-    const roots=platform==='linux'?[root,join(root,'app','com.discordapp.Discord')]:[root]
-    return roots.flatMap(path=>Array.from({length:10},(_,i)=>join(path,'discord-ipc-'+i)))
+    const root=[env.XDG_RUNTIME_DIR,env.TMPDIR,env.TMP,env.TEMP,'/tmp'].find(value=>typeof value==='string'&&posix.isAbsolute(value))||'/tmp'
+    const roots=platform==='linux'?[root,posix.join(root,'app','com.discordapp.Discord')]:[root]
+    return roots.flatMap(path=>Array.from({length:10},(_,i)=>posix.join(path,'discord-ipc-'+i)))
 }
 async function openDiscordSocket():Promise<Socket|undefined>{
     for(const path of discordSocketPaths()){
