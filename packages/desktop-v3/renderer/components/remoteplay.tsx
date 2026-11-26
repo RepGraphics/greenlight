@@ -1,6 +1,8 @@
-import {useEffect,useRef,useState} from 'react'
+import {useEffect,useRef,useState,type CSSProperties} from 'react'
 import dynamic from 'next/dynamic'
 import CaptureControls from './capturecontrols'
+import VideoAppearance from './videoappearance'
+import {selectWebVideoPreset,webVideoPresentation} from '../utils/videoappearance'
 import {useAuth} from '../contexts/AuthContext'
 import {useTRPCClient} from '../utils/trpc'
 import {createRemoteSession,selectStreamCredentials,type WebStreamTarget} from '../utils/remotesession'
@@ -32,6 +34,8 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     const [muted,setMuted]=useState(false)
     const [volume,setVolume]=useState(1)
     const [showStats,setShowStats]=useState(true)
+    const [filters,setFilters]=useState(()=>selectWebVideoPreset('neutral'))
+    const presentation=webVideoPresentation(filters)
     const [profile,setProfile]=useState(()=>selectWebControllerPreset('standard'))
     const [preset,setPreset]=useState('standard')
     const [vibration,setVibration]=useState(true)
@@ -124,7 +128,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         {phase==='startFailed'&&<p role="alert">Unable to start. If the provisioning response was lost, check for an existing Xbox session before retrying.</p>}
         {phase==='stopping'&&<p role="status">Waiting for Xbox to acknowledge session termination…</p>}
         {phase==='stopFailed'&&<p role="alert">Xbox termination is not confirmed. A previous request may still be pending. Retry before leaving.</p>}
-        {phase==='playing'&&adapter&&status!=='Error'&&<div ref={playerSurface} className="web-remote-player"><SharedPlayer communicationHandler={adapter} onStatusChanged={setStatus} useWebGpu={false} {...inputOptions} {...controllerOptions} videoBitrate={bitrate} volume={volume} muted={muted} showStats={showStats} keyframeRequest={keyframe} guideRequest={guide} onGuideUnavailable={()=>setGuideMissing(true)}/></div>}
+        {phase==='playing'&&adapter&&status!=='Error'&&<div ref={playerSurface} className="web-remote-player" style={{'--gl-web-video-filter':presentation.filter} as CSSProperties}>{presentation.kernel&&<svg width="0" height="0" aria-hidden="true" style={{position:'absolute',pointerEvents:'none'}}><defs><filter id="gl-stream-sharpen" colorInterpolationFilters="sRGB"><feConvolveMatrix order={3} kernelMatrix={presentation.kernel} divisor={1} edgeMode="duplicate" preserveAlpha={true}/></filter></defs></svg>}<SharedPlayer communicationHandler={adapter} onStatusChanged={setStatus} useWebGpu={false} {...inputOptions} {...controllerOptions} videoBitrate={bitrate} volume={volume} muted={muted} showStats={showStats} keyframeRequest={keyframe} guideRequest={guide} onGuideUnavailable={()=>setGuideMissing(true)}/></div>}
         {phase==='playing'&&status==='Connected'&&<div className="flex flex-wrap gap-3 my-3">
             {!inputOptions.consoleController&&<><label>Touch input <select className="bg-[#202020] rounded p-2" value={touch} onChange={event=>{const value=event.target.value;setTouch(value==='direct'||value==='controller'?value:'off');setGuideMissing(false)}}><option value="off">Off</option><option value="controller">On-screen controller</option><option value="direct">Direct touch (experimental)</option></select></label><button type="button" className={button} aria-pressed={keyboard} onClick={()=>{setKeyboard(value=>!value);setGuideMissing(false)}}>Keyboard controller</button></>}
             <button type="button" className={button} aria-pressed={muted} onClick={()=>setMuted(value=>!value)}>Mute</button>
@@ -135,6 +139,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         </div>}
         {phase==='playing'&&status==='Connected'&&inputOptions.directTouch&&<p className="text-sm text-white/60">Direct touch requires compatible Xbox titles and is experimental. Switch to the on-screen controller for other games.</p>}
         {phase==='playing'&&status==='Connected'&&inputOptions.keyboardMapping&&<p className="text-sm text-white/60">Click the video to move focus away from controls. Arrow keys: D-pad · Enter/Backspace: A/B · X/Y: X/Y · M/V/N: Menu/View/Guide · [ / ]: shoulders · L/R: stick buttons · - / =: triggers.</p>}
+        {phase==='playing'&&status==='Connected'&&<VideoAppearance value={filters} onChange={setFilters}/>}
         {phase==='playing'&&status==='Connected'&&<CaptureControls surface={()=>playerSurface.current}/>}
         {guideMissing&&<p role='status'>Connect a controller or enable the on-screen or keyboard controller to open the guide.</p>}
         {phase!=='idle'&&<button type="button" className={button} disabled={phase==='stopping'} onClick={()=>void end()}>{phase==='stopFailed'?'Retry ending session':phase==='starting'?'Cancel and end session':'End session'}</button>}

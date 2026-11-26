@@ -221,3 +221,6 @@ body {
 .web-remote-player .gl-virtual-stick { position:absolute; width:clamp(48px,12vw,100px); aspect-ratio:1; border-radius:50%; bottom:14%; display:grid; place-items:center; }
 .web-remote-player .gl-stick-left { left:24%; }.web-remote-player .gl-stick-right { right:24%; }
 .web-remote-player .gl-virtual-stick span { width:48%; aspect-ratio:1; border-radius:50%; background:#ffffffaa; }
+
+/* Presentation only: leave touch coordinates, overlays and captured media unchanged. */
+.web-remote-player #playerContainer video { filter:var(--gl-web-video-filter,none); }
