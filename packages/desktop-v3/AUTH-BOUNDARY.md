@@ -8,3 +8,5 @@ The standalone web frontend in `packages/desktop-v3` is separate from the V3 str
 - The web HTTP client uses POST for all tRPC procedures; the Pages adapter accepts POST queries, rejects URL input and sends no-store headers. Existing GET-based experimental clients must update together. Electron IPC is unchanged.
 
 These changes do not make a public worker a trusted credential backend. A deployment must still secure authorization, rate limits, request logging, upstream host/session path validation, token storage and lifecycle. Do not deploy this experimental backend publicly until those boundaries are reviewed. A standalone Android client and native secure storage are still outstanding.
+
+The shared player server now restricts streaming requests to production Xbox GSSV origins and validates session paths against the stream type. Redirects are rejected, including during transfer-token exchange. The new `streaming_stop_stream` mutation returns an acknowledged HTTP status, accepting 404/410 as already stopped. A standalone client must still wire this mutation into its own session ownership lifecycle; this is not a complete remote-access authorization model.
