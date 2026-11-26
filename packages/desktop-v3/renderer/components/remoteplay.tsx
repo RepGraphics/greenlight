@@ -42,6 +42,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     const presentation=webVideoPresentation(filters)
     const [profile,setProfile]=useState(()=>selectWebControllerPreset('standard'))
     const [preset,setPreset]=useState('standard')
+    const [advancedOpen,setAdvancedOpen]=useState(false)
     const [vibration,setVibration]=useState(true)
     const [touch,setTouch]=useState<WebTouchMode>('off')
     const [keyboard,setKeyboard]=useState(false)
@@ -112,17 +113,17 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         {phase==='idle'&&<div className="flex flex-wrap gap-3 my-4">
             <label>Resolution <select className="bg-[#202020] rounded p-2" value={resolution} onChange={event=>setResolution(event.target.value==='720'?720:1080)}><option value="720">720p</option><option value="1080">1080p</option></select></label>
             <label>Requested bitrate <select className="bg-[#202020] rounded p-2" value={bitrate} onChange={event=>{const value=parseSessionBitrate(event.target.value);if(value!==null)setBitrate(value)}}>{sessionBitrates.map(cap=><option key={cap} value={cap}>{sessionBitrateLabel(cap,'Automatic')}</option>)}</select></label>
-            {!cloud&&<label className="flex items-center gap-2"><input type="checkbox" checked={consolePaired} onChange={event=>{setConsolePaired(event.target.checked);if(event.target.checked){setTouch('off');setKeyboard(false)}}}/> Controller connected directly to Xbox</label>}
+            {!cloud&&<label className="flex items-center gap-2"><input type="checkbox" checked={consolePaired} onChange={event=>{setConsolePaired(event.target.checked);if(event.target.checked){setTouch('off');setKeyboard(false);setAdvancedOpen(false)}}}/> Controller connected directly to Xbox</label>}
             {!inputOptions.consoleController&&<label className="flex items-center gap-2"><input type="checkbox" checked={multipleControllers} onChange={event=>setMultipleControllers(event.target.checked)}/> Multiple local controllers (experimental)</label>}
             {!inputOptions.consoleController&&<label className="flex items-center gap-2"><input type="checkbox" checked={keyboard} onChange={event=>setKeyboard(event.target.checked)}/> Keyboard controller emulation</label>}
-            {!inputOptions.consoleController&&<details className="w-full rounded border border-white/10 p-3"><summary className="cursor-pointer">Advanced physical controller options</summary><div className="flex flex-wrap gap-3 mt-3 items-center">
+            {!inputOptions.consoleController&&<details className="w-full rounded border border-white/10 p-3" onToggle={event=>{if(event.target===event.currentTarget)setAdvancedOpen(event.currentTarget.open)}}><summary className="cursor-pointer">Advanced physical controller options</summary><div className="flex flex-wrap gap-3 mt-3 items-center">
                 <label>Preset <select className="bg-[#202020] rounded p-2" value={preset} onChange={event=>{if(event.target.value==='custom')return;setProfile(selectWebControllerPreset(event.target.value));setPreset(event.target.value)}}>{Object.entries(webControllerPresets).map(([id,item])=><option key={id} value={id}>{item.name}</option>)}{preset==='custom'&&<option value="custom">Custom</option>}</select></label>
                 <label>Stick deadzone: {Math.round(profile.v3_deadzone*100)}% <input type="range" min="0" max="50" step="1" value={Math.round(profile.v3_deadzone*100)} onChange={event=>{const value=parseWebDeadzone(event.target.value);if(value!==null){setProfile(previous=>({...previous,v3_deadzone:value}));setPreset('custom')}}}/></label>
                 <label><input type="checkbox" checked={profile.v3_invert_y} onChange={event=>{setProfile(previous=>({...previous,v3_invert_y:event.target.checked}));setPreset('custom')}}/> Invert Y axes</label>
                 <label><input type="checkbox" checked={profile.v3_swap_sticks} onChange={event=>{setProfile(previous=>({...previous,v3_swap_sticks:event.target.checked}));setPreset('custom')}}/> Swap sticks</label>
                 <label><input type="checkbox" checked={vibration} onChange={event=>setVibration(event.target.checked)}/> Controller vibration</label>
                 <button type="button" className={button} onClick={()=>{setProfile(selectWebControllerPreset('standard'));setPreset('standard');setVibration(true)}}>Reset controller options</button>
-                <ControllerBindings mapping={profile.v3_button_mapping} onChange={mapping=>{setProfile(previous=>({...previous,v3_button_mapping:mapping}));setPreset('custom')}}/>
+                {advancedOpen&&<ControllerBindings mapping={profile.v3_button_mapping} onChange={mapping=>{setProfile(previous=>({...previous,v3_button_mapping:mapping}));setPreset('custom')}}/>}
                 <p className="w-full text-sm text-white/60">These options apply to local physical controllers for this session. Vibration requires compatible browser and hardware support.</p>
             </div></details>}
             <p className="w-full text-sm text-white/60">Resolution and bitrate are requested at connection time, not guaranteed or adjusted live. Local multiplayer depends on Xbox service and game support.</p>
