@@ -90,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const getBrowserLanguage = () => {
+    if(typeof navigator==='undefined')return 'en-us';
     const primaryLang = navigator.languages?.[0]?.split('-')[0] || 'en';
     const regionalVariant = navigator.languages?.find(lang => 
       lang.toLowerCase().startsWith(primaryLang + '-')

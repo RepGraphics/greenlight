@@ -1,6 +1,6 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {defaultStreamOrigin,returnedSessionPath,createRemoteSession,type RemoteRpc} from '../../../desktop-v3/renderer/utils/remotesession'
+import {defaultStreamOrigin,returnedSessionPath,createRemoteSession,selectStreamCredentials,provisioningMessage,type RemoteRpc} from '../../../desktop-v3/renderer/utils/remotesession'
 import {SessionLifecycle} from '../../renderer/lib/sessionlifecycle'
 const host='https://uks.core.gssv-play-prodxhome.xboxlive.com'
 const config={id:'console',type:'home' as const,host,language:'en-GB',resolution:720 as const}
@@ -91,4 +91,37 @@ test('cannot address an unrelated session even with a syntactically valid path',
     await assert.rejects(session.stop('/v5/sessions/home/other'),/not owned/)
     assert.deepEqual(f.calls.map(item=>item[0]),['start'])
     await session.stop(id)
+})
+
+test('cloud launches use cloud credentials and region rather than home credentials',()=>{
+    const cloudToken={...token,token:'cloud-token'}
+    const cloudHost='https://weu.core.gssv-play-prod.xboxlive.com'
+    const regions={home:[{isDefault:true,baseUri:host}],cloud:[{isDefault:true,baseUri:cloudHost}]}
+    const target={type:'cloud' as const,id:'title',name:'Game',entitled:true}
+    assert.deepEqual(selectStreamCredentials(target,token,cloudToken,regions),{token:cloudToken,host:cloudHost})
+    assert.deepEqual(selectStreamCredentials({type:'home',id:'console',name:'Xbox'},token,cloudToken,regions),{token,host})
+    assert.throws(()=>selectStreamCredentials({...target,entitled:false},token,cloudToken,regions))
+    assert.throws(()=>selectStreamCredentials(target,token,{...cloudToken,token:''},regions))
+    assert.throws(()=>selectStreamCredentials(target,token,cloudToken,{...regions,cloud:[]}))
+})
+test('cloud session adapter reports server queue states and stops its own cloud session',async()=>{
+    const cloudPath='/v5/sessions/cloud/game-1'
+    const cloudConfig={...config,type:'cloud' as const,id:'title',host:'https://weu.core.gssv-play-prod.xboxlive.com'}
+    const f=fixture(),messages:string[]=[]
+    f.rpc.start=async input=>{f.calls.push(['start',input]);return {sessionId:'game-1',sessionPath:cloudPath}}
+    f.rpc.status=async input=>{f.calls.push(['status',input]);return {state:'WaitingForResources'}}
+    const session=createRemoteSession(f.rpc,cloudConfig,token,'refresh',message=>messages.push(message))
+    const id=await session.start(),player=session.player(id)
+    await player.getStreamStatus()
+    assert.deepEqual(messages,['Waiting in the Xbox Cloud Gaming queue…'])
+    assert.equal(player.getStreamConfig().type,'cloud')
+    await session.stop(id)
+    assert.equal(f.calls.at(-1)?.[1].sessionPath,cloudPath)
+    assert.equal(f.calls[0][1].xCloudStreamConfig.id,'title')
+})
+test('provisioning messages expose only known status labels',()=>{
+    assert.equal(provisioningMessage({state:'ReadyToConnect'}),'Authorizing Xbox session…')
+    assert.equal(provisioningMessage({state:'Provisioned'}),'Negotiating stream…')
+    assert.equal(provisioningMessage({state:'secret-token'}),null)
+    assert.equal(provisioningMessage(null),null)
 })
