@@ -1,0 +1,45 @@
+name: Android companion build
+on:
+  pull_request:
+    paths:
+      - 'packages/android/**'
+      - '.github/workflows/android-companion.yml'
+  push:
+    branches: [main-v2]
+    paths:
+      - 'packages/android/**'
+      - '.github/workflows/android-companion.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+          cache-read-only: true
+      - name: Install Android SDK
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Test trusted origin policy
+        working-directory: packages/android
+        run: |
+          mkdir -p /tmp/android-policy-test
+          javac -d /tmp/android-policy-test app/src/main/java/uk/repgraphics/greenlight/companion/OriginPolicy.java tests/OriginPolicyTest.java
+          java -cp /tmp/android-policy-test uk.repgraphics.greenlight.companion.OriginPolicyTest
+      - name: Compile and lint APK
+        working-directory: packages/android
+        run: gradle --no-daemon :app:assembleDebug :app:lintDebug
+      - name: Upload experimental debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: greenlight-android-companion-debug
+          path: packages/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
