@@ -24,7 +24,7 @@ export default class Touch{
             if(this.active===event.pointerId){this.release();event.preventDefault()}
             return
         }
-        if(document.hidden||!document.hasFocus()||!surface.isConnected)return
+        if(player.consoleController||document.hidden||!document.hasFocus()||!surface.isConnected)return
         const input=player._channels.input
         if(!input.isOpen()||!input.getServerVideoWidth()||!input.getServerVideoHeight())return
         const down=event.type==='pointerdown'
@@ -41,16 +41,18 @@ export default class Touch{
     attach(player:xCloudPlayer){
         this.detach()
         const surface=player.getVideoElement()
-        if(!surface||surface.tagName!=='VIDEO'||!surface.isConnected)return
+        if(player.consoleController||!surface||surface.tagName!=='VIDEO'||!surface.isConnected)return
         this.player=player;this.surface=surface as HTMLVideoElement
         this.previousTouchAction=surface.style.touchAction;surface.style.touchAction='none'
         for(const name of ['pointerdown','pointermove','pointerup','pointercancel','lostpointercapture'])surface.addEventListener(name,this.onPointer as EventListener,{passive:false})
         window.addEventListener('blur',this.release);document.addEventListener('visibilitychange',this.hidden)
+        player._channels.message.setTouchInputEnabled(true)
     }
     detach(){
         const surface=this.surface
         if(!surface)return
         this.release()
+        this.player?._channels.message.setTouchInputEnabled(false)
         for(const name of ['pointerdown','pointermove','pointerup','pointercancel','lostpointercapture'])surface.removeEventListener(name,this.onPointer as EventListener)
         surface.style.touchAction=this.previousTouchAction
         window.removeEventListener('blur',this.release);document.removeEventListener('visibilitychange',this.hidden)
