@@ -13,18 +13,23 @@ This separate V3 frontend supports Xbox Remote Play and Cloud Gaming through the
 - Experimental local PNG screenshots and bounded WebM clips in compatible browsers.
 - Live video appearance presets, brightness, contrast, saturation and experimental sharpening.
 - Experimental opt-in microphone voice chat in secure, compatible browsers.
+- Browser-native picture-in-picture playback where supported.
 
 During playback, choose either the on-screen controller or experimental direct touch for compatible Xbox titles. Keyboard controller emulation uses arrow keys for the D-pad, Enter/Backspace for A/B and the remaining bindings shown in the player. It is opt-in and is not native mouse/keyboard support. Console-paired mode disables local input.
 
 Local captures contain decoded game video, not the desktop or web UI. WebM clips use available remote audio and are limited to 60 seconds or the shared recorder size limit. Save the capture explicitly before leaving, reconnecting or starting another capture. Nothing is uploaded. Android WebView does not currently support saving these downloads.
 
-Before starting a session, expand Advanced physical controller options to select Standard, Southpaw, Inverted or Alternate face buttons and adjust the deadzone and axes. Settings apply to the selected session only; they are not stored across reloads. Console-paired mode bypasses local controller input. During playback, adjust volume independently of mute or toggle streaming statistics. Browser and hardware support determine vibration availability.
+Before starting a session, expand Advanced physical controller options to select Standard, Southpaw, Inverted or Alternate face buttons and adjust the deadzone and axes. Settings apply to the selected session only; they are not stored across reloads. Console-paired mode bypasses local controller input. During playback, adjust volume independently of mute or toggle streaming statistics. Browser and hardware support determine vibration availability. Expand Custom button mappings to assign any supported Xbox button to a physical button index (0–63), or listen for a press on a selected connected controller. Listening requires focus and ends after ten seconds; held or simultaneous presses require release before capture. Confirm with Apply mapping. Mappings apply to all local physical controllers for the session and are not persisted.
 
 During playback, expand Video appearance to choose a desktop-compatible preset or adjust the individual SDR filters. Neutral restores the default appearance. These adjustments affect only the displayed video and do not change the remote stream, touch coordinates or saved captures. Sharpening requires browser SVG filter support and may increase rendering cost. Appearance is session-local, not HDR processing.
 
 During a connected stream, choose Enable microphone (experimental) to request browser permission and negotiate Xbox voice chat. The microphone starts disabled, is independent of playback mute, and is never enabled automatically after disconnection. Cancel a pending microphone request or disable active capture at any time. Actual voice transmission depends on the Xbox service, browser permissions and hardware. Android companion builds still deny microphone access; this is not native Android microphone support.
 
+During a connected session, Picture-in-picture opens the decoded game video in a floating browser window where supported. It never replaces an unrelated video's picture-in-picture window. Ending the session closes a window opened by this control; the floating window is video-only and does not contain the touch controller or capture controls. Browser support, permissions and mobile compatibility vary. Android companion support is not guaranteed.
+
 Resolution and bitrate are negotiated when connecting, not guaranteed or adjusted live. Xbox services, browser support and individual games determine actual compatibility.
+
+The Cloud Gaming library also offers Favourites and Recently opened collections. These contain only title identifiers in memory for the current sign-in, are cleared on sign-out or reload, and never bypass the current catalog or entitlement checks. Recently opened records opening session setup, not confirmed gameplay. Clear both collections from the library at any time.
 
 Before connecting, open Controller test and stick drift calibration to inspect the four axes of a standard-mapped physical controller. Measure drift with both sticks untouched for three seconds, then explicitly apply the suggested deadzone. A lost controller, interrupted sampling, unfocused tab or large stick movement invalidates the measurement. The recommendation applies to all local controllers for this session only.
 
