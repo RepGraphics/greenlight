@@ -1,0 +1,66 @@
+import {test} from 'node:test'
+import assert from 'node:assert/strict'
+import {createHash} from 'node:crypto'
+import {mkdtemp,readFile,readdir,rm,writeFile} from 'node:fs/promises'
+import {tmpdir} from 'node:os'
+import {join} from 'node:path'
+import {selectForkInstaller,selectForkRelease} from '../../main/helpers/updaterelease'
+import {downloadVerifiedInstaller,validInstallerRedirect,UpdateDownloadTask} from '../../main/helpers/updatedownload'
+import {isAllowedIpc,isAllowedWebIpc} from '../../main/ipc/policy'
+const bytes=Buffer.from('test installer')
+const sha=createHash('sha256').update(bytes).digest('hex')
+const item={name:'windows-Greenlight Setup 2.5.0.exe',state:'uploaded',size:bytes.length,digest:'sha256:'+sha,browser_download_url:'https://evil.invalid/file'}
+const asset=selectForkInstaller([item],'v2.5.0','win32','x64')!
+const request=(async()=>new Response(bytes)) as typeof fetch
+const flush=()=>new Promise<void>(resolve=>setImmediate(resolve))
+test('installer selection is platform-specific and requires a unique uploaded digest',()=>{
+    assert.equal(asset.sha256,sha);assert.ok(asset.url.startsWith('https://github.com/RepGraphics/greenlight/releases/download/v2.5.0/'))
+    assert.equal(selectForkInstaller([item,item],'v2.5.0','win32','x64'),undefined)
+    assert.equal(selectForkInstaller([{...item,digest:null}],'v2.5.0','win32','x64'),undefined)
+    assert.equal(selectForkInstaller([{...item,name:'windows-../file.exe'}],'v2.5.0','win32','x64'),undefined)
+    assert.equal(selectForkInstaller([item],'v2.5.0','win32','arm64'),undefined)
+    assert.equal(selectForkInstaller([{...item,name:'linux-greenlight.AppImage'}],'v2.5.0','linux','x64')?.name,'linux-greenlight.AppImage')
+    assert.equal(selectForkInstaller([{...item,name:'macos-greenlight.dmg'}],'v2.5.0','darwin','arm64')?.name,'macos-greenlight.dmg')
+    assert.equal(selectForkRelease([{tag_name:'v2.5.0',draft:false,assets:[item]}],'2.4.2',false,'win32','x64').release?.installer?.name,item.name)
+})
+test('redirects remain on the fork and GitHub release asset hosts',()=>{
+    assert.equal(validInstallerRedirect('https://release-assets.githubusercontent.com/asset?token=1',asset.url),'https://release-assets.githubusercontent.com/asset?token=1')
+    for(const value of ['http://github.com/file','https://evil.invalid/file','https://github.com/other/repo/releases/download/a/b','https://user@release-assets.githubusercontent.com/file','https://release-assets.githubusercontent.com:444/file'])assert.throws(()=>validInstallerRedirect(value,asset.url))
+})
+test('verified download publishes only matching bytes and never overwrites existing files',async()=>{
+    const dir=await mkdtemp(join(tmpdir(),'streamcloud-test-'))
+    try{
+        const path=await downloadVerifiedInstaller(asset,dir,new AbortController().signal,()=>{},request)
+        assert.deepEqual(await readFile(path),bytes)
+        assert.deepEqual(await readdir(dir),[asset.name])
+        await writeFile(path,'existing')
+        await assert.rejects(downloadVerifiedInstaller(asset,dir,new AbortController().signal,()=>{},request))
+        assert.equal(await readFile(path,'utf8'),'existing')
+        assert.deepEqual(await readdir(dir),[asset.name])
+    }finally{await rm(dir,{recursive:true,force:true})}
+})
+test('checksum mismatch, excessive size and cancellation leave no installer or temporary file',async()=>{
+    const dir=await mkdtemp(join(tmpdir(),'streamcloud-test-'))
+    try{
+        await assert.rejects(downloadVerifiedInstaller({...asset,sha256:'0'.repeat(64)},dir,new AbortController().signal,()=>{},request),/checksum/)
+        await assert.rejects(downloadVerifiedInstaller({...asset,size:1},dir,new AbortController().signal,()=>{},request),/size/)
+        const controller=new AbortController()
+        await assert.rejects(downloadVerifiedInstaller(asset,dir,controller.signal,()=>controller.abort(),request))
+        assert.deepEqual(await readdir(dir),[])
+    }finally{await rm(dir,{recursive:true,force:true})}
+})
+test('download task stays single-owner and handles cancellation before choosing a folder',async()=>{
+    const task=new UpdateDownloadTask();let finish!:(value:typeof asset)=>void;let chosen=0
+    task.start(()=>new Promise(resolve=>{finish=resolve}),async()=>{chosen++;return '/tmp'})
+    task.start(async()=>asset,async()=>{chosen++;return '/tmp'})
+    task.cancel();finish(asset);await flush()
+    assert.equal(chosen,0);assert.equal(task.status().phase,'cancelled')
+    assert.equal(task.readyPath,undefined)
+    task.start(async()=>asset,async()=>'/tmp',async(_a,_d,_s,progress)=>{progress?.(bytes.length);return '/tmp/verified.exe'})
+    await flush();assert.equal(task.status().phase,'ready');assert.equal(task.readyPath,'/tmp/verified.exe')
+})
+test('installer download and reveal IPC are desktop-only',()=>{
+    for(const action of ['startUpdateDownload','getUpdateDownloadStatus','cancelUpdateDownload','revealUpdateDownload']){
+        assert.equal(isAllowedIpc('app',action),true);assert.equal(isAllowedWebIpc('app',action),false)
+    }
+})

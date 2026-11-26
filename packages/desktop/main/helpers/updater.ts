@@ -22,7 +22,7 @@ export async function checkForkUpdates(includePrereleases=false):Promise<UpdateR
         }
         await pending
     }
-    return selectForkRelease(cached?.data,electron.app.getVersion(),includePrereleases)
+    return selectForkRelease(cached?.data,electron.app.getVersion(),includePrereleases,process.platform,process.arch)
 }
 export function setUpdateNotification(options:Options=defaultOptions,logger){
     const settings={...defaultOptions,...options}
