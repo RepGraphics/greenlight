@@ -11,12 +11,15 @@ This separate V3 frontend supports Xbox Remote Play and Cloud Gaming through the
 - Physical controller presets, stick deadzone, Y-axis inversion, stick swapping and optional vibration.
 - Audio mute and volume, Xbox guide, toggleable streaming statistics, video refresh requests and acknowledged session termination.
 - Experimental local PNG screenshots and bounded WebM clips in compatible browsers.
+- Live video appearance presets, brightness, contrast, saturation and experimental sharpening.
 
 During playback, choose either the on-screen controller or experimental direct touch for compatible Xbox titles. Keyboard controller emulation uses arrow keys for the D-pad, Enter/Backspace for A/B and the remaining bindings shown in the player. It is opt-in and is not native mouse/keyboard support. Console-paired mode disables local input.
 
 Local captures contain decoded game video, not the desktop or web UI. WebM clips use available remote audio and are limited to 60 seconds or the shared recorder size limit. Save the capture explicitly before leaving, reconnecting or starting another capture. Nothing is uploaded. Android WebView does not currently support saving these downloads.
 
 Before starting a session, expand Advanced physical controller options to select Standard, Southpaw, Inverted or Alternate face buttons and adjust the deadzone and axes. Settings apply to the selected session only; they are not stored across reloads. Console-paired mode bypasses local controller input. During playback, adjust volume independently of mute or toggle streaming statistics. Browser and hardware support determine vibration availability.
+
+During playback, expand Video appearance to choose a desktop-compatible preset or adjust the individual SDR filters. Neutral restores the default appearance. These adjustments affect only the displayed video and do not change the remote stream, touch coordinates or saved captures. Sharpening requires browser SVG filter support and may increase rendering cost. Appearance is session-local, not HDR processing.
 
 Resolution and bitrate are negotiated when connecting, not guaranteed or adjusted live. Xbox services, browser support and individual games determine actual compatibility.
 
