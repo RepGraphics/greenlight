@@ -33,6 +33,8 @@ The Cloud Gaming library also offers Favourites and Recently opened collections.
 
 Before connecting, open Controller test and stick drift calibration to inspect the four axes of a standard-mapped physical controller. Measure drift with both sticks untouched for three seconds, then explicitly apply the suggested deadzone. A lost controller, interrupted sampling, unfocused tab or large stick movement invalidates the measurement. The recommendation applies to all local controllers for this session only.
 
+Instant replay is opt-in during a connected session. Choose 15, 30 or 60 second rolling segments, then enable the replay buffer. Save replay and stop finalizes the current or recent completed segment using the existing bounded desktop recorder; it is not an exact continuous history. Save the resulting capture explicitly, preview it, or discard it. Only one capture mode runs at a time. Disabling replay or ending playback releases the buffered media. Nothing is uploaded, and microphone audio is not included.
+
 ## Development
 
 From the repository root, use Node.js 24 and Yarn Classic 1.22.22:
