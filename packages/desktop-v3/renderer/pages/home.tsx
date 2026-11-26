@@ -1,79 +1,99 @@
-import React from 'react'
+import {useEffect,useRef,useState} from 'react'
 import Head from 'next/head'
 import Sidebar from '../components/sidebar'
-// import Link from 'next/link'
-// import Image from 'next/image'
+import {useAuth} from '../contexts/AuthContext'
+import {useTRPCClient} from '../utils/trpc'
+import {AuthAttempt} from '../contexts/authattempt'
+import {normalizeCloudTitles,catalogBatches,hydrateCloudTitles,filterCloudTitles,type CloudTitle} from '../utils/cloudlibrary'
 
-import { useQueryClient } from "@tanstack/react-query";
-import { useTRPC } from "../utils/trpc";
-
-
-export default function HomePage() {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-
-
-
-
-
-
-
-  const ping = () => {
-    queryClient.fetchQuery(trpc.ping.queryOptions())
-      .then((data) => {
-          console.log(data)
-      })
-      .catch((error) => {
-          console.error('Error fetching data:', error);
-      });
-  }
-  
-  const getVersion = () => {
-    queryClient.fetchQuery(trpc.version.queryOptions())
-      .then((data) => {
-          console.log(data)
-      })
-      .catch((error) => {
-          console.error('Error fetching data:', error);
-      });
-  }
-
-  return (
-    <React.Fragment>
-      <Head>
-        <title>Greenlight</title>
-      </Head>
-      <div className="flex h-screen bg-[#0d0d0d] bg-pattern overflow-hidden">
-            {/* Sidebar */}
-            <Sidebar />
-
-            {/* Main content */}
-            <main className="flex-1 overflow-hidden relative">
-              {/* Ambient background glow */}
-              <div className="absolute top-0 right-0 w-96 h-96 bg-[#107C10]/3 rounded-full blur-3xl pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#107C10]/2 rounded-full blur-3xl pointer-events-none" />
-
-              {/* Main content area */}
-
-              <div className="h-full overflow-y-auto">
-                <div className="p-6 md:p-8 max-w-5xl mx-auto">
-                  {/* Header */}
-                  <div className="mb-6 animate-fade-in-up">
-                    <h2 className="text-2xl font-bold text-white mb-1">Game Library</h2>
-                    <p className="text-white/40 text-sm">0 titles in your collection</p>
-
-                    <button onClick={ping}>Ping</button>
-                    <button onClick={getVersion}>getVersion</button>
-
-
-
-                  </div>
-                </div>
-              </div>
-
-              {/* End of main content */}
+export default function HomePage(){
+    const {getxCloudToken,isAuthenticated}=useAuth()
+    const client=useTRPCClient()
+    const {token,market,language}=getxCloudToken()
+    const [titles,setTitles]=useState<CloudTitle[]>([])
+    const [loading,setLoading]=useState(false)
+    const [failed,setFailed]=useState(false)
+    const [metadataFailed,setMetadataFailed]=useState(false)
+    const [search,setSearch]=useState('')
+    const [entitledOnly,setEntitledOnly]=useState(true)
+    const [sort,setSort]=useState<'az'|'za'>('az')
+    const [page,setPage]=useState(0)
+    const attempts=useRef(new AuthAttempt())
+    const locked=useRef(false)
+    const load=async()=>{
+        if(locked.current||!isAuthenticated||!token)return
+        locked.current=true
+        const attempt=attempts.current.begin()
+        const credentials={token,market,language}
+        setLoading(true);setFailed(false);setMetadataFailed(false);setTitles([]);setPage(0)
+        try{
+            let items=normalizeCloudTitles(await client.gamepass_get_titles.query(credentials,{signal:attempt.signal}))
+            if(!attempt.current())return
+            setTitles(items)
+            // Resolve metadata sequentially in bounded batches. The title list
+            // remains usable if the metadata service fails or returns partially.
+            for(const productIds of catalogBatches(items)){
+                if(!attempt.current())return
+                try{
+                    const response=await client.gamepass_batch_productids.query({token:credentials,productIds},{signal:attempt.signal})
+                    if(!attempt.current())return
+                    items=hydrateCloudTitles(items,response)
+                    setTitles(items)
+                }catch{
+                    if(!attempt.current())return
+                    setMetadataFailed(true)
+                    break
+                }
+            }
+        }catch{
+            if(attempt.current()){setTitles([]);setFailed(true)}
+        }finally{
+            if(attempt.current()){locked.current=false;setLoading(false)}
+        }
+    }
+    useEffect(()=>{
+        setTitles([]);setFailed(false);setMetadataFailed(false);setPage(0)
+        if(isAuthenticated&&token)void load()
+        else setLoading(false)
+        return()=>{attempts.current.cancel();locked.current=false}
+    },[client,isAuthenticated,token,market,language])
+    const visible=filterCloudTitles(titles,search,entitledOnly,sort)
+    const pageSize=48
+    const lastPage=Math.max(0,Math.ceil(visible.length/pageSize)-1)
+    const currentPage=Math.min(page,lastPage)
+    const button='rounded border border-white/20 px-4 py-2 disabled:opacity-50'
+    return <>
+        <Head><title>Greenlight — Cloud Gaming library</title></Head>
+        <div className="flex h-[100dvh] flex-col md:flex-row bg-[#0d0d0d] text-white overflow-hidden">
+            <Sidebar/>
+            <main className="flex-1 min-h-0 min-w-0 overflow-y-auto p-4 md:p-8">
+                <h1 className="text-2xl font-bold">Cloud Gaming library</h1>
+                <p className="text-white/60 mt-2">Experimental web client — browse the Xbox catalog. Starting cloud sessions is not available yet.</p>
+                {!token?<p className="mt-5" role="status">Cloud Gaming authorization is unavailable for this account.</p>:<>
+                    <div className="flex flex-wrap gap-3 my-5 items-center">
+                        <input type="search" maxLength={100} value={search} onChange={event=>{setSearch(event.target.value);setPage(0)}} aria-label="Search games" placeholder="Search games or publishers" className="min-w-0 flex-1 rounded border border-white/20 bg-white/5 p-2"/>
+                        <label><input type="checkbox" checked={entitledOnly} onChange={event=>{setEntitledOnly(event.target.checked);setPage(0)}}/> Entitled and free titles</label>
+                        <label>Sort <select value={sort} onChange={event=>{setSort(event.target.value==='za'?'za':'az');setPage(0)}} className="bg-[#202020] rounded p-2"><option value="az">A–Z</option><option value="za">Z–A</option></select></label>
+                        <button type="button" className={button} disabled={loading} onClick={()=>void load()}>{loading?'Refreshing…':'Refresh'}</button>
+                    </div>
+                    <p role="status">{loading?'Loading catalog and metadata…':visible.length+' matching titles'}</p>
+                    {failed&&<p role="alert" className="my-3">Unable to retrieve the Xbox catalog. Try refreshing.</p>}
+                    {metadataFailed&&<p role="status" className="my-3">Some game names are unavailable. Title identifiers are shown instead.</p>}
+                    {!loading&&!failed&&visible.length===0&&<p>No matching titles.</p>}
+                    <section aria-busy={loading} aria-label="Cloud games" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 mt-4">
+                        {visible.slice(currentPage*pageSize,(currentPage+1)*pageSize).map(title=><article key={title.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
+                            <h2 className="font-semibold break-words">{title.name}</h2>
+                            {title.publisher&&<p className="text-white/60 text-sm">{title.publisher}</p>}
+                            <p className="text-sm mt-2">{title.entitled?'Available entitlement or free title':'Entitlement not reported'}</p>
+                        </article>)}
+                    </section>
+                    {lastPage>0&&<nav aria-label="Game pages" className="flex flex-wrap gap-3 items-center mt-5">
+                        <button type="button" className={button} disabled={currentPage===0} onClick={()=>setPage(currentPage-1)}>Previous</button>
+                        <span>Page {currentPage+1} of {lastPage+1}</span>
+                        <button type="button" className={button} disabled={currentPage===lastPage} onClick={()=>setPage(currentPage+1)}>Next</button>
+                    </nav>}
+                </>}
             </main>
-          </div>
-    </React.Fragment>
-  )
+        </div>
+    </>
 }
