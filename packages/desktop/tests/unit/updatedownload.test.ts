@@ -1,7 +1,7 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import {createHash} from 'node:crypto'
-import {mkdtemp,readFile,readdir,rm,writeFile} from 'node:fs/promises'
+import {mkdtemp,readFile,readdir,rm,writeFile,stat} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {selectForkInstaller,selectForkRelease} from '../../main/helpers/updaterelease'
@@ -63,4 +63,44 @@ test('installer download and reveal IPC are desktop-only',()=>{
     for(const action of ['startUpdateDownload','getUpdateDownloadStatus','cancelUpdateDownload','revealUpdateDownload']){
         assert.equal(isAllowedIpc('app',action),true);assert.equal(isAllowedWebIpc('app',action),false)
     }
+})
+
+test('invalid destination and pre-aborted downloads do not request installer bytes',async()=>{
+    const dir=await mkdtemp(join(tmpdir(),'streamcloud-test-'))
+    let calls=0
+    const fetcher=(async()=>{calls++;return new Response(bytes)}) as typeof fetch
+    try{
+        await assert.rejects(downloadVerifiedInstaller(asset,join(dir,'missing'),new AbortController().signal,()=>{},fetcher))
+        const controller=new AbortController();controller.abort()
+        await assert.rejects(downloadVerifiedInstaller(asset,dir,controller.signal,()=>{},fetcher))
+        assert.equal(calls,0);assert.deepEqual(await readdir(dir),[])
+    }finally{await rm(dir,{recursive:true,force:true})}
+})
+test('HTTP errors, invalid redirects and mismatched content length cancel bodies and clean temporary files',async()=>{
+    const dir=await mkdtemp(join(tmpdir(),'streamcloud-test-'))
+    try{
+        for(const options of [{status:503},{status:302,headers:{location:'https://evil.invalid/file'}},{status:200,headers:{'content-length':'1'}}]){
+            let cancelled=0
+            const fetcher=(async()=>new Response(new ReadableStream({cancel(){cancelled++}}),options as ResponseInit)) as typeof fetch
+            await assert.rejects(downloadVerifiedInstaller(asset,dir,new AbortController().signal,()=>{},fetcher))
+            assert.equal(cancelled,1);assert.deepEqual(await readdir(dir),[])
+        }
+    }finally{await rm(dir,{recursive:true,force:true})}
+})
+test('network rejection after destination reservation removes temporary directories',async()=>{
+    const dir=await mkdtemp(join(tmpdir(),'streamcloud-test-'))
+    try{
+        await assert.rejects(downloadVerifiedInstaller(asset,dir,new AbortController().signal,()=>{},(async()=>{throw Error('network')}) as typeof fetch),/network/)
+        assert.deepEqual(await readdir(dir),[])
+    }finally{await rm(dir,{recursive:true,force:true})}
+})
+test('verified Linux AppImages are executable by the owner only',{skip:process.platform!=='linux'},async()=>{
+    const dir=await mkdtemp(join(tmpdir(),'streamcloud-test-'))
+    try{
+        const linuxAsset=selectForkInstaller([{...item,name:'linux-Greenlight.AppImage'}],'v2.5.0','linux','x64')!
+        const path=await downloadVerifiedInstaller(linuxAsset,dir,new AbortController().signal,()=>{},request)
+        assert.equal((await stat(path)).mode&0o777,0o700)
+        assert.deepEqual(await readFile(path),bytes)
+        assert.deepEqual(await readdir(dir),[linuxAsset.name])
+    }finally{await rm(dir,{recursive:true,force:true})}
 })
