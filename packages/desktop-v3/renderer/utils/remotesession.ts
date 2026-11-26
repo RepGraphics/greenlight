@@ -25,7 +25,22 @@ export function returnedSessionPath(result:unknown,type:'home'|'cloud'){
     if(value?.sessionId!==undefined&&value.sessionId!==id)throw Error('Inconsistent Xbox session identifier')
     return path
 }
-export function createRemoteSession(rpc:RemoteRpc,config:xCloudStreamConfig,token:xStreamToken,refreshToken:string){
+export type WebStreamTarget={id:string;name:string;type:'home'}|{id:string;name:string;type:'cloud';entitled:boolean}
+export function selectStreamCredentials(target:WebStreamTarget,home:xStreamToken,cloud:xStreamToken,regions:{home:unknown;cloud:unknown}){
+    if(!target.id||target.id.length>160||(target.type==='cloud'&&target.entitled!==true))throw Error('Streaming target unavailable')
+    const token=target.type==='cloud'?cloud:home
+    if(!token.token)throw Error('Xbox streaming authorization unavailable')
+    return {token,host:defaultStreamOrigin(regions[target.type])}
+}
+export function provisioningMessage(value:unknown):string|null{
+    const state=(value as {state?:unknown}|null)?.state
+    if(state==='WaitingForResources')return 'Waiting in the Xbox Cloud Gaming queue…'
+    if(state==='ReadyToConnect')return 'Authorizing Xbox session…'
+    if(state==='Provisioned')return 'Negotiating stream…'
+    if(state==='Provisioning')return 'Provisioning Xbox session…'
+    return null
+}
+export function createRemoteSession(rpc:RemoteRpc,config:xCloudStreamConfig,token:xStreamToken,refreshToken:string,onProvisioning?:(message:string)=>void){
     if(!token.token||!refreshToken||!config.id)throw Error('Xbox streaming authorization unavailable')
     const request={token:{...token},xCloudStreamConfig:{...config,host:streamOrigin(config.host)}}
     let closing=false
@@ -75,7 +90,12 @@ export function createRemoteSession(rpc:RemoteRpc,config:xCloudStreamConfig,toke
                 getSessionId:()=>sessionPath.split('/').at(-1)!,
                 getSessionPath:()=>sessionPath,
                 getStreamConfig:()=>({...request.xCloudStreamConfig}),
-                getStreamStatus:()=>operate(sessionPath,()=>rpc.status(input)),
+                getStreamStatus:()=>operate(sessionPath,async()=>{
+                    const result=await rpc.status(input)
+                    const message=provisioningMessage(result)
+                    if(!closing&&message)onProvisioning?.(message)
+                    return result
+                }),
                 sendSDPOffer:sdpOffer=>operate(sessionPath,()=>rpc.sdp({...input,sdpOffer})),
                 sendICECandidates:candidates=>{
                     const parsed=candidates.map(candidate=>{

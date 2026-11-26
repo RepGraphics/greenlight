@@ -40,7 +40,7 @@ export default function ConsolesPage(){
         return()=>{attempts.current.cancel();locked.current=false}
     },[client,isAuthenticated,uhs,token])
     const visible=searchConsoles(items,search)
-    if(selected)return <RemotePlay console={selected} onExit={()=>setSelected(null)}/>
+    if(selected)return <RemotePlay target={{id:selected.id,name:selected.name,type:'home'}} onExit={()=>setSelected(null)}/>
     return <React.Fragment>
         <Head><title>Greenlight — My Consoles</title></Head>
         <div className="flex min-h-screen flex-col md:h-screen md:flex-row bg-[#0d0d0d] text-white">

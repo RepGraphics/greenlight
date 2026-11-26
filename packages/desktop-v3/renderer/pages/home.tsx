@@ -1,6 +1,7 @@
 import {useEffect,useRef,useState} from 'react'
 import Head from 'next/head'
 import Sidebar from '../components/sidebar'
+import RemotePlay from '../components/remoteplay'
 import {useAuth} from '../contexts/AuthContext'
 import {useTRPCClient} from '../utils/trpc'
 import {AuthAttempt} from '../contexts/authattempt'
@@ -18,6 +19,7 @@ export default function HomePage(){
     const [entitledOnly,setEntitledOnly]=useState(true)
     const [sort,setSort]=useState<'az'|'za'>('az')
     const [page,setPage]=useState(0)
+    const [selected,setSelected]=useState<CloudTitle|null>(null)
     const attempts=useRef(new AuthAttempt())
     const locked=useRef(false)
     const load=async()=>{
@@ -62,13 +64,14 @@ export default function HomePage(){
     const lastPage=Math.max(0,Math.ceil(visible.length/pageSize)-1)
     const currentPage=Math.min(page,lastPage)
     const button='rounded border border-white/20 px-4 py-2 disabled:opacity-50'
+    if(selected)return <RemotePlay target={{id:selected.id,name:selected.name,type:'cloud',entitled:selected.entitled}} onExit={()=>setSelected(null)}/>
     return <>
         <Head><title>Greenlight — Cloud Gaming library</title></Head>
         <div className="flex h-[100dvh] flex-col md:flex-row bg-[#0d0d0d] text-white overflow-hidden">
             <Sidebar/>
             <main className="flex-1 min-h-0 min-w-0 overflow-y-auto p-4 md:p-8">
                 <h1 className="text-2xl font-bold">Cloud Gaming library</h1>
-                <p className="text-white/60 mt-2">Experimental web client — browse the Xbox catalog. Starting cloud sessions is not available yet.</p>
+                <p className="text-white/60 mt-2">Experimental web client — Cloud Gaming launch is unverified on hardware.</p>
                 {!token?<p className="mt-5" role="status">Cloud Gaming authorization is unavailable for this account.</p>:<>
                     <div className="flex flex-wrap gap-3 my-5 items-center">
                         <input type="search" maxLength={100} value={search} onChange={event=>{setSearch(event.target.value);setPage(0)}} aria-label="Search games" placeholder="Search games or publishers" className="min-w-0 flex-1 rounded border border-white/20 bg-white/5 p-2"/>
@@ -85,6 +88,7 @@ export default function HomePage(){
                             <h2 className="font-semibold break-words">{title.name}</h2>
                             {title.publisher&&<p className="text-white/60 text-sm">{title.publisher}</p>}
                             <p className="text-sm mt-2">{title.entitled?'Available entitlement or free title':'Entitlement not reported'}</p>
+                            <button type="button" disabled={!title.entitled||!token||loading} className={button+' mt-3'} onClick={()=>setSelected(title)}>Play (experimental)</button>
                         </article>)}
                     </section>
                     {lastPage>0&&<nav aria-label="Game pages" className="flex flex-wrap gap-3 items-center mt-5">
