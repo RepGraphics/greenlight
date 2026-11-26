@@ -80,7 +80,8 @@ export default class xCloudPlayer {
         this.videoWatchdog = setInterval(()=>{
             if(this._isDestoyed || this._peerConnection.connectionState!=='connected' || document.hidden) return
             const video=this._videoComponent
-            if(video instanceof VideoComponent && performance.now()-video.getLastFrameAt()>5000 && performance.now()-this.lastVideoRecovery>5000){
+            const lastFrameAt=video instanceof VideoComponent?video.getLastFrameAt():undefined
+            if(video instanceof VideoComponent && lastFrameAt!==undefined && performance.now()-lastFrameAt>5000 && performance.now()-this.lastVideoRecovery>5000){
                 this.lastVideoRecovery=performance.now();video.recover()
             } else if(video instanceof WebGpuComponent && this.videoStream && performance.now()-this.videoReceivedAt>10000 && video.getFrameStats().renderingFps===0){
                 video.destroy();this._videoComponent=new VideoComponent(this);this._videoComponent.create(this.videoStream);this._channels.control.requestKeyframeRequest(true)

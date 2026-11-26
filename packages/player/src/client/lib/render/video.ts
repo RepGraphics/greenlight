@@ -1,5 +1,6 @@
 import xCloudPlayer from '../player'
 import Overlay from './overlay'
+import {PlaybackFrameProgress} from './frameprogress'
 
 export default class VideoComponent {
     private _player:xCloudPlayer
@@ -8,9 +9,15 @@ export default class VideoComponent {
     private _overlay:Overlay
     private frameCallback?: number
     private lastFrameAt = 0
+    private callbackActive=false
+    private fallbackProgress=new PlaybackFrameProgress()
     private resume = () => { if (this._element?.paused) void this._element.play().catch(()=>{}) }
 
-    getLastFrameAt(){ return this.lastFrameAt }
+    getLastFrameAt(){
+        if(this.callbackActive)return this.lastFrameAt
+        try{return this.fallbackProgress.sample(performance.now(),this._element?.getVideoPlaybackQuality?.())}
+        catch{this.fallbackProgress.reset();return undefined}
+    }
     recover(){ this.resume(); this._player._channels.control.requestKeyframeRequest(true) }
 
     constructor(player:any){
@@ -19,6 +26,7 @@ export default class VideoComponent {
     }
 
     create(stream:MediaStream) {
+        this.destroy()
         const videoElement = document.createElement('video')
         videoElement.srcObject = stream
         videoElement.autoplay = true
@@ -44,14 +52,25 @@ export default class VideoComponent {
             element.style.position = 'relative'
         }
 
-        this.frameCallback = this._element.requestVideoFrameCallback(this.processVideoMetadata.bind(this))
+        this.scheduleFrame(videoElement)
     }
 
-    processVideoMetadata(timestamp, data:VideoFrameCallbackMetadata) {
-        if(this._element === undefined) {return}
-        this.lastFrameAt = performance.now()
+    private scheduleFrame(element:HTMLVideoElement){
+        this.callbackActive=false
+        if(typeof element.requestVideoFrameCallback!=='function'||typeof element.cancelVideoFrameCallback!=='function')return
+        try{
+            this.frameCallback=element.requestVideoFrameCallback((_timestamp,data)=>{
+                if(this._element!==element||!this.callbackActive)return
+                this.frameCallback=undefined
+                this.lastFrameAt=performance.now()
+                this.scheduleFrame(element)
+                this.processVideoMetadata(data)
+            })
+            this.callbackActive=true
+        }catch{this.callbackActive=false;this.frameCallback=undefined;this.fallbackProgress.reset()}
+    }
 
-        this.frameCallback = this._element.requestVideoFrameCallback(this.processVideoMetadata.bind(this))
+    private processVideoMetadata(data:VideoFrameCallbackMetadata) {
 
         this._player._channels.input.queueMetadataFrame({
             serverDataKey: data.rtpTimestamp as number,
@@ -72,8 +91,13 @@ export default class VideoComponent {
 
     destroy(){
         const element = this._element
-        if (element && this.frameCallback !== undefined) element.cancelVideoFrameCallback(this.frameCallback)
         this._element = undefined
+        this.callbackActive=false
+        if (element && this.frameCallback !== undefined) {
+            try{element.cancelVideoFrameCallback(this.frameCallback)}catch{}
+        }
+        this.frameCallback=undefined
+        this.fallbackProgress.reset()
         if (element) { element.removeEventListener('pause',this.resume); element.removeEventListener('canplay',this.resume); element.pause(); element.srcObject = null }
 
         if(this._overlay !== undefined){
