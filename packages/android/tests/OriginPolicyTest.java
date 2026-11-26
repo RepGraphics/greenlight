@@ -24,6 +24,18 @@ public final class OriginPolicyTest {
         check(!origin.allowsChallenge("evil.example", "Greenlight WebUI"), "foreign host");
         check(!origin.allowsChallenge("private.example", "Other realm"), "foreign realm");
         check(!origin.allowsChallenge(null, null), "missing challenge");
-        System.out.println("Android origin policy tests passed");
+        String token = "a".repeat(64);
+        check(ConnectionMode.DESKTOP_COMPANION.acceptsCredential(token), "companion token");
+        check(!ConnectionMode.DESKTOP_COMPANION.acceptsCredential(""), "companion requires token");
+        check(!ConnectionMode.DESKTOP_COMPANION.acceptsCredential("g".repeat(64)), "invalid token");
+        check(ConnectionMode.PRIVATE_V3.acceptsCredential(""), "V3 uses device authorization");
+        check(!ConnectionMode.PRIVATE_V3.acceptsCredential(token), "V3 never accepts desktop credential");
+        check(ConnectionMode.DESKTOP_COMPANION.allowsChallenge(origin, "private.example", "Greenlight WebUI"), "companion challenge");
+        check(!ConnectionMode.PRIVATE_V3.allowsChallenge(origin, "private.example", "Greenlight WebUI"), "V3 rejects desktop challenge");
+        check(!ConnectionMode.DESKTOP_COMPANION.allowsChallenge(origin, "evil.example", "Greenlight WebUI"), "foreign challenge");
+        check(ConnectionMode.DESKTOP_COMPANION.landingPage(origin).equals("https://private.example/"), "companion landing");
+        check(ConnectionMode.PRIVATE_V3.landingPage(origin).equals("https://private.example/home/"), "V3 landing");
+        check(ConnectionMode.MICROSOFT_DEVICE_LOGIN.equals("https://microsoft.com/devicelogin"), "fixed Microsoft browser destination");
+        System.out.println("Android origin and connection mode policy tests passed");
     }
 }
