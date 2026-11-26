@@ -104,13 +104,32 @@ export default class InputPacket {
         this._serverVideoHeight = options.height
     }
 
+    private resetReport(){
+        this._reportType = ReportTypes.None
+        this._metadataFrames = []
+        this._gamepadFrames = []
+        this._pointerFrames = []
+        this._mouseFrames = []
+        this._keyboardFrames = []
+    }
+
     setMetadata(maxTouchpoints = 1){
+        if(!Number.isInteger(maxTouchpoints) || maxTouchpoints < 0 || maxTouchpoints > 255){
+            throw new RangeError('Invalid client metadata touchpoint count')
+        }
+        this.resetReport()
         this._reportType = ReportTypes.ClientMetadata
         this._totalSize = 15
         this._maxTouchpoints = maxTouchpoints
     }
 
-    setData(metadataQueue:Array<any>, gamepadQueue:Array<InputFrame>, pointerQueue:Array<PointerFrame>, mouseQueue:Array<MouseFrame>, keyboardQueue:Array<KeyboardFrame>){
+    setData(metadataQueue:Array<MetadataFrame>, gamepadQueue:Array<InputFrame>, pointerQueue:Array<PointerFrame>, mouseQueue:Array<MouseFrame>, keyboardQueue:Array<KeyboardFrame>){
+        // The protocol stores each report count in a single unsigned byte.
+        if([metadataQueue,gamepadQueue,mouseQueue,keyboardQueue].some(queue=>queue.length>255) ||
+            pointerQueue.reduce((count,frame)=>count+frame.events.length,0)>255){
+            throw new RangeError('Too many input report frames')
+        }
+        this.resetReport()
         let size = 14
 
         if(metadataQueue.length > 0){
@@ -336,7 +355,7 @@ export default class InputPacket {
             offset++
         }
 
-        if(offset !== offset){
+        if(offset !== packet.byteLength){
             throw new Error('Packet length mismatch. Something is wrong!')
         }
 
