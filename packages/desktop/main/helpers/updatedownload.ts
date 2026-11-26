@@ -17,27 +17,32 @@ export async function downloadVerifiedInstaller(asset:ForkInstaller,directory:st
     const initial=new URL(asset.url)
     if(initial.hostname!=='github.com'||!safeAssetHost(initial)||!initial.pathname.startsWith('/RepGraphics/greenlight/releases/download/')||initial.search||initial.hash||decodeURIComponent(initial.pathname.split('/').at(-1)!)!==asset.name)throw Error('Invalid installer URL')
     const bounded=AbortSignal.any([signal,AbortSignal.timeout(10*60*1000)])
-    let url=initial.href
-    let response:Response|undefined
-    for(let i=0;i<5;i++){
-        bounded.throwIfAborted()
-        response=await request(url,{redirect:'manual',signal:bounded,headers:{Accept:'application/octet-stream'}})
-        if(![301,302,303,307,308].includes(response.status))break
-        const location=response.headers.get('location')
-        await response.body?.cancel()
-        if(!location)throw Error('Missing installer redirect')
-        url=validInstallerRedirect(location,url);response=undefined
-    }
-    if(!response?.ok||!response.body){await response?.body?.cancel();throw Error('Installer download failed')}
-    const length=response.headers.get('content-length')
-    if(length!==null&&Number(length)!==asset.size){await response.body.cancel();throw Error('Unexpected installer size')}
+    bounded.throwIfAborted()
+    // Reserve the destination filesystem before requesting the asset. Keep
+    // all response and file resources inside a single cleanup boundary.
     const temp=await mkdtemp(join(directory,'.streamcloud-update-'))
     const partial=join(temp,'installer.part'),destination=join(directory,asset.name)
     let handle:Awaited<ReturnType<typeof open>>|undefined
-    const reader=response.body.getReader()
-    const hash=createHash('sha256')
-    let received=0
+    let response:Response|undefined
+    let reader:ReadableStreamDefaultReader<Uint8Array>|undefined
     try{
+        let url=initial.href
+        for(let i=0;i<5;i++){
+            bounded.throwIfAborted()
+            response=await request(url,{redirect:'manual',signal:bounded,headers:{Accept:'application/octet-stream'}})
+            if(![301,302,303,307,308].includes(response.status))break
+            const location=response.headers.get('location')
+            await response.body?.cancel()
+            response=undefined
+            if(!location)throw Error('Missing installer redirect')
+            url=validInstallerRedirect(location,url)
+        }
+        if(!response?.ok||!response.body)throw Error('Installer download failed')
+        const length=response.headers.get('content-length')
+        if(length!==null&&Number(length)!==asset.size)throw Error('Unexpected installer size')
+        reader=response.body.getReader()
+        const hash=createHash('sha256')
+        let received=0
         handle=await open(partial,'wx',0o600)
         while(true){
             bounded.throwIfAborted()
@@ -51,6 +56,9 @@ export async function downloadVerifiedInstaller(asset:ForkInstaller,directory:st
         }
         if(received!==asset.size||hash.digest('hex')!==asset.sha256)throw Error('Installer checksum mismatch')
         bounded.throwIfAborted()
+        // AppImages require the owner execute bit. Never execute a download
+        // automatically, and never grant group/other execute permissions.
+        if(process.platform==='linux'&&/^linux-.*\.AppImage$/i.test(asset.name))await handle.chmod(0o700)
         await handle.sync();await handle.close();handle=undefined
         bounded.throwIfAborted()
         // Publish only a verified file. An existing destination is never
@@ -58,7 +66,9 @@ export async function downloadVerifiedInstaller(asset:ForkInstaller,directory:st
         await link(partial,destination)
         return destination
     }finally{
-        await reader.cancel().catch(()=>{});reader.releaseLock()
+        if(reader){
+            await reader.cancel().catch(()=>{});reader.releaseLock()
+        }else await response?.body?.cancel().catch(()=>{})
         await handle?.close().catch(()=>{})
         await rm(temp,{recursive:true,force:true}).catch(()=>{})
     }
