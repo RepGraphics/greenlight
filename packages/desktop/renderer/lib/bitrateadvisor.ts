@@ -7,8 +7,14 @@ export function recommendLowerBitrate(samples: DiagnosticSample[], configuredCap
     if(samples.at(-1)?.statsFresh===false)return null
     const recent = samples.slice(-20).filter(sample=>sample.statsFresh!==false&&sample.width>0&&sample.height>0&&sample.rtt>0&&sample.bitrate>0)
     if(recent.length<15 || recent[recent.length-1].elapsedSeconds-recent[0].elapsedSeconds<12 || recent[recent.length-1].elapsedSeconds-recent[0].elapsedSeconds>30 || recent.some((sample,index)=>index>0&&(sample.elapsedSeconds<=recent[index-1].elapsedSeconds||sample.elapsedSeconds-recent[index-1].elapsedSeconds>3))) return null
-    const first = summarizeDiagnostics(recent.slice(0,Math.floor(recent.length/2)))
-    const second = summarizeDiagnostics(recent.slice(Math.floor(recent.length/2)))
+    const firstWindow = recent.slice(0,Math.floor(recent.length/2))
+    const secondWindow = recent.slice(Math.floor(recent.length/2))
+    // With at most ten samples per half, p95 is effectively the maximum.
+    // Require repeated poor readings in both halves, not isolated spikes.
+    const sustained = (window:DiagnosticSample[]) => window.filter(sample=>sample.rtt>150||sample.jitter>30).length >= Math.ceil(window.length*0.6)
+    if(!sustained(firstWindow)||!sustained(secondWindow)) return null
+    const first = summarizeDiagnostics(firstWindow)
+    const second = summarizeDiagnostics(secondWindow)
     if(first.quality!=='poor'||second.quality!=='poor') return null
     const observed = Math.min(first.averageBitrate??0,second.averageBitrate??0)*1000
     const cap = Number.isFinite(configuredCap)&&configuredCap>0?configuredCap:40960
