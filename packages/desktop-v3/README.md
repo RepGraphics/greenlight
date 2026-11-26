@@ -26,6 +26,8 @@ During a connected stream, choose Enable microphone (experimental) to request br
 
 Resolution and bitrate are negotiated when connecting, not guaranteed or adjusted live. Xbox services, browser support and individual games determine actual compatibility.
 
+Before connecting, open Controller test and stick drift calibration to inspect the four axes of a standard-mapped physical controller. Measure drift with both sticks untouched for three seconds, then explicitly apply the suggested deadzone. A lost controller, interrupted sampling, unfocused tab or large stick movement invalidates the measurement. The recommendation applies to all local controllers for this session only.
+
 ## Development
 
 From the repository root, use Node.js 24 and Yarn Classic 1.22.22:
