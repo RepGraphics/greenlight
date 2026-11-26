@@ -87,7 +87,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
         const stickOwners=useRef(new Map<'Left'|'Right',number>());
         const [touchEpoch,setTouchEpoch]=useState(0);
         const releaseTouch = () => {
-            for(const button of new Set(pressed.current.values()))controller.current?.sendButtonState(button,0);
+            controller.current?.cancelVirtualButtons();
             const hadInput=pressed.current.size>0||stickOwners.current.size>0;
             pressed.current.clear();stickOwners.current.clear();
             controller.current?.releaseVirtualStick('Left');controller.current?.releaseVirtualStick('Right');
@@ -99,11 +99,11 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             window.addEventListener('blur',releaseTouch);document.addEventListener('visibilitychange',hidden);
             return()=>{window.removeEventListener('blur',releaseTouch);document.removeEventListener('visibilitychange',hidden);releaseTouch()};
         },[touchControls]);
-        const releaseButton=(pointer:number)=>{
+        const releaseButton=(pointer:number,preserveTap=true)=>{
             const button=pressed.current.get(pointer);
             if(!button)return;
             pressed.current.delete(pointer);
-            if(!Array.from(pressed.current.values()).includes(button))controller.current?.sendButtonState(button,0);
+            if(!Array.from(pressed.current.values()).includes(button))controller.current?.sendButtonState(button,0,preserveTap);
         };
         const startStick=(side:'Left'|'Right',pointer:number)=>{
             if(!controller.current||document.hidden||!document.hasFocus()||stickOwners.current.has(side))return false;
@@ -360,7 +360,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             event.preventDefault();
             try{event.currentTarget.setPointerCapture(event.pointerId)}catch{return}
             pressed.current.set(event.pointerId,button);controller.current.sendButtonState(button,1);
-        }} onPointerUp={event=>releaseButton(event.pointerId)} onPointerCancel={event=>releaseButton(event.pointerId)} onLostPointerCapture={event=>releaseButton(event.pointerId)}>{label}</button>;
+        }} onPointerUp={event=>releaseButton(event.pointerId)} onPointerCancel={event=>releaseButton(event.pointerId,false)} onLostPointerCapture={event=>releaseButton(event.pointerId,false)}>{label}</button>;
         return (
             <div ref={playerInstance}>
                 <div id="playerContainer"></div>
