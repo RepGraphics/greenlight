@@ -4,7 +4,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTRPCClient, RouterOutputs } from "../utils/trpc";
 import {AuthAttempt,clearLegacyUserToken} from "./authattempt";
 
+import {emptyLibraryCollections,toggleFavorite,openLibraryTitle,type LibraryCollections} from '../utils/librarycollections';
+
 interface AuthContextType {
+  libraryCollections: LibraryCollections;
+  toggleLibraryFavorite: (id:string)=>void;
+  rememberLibraryTitle: (id:string)=>void;
+  clearLibraryCollections: ()=>void;
   startAuth: () => Promise<RouterOutputs["auth_msal_start"] | undefined>;
   verifyCode: (code: string) => Promise<RouterOutputs["auth_msal_verify"] | undefined>;
   logout: () => void;
@@ -39,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isAuthenticating, setIsAuthenticating] = useState(true);
+  const [libraryCollections,setLibraryCollections]=useState(emptyLibraryCollections);
   const attempts = useRef(new AuthAttempt());
   const active = useRef<ReturnType<AuthAttempt['begin']>|null>(null);
   const verifying = useRef(false);
@@ -70,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         trpc.auth_get_streamingtokens.query(userToken,{signal:attempt.signal}),
       ]);
       if(!attempt.current())return;
+      setLibraryCollections(emptyLibraryCollections());
       setAuthState({userToken,webToken,streamingTokens});
       setIsAuthenticated(true);
       return userToken;
@@ -82,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     attempts.current.cancel();
     active.current=null;
     verifying.current=false;
+    setLibraryCollections(emptyLibraryCollections());
     setAuthState({userToken:null,webToken:null,streamingTokens:null});
     setIsAuthenticated(false);
     setIsAuthenticating(false);
@@ -129,6 +138,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider
       value={{
+        libraryCollections,
+        toggleLibraryFavorite:id=>{if(isAuthenticated)setLibraryCollections(previous=>toggleFavorite(previous,id))},
+        rememberLibraryTitle:id=>{if(isAuthenticated)setLibraryCollections(previous=>openLibraryTitle(previous,id))},
+        clearLibraryCollections:()=>setLibraryCollections(emptyLibraryCollections()),
         startAuth,
         verifyCode,
         logout,
