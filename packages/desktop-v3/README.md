@@ -26,6 +26,8 @@ During a connected stream, choose Enable microphone (experimental) to request br
 
 Resolution and bitrate are negotiated when connecting, not guaranteed or adjusted live. Xbox services, browser support and individual games determine actual compatibility.
 
+The Cloud Gaming library also offers Favourites and Recently opened collections. These contain only title identifiers in memory for the current sign-in, are cleared on sign-out or reload, and never bypass the current catalog or entitlement checks. Recently opened records opening session setup, not confirmed gameplay. Clear both collections from the library at any time.
+
 ## Development
 
 From the repository root, use Node.js 24 and Yarn Classic 1.22.22:
