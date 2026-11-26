@@ -45,13 +45,18 @@ export default class InputChannel extends Channel {
     }
 
     onOpen() { if (this.startRequested) this.start() }
+    onClose() { this.destroy() }
+
+    private canSendInput(){return this.started&&!this.stopped&&this.isOpen()}
 
     start(){
+        if(this.stopped)return
         this.startRequested = true
-        if (this.stopped || this.started || !this.isOpen()) return
+        if (this.started || !this.isOpen()) return
         this.started = true
         const Packet = new InputPacket(0)
-        Packet.setMetadata(Math.max(2,navigator.maxTouchPoints || 0))
+        const touchpoints=navigator.maxTouchPoints
+        Packet.setMetadata(Number.isFinite(touchpoints)?Math.max(2,Math.min(255,Math.floor(touchpoints))):2)
         this.send(Packet.toBuffer())
 
         console.log('[InputChannel] Sent metadata:', Packet, Packet.toBuffer())
@@ -61,7 +66,7 @@ export default class InputChannel extends Channel {
     }
 
     onMessage(event: MessageEvent<any>) {
-        if (!(event.data instanceof ArrayBuffer) || event.data.byteLength < 1) return
+        if (this.stopped || !(event.data instanceof ArrayBuffer) || event.data.byteLength < 1) return
         const dataView = new DataView(event.data)
         const reportType = dataView.getUint8(0)
 
@@ -110,7 +115,7 @@ export default class InputChannel extends Channel {
     }
 
     gamepadStateLoop(){
-        if (this.stopped) return
+        if (!this.canSendInput()) return
         const gamepadHandlers = this.getPlayer()._channels.control.getGamepadHandlers()
         // console.log('[InputChannel] gamepadStateLoop() called', gamepadHandlers)
         const gamepadFrames:Array<GamepadFrame> = []
@@ -132,30 +137,34 @@ export default class InputChannel extends Channel {
     }
 
     queueMetadataFrame(data:MetadataFrame){
-        if (!this.started || this.stopped || !this.isOpen()) return
+        if (!this.canSendInput()) return
         return this._inputQueue.queueMetadataFrame(data)
     }
 
     queueGamepadFrames(frames:Array<GamepadFrame>, forceSend = false){
+        if(!this.canSendInput())return
         this._inputQueue.queueGamepadFrames(frames, forceSend)
     }
 
     queueMouseFrame(data:MouseFrame){
+        if(!this.canSendInput())return
         this._inputQueue.queueMouseFrame(data)
     }
 
     queueKeyboardFrame(data:KeyboardFrame){
+        if(!this.canSendInput())return
         this._inputQueue.queueKeyboardFrame(data)
     }
 
     queuePointerFrame(data:PointerFrame){
-        if(this.stopped||!this.isOpen())return
+        if(!this.canSendInput())return
         this._inputQueue.queuePointerFrame(data)
     }
 
     destroy() {
         this.stopped = true
         clearTimeout(this.loopTimer)
+        this.loopTimer=undefined
         this._inputQueue.clearQueues()
     }
 }
