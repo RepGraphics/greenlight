@@ -11,8 +11,9 @@ export class SessionLifecycle {
     private tail:Promise<void>=Promise.resolve()
     private cancelCurrent:((cleanup:boolean)=>void)|undefined
     private ending:Promise<boolean>|undefined
+    private endOperation:Promise<boolean>|undefined
     private active:{id:string;owner:object;stop:SessionAttempt['stop']}|undefined
-    constructor(private schedule=setTimeout,private cancel=clearTimeout,private timeoutMs=60000){}
+    constructor(private schedule=setTimeout,private cancel=clearTimeout,private timeoutMs=60000,private endTimeoutMs=120000){}
     private enqueue(operation:()=>Promise<void>){
         this.tail=this.tail.then(operation).catch(()=>{})
     }
@@ -27,10 +28,21 @@ export class SessionLifecycle {
     end():Promise<boolean>{
         if(this.ending)return this.ending
         this.cancelCurrent?.(false)
-        const operation=this.tail.then(()=>this.closeActive()).then(()=>true,()=>false)
-        const result=operation.finally(()=>{if(this.ending===result)this.ending=undefined})
+        if(!this.endOperation){
+            const operation=this.tail.then(()=>this.closeActive()).then(()=>true,()=>false)
+            const pending=operation.finally(()=>{if(this.endOperation===pending)this.endOperation=undefined})
+            this.endOperation=pending
+            // Keep serialization tied to actual remote cleanup, not the
+            // bounded UI wait. A replacement cannot overtake provisioning.
+            this.tail=pending.then(()=>{})
+        }
+        const operation=this.endOperation
+        const waiting=new Promise<boolean>(resolve=>{
+            const timer=this.schedule(()=>resolve(false),this.endTimeoutMs)
+            void operation.then(value=>{this.cancel(timer);resolve(value)})
+        })
+        const result=waiting.finally(()=>{if(this.ending===result)this.ending=undefined})
         this.ending=result
-        this.tail=result.then(()=>{})
         return result
     }
     begin(attempt:SessionAttempt){
