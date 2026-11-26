@@ -36,6 +36,17 @@ public final class OriginPolicyTest {
         check(ConnectionMode.DESKTOP_COMPANION.landingPage(origin).equals("https://private.example/"), "companion landing");
         check(ConnectionMode.PRIVATE_V3.landingPage(origin).equals("https://private.example/home/"), "V3 landing");
         check(ConnectionMode.MICROSOFT_DEVICE_LOGIN.equals("https://microsoft.com/devicelogin"), "fixed Microsoft browser destination");
-        System.out.println("Android origin and connection mode policy tests passed");
+        PlaybackDisplay display = new PlaybackDisplay();
+        check(!display.enter() && !display.exit(), "disconnected cannot enter fullscreen");
+        display.connected();
+        check(display.enter() && display.isImmersive(), "connected fullscreen");
+        check(!display.enter(), "duplicate enter ignored");
+        check(display.exit() && !display.isImmersive(), "Back exits fullscreen without disconnect");
+        check(display.enter(), "can re-enter after Back");
+        check(display.disconnected() && !display.isImmersive(), "disconnect resets fullscreen");
+        check(!display.enter(), "cannot enter after disconnect");
+        display.connected();
+        check(!display.isImmersive() && display.enter(), "new connection starts windowed");
+        System.out.println("Android origin, connection mode and playback display tests passed");
     }
 }
