@@ -1,4 +1,4 @@
-import React,{useEffect,useRef,useState} from 'react'
+import {useEffect,useRef,useState} from 'react'
 import Head from 'next/head'
 import Sidebar from '../components/sidebar'
 import {useAuth} from '../contexts/AuthContext'
