@@ -1,19 +1,32 @@
 import {useEffect,useRef,useState} from 'react'
-import {WebCaptureSession,webCaptureMedia,downloadWebCapture,type WebCaptureState} from '../utils/webcapture'
+import {WebCaptureSession,webCaptureMedia,downloadWebCapture,webRecordingDurations,webRecordingBitrates,type WebCaptureState} from '../utils/webcapture'
 import {recordingMimeType} from '../../../desktop/renderer/lib/streamrecording'
 
 export default function CaptureControls({surface}:{surface:()=>HTMLElement|null}){
     const [state,setState]=useState<WebCaptureState>({phase:'idle'})
     const [supported,setSupported]=useState(false)
     const [error,setError]=useState(false)
+    const [seconds,setSeconds]=useState<number>(60)
+    const [bitrate,setBitrate]=useState<number>(3000000)
+    const [preview,setPreview]=useState(false)
+    const [previewUrl,setPreviewUrl]=useState<string|null>(null)
     const session=useRef<WebCaptureSession|null>(null)
     useEffect(()=>{
         const capture=new WebCaptureSession(setState)
         session.current=capture
         setState({phase:'idle'})
-        setSupported(Boolean(recordingMimeType()))
+        try{setSupported(Boolean(recordingMimeType()))}catch{setSupported(false)}
         return()=>{session.current=null;capture.reset()}
     },[])
+    useEffect(()=>{
+        setPreview(false)
+    },[state.blob])
+    useEffect(()=>{
+        if(!preview||!state.blob){setPreviewUrl(null);return}
+        const url=URL.createObjectURL(state.blob)
+        setPreviewUrl(url)
+        return()=>URL.revokeObjectURL(url)
+    },[preview,state.blob])
     const busy=['capturing','recording','stopping'].includes(state.phase)
     const button='rounded border border-white/20 px-4 py-2 disabled:opacity-50'
     const screenshot=()=>{
@@ -26,11 +39,15 @@ export default function CaptureControls({surface}:{surface:()=>HTMLElement|null}
         setError(false)
         const {video,audio}=webCaptureMedia(surface())
         if(!video){setError(true);return}
-        session.current?.startRecording(video,audio)
+        session.current?.startRecording(video,audio,{seconds,videoBitsPerSecond:bitrate})
     }
     return <section aria-label="Local game captures" className="my-3 rounded border border-white/10 p-3">
         <h2 className="font-semibold">Game captures (experimental)</h2>
-        <p className="text-sm text-white/60 my-2">Capture decoded game video only. Clips include available remote audio, up to 60 seconds or the recorder size limit. Save before leaving or starting another capture. Browser downloads may not be supported in Android WebView.</p>
+        <p className="text-sm text-white/60 my-2">Capture decoded game video only. Clips include available remote audio, up to the selected duration or the 128 MiB recorder size limit. Higher recording quality may shorten the clip. Save before leaving or starting another capture. Browser downloads may not be supported in Android WebView.</p>
+        {supported&&<div className="flex flex-wrap gap-3 my-3">
+            <label>Maximum clip duration <select className="bg-[#202020] rounded p-2" disabled={busy} value={seconds} onChange={event=>setSeconds(Number(event.target.value))}>{webRecordingDurations.map(value=><option key={value} value={value}>{value/60} min</option>)}</select></label>
+            <label>Recording video bitrate <select className="bg-[#202020] rounded p-2" disabled={busy} value={bitrate} onChange={event=>setBitrate(Number(event.target.value))}>{webRecordingBitrates.map(value=><option key={value} value={value}>{value/1000000} Mbps</option>)}</select></label>
+        </div>}
         <div className="flex flex-wrap gap-2">
             <button type="button" className={button} disabled={busy} onClick={screenshot}>Take screenshot</button>
             {supported&&<button type="button" className={button} disabled={busy} onClick={record}>Record clip</button>}
@@ -38,7 +55,14 @@ export default function CaptureControls({surface}:{surface:()=>HTMLElement|null}
             {state.phase==='ready'&&state.blob&&state.filename&&<button type="button" className={button} onClick={()=>{try{downloadWebCapture(state.blob!,state.filename!)}catch{setError(true)}}}>Save capture</button>}
         </div>
         {busy&&<p role="status">{state.phase==='recording'?'Recording…':state.phase==='stopping'?'Finishing clip…':'Capturing frame…'}</p>}
-        {state.phase==='ready'&&<p role="status">Capture ready to save: {state.filename}</p>}
+        {state.phase==='ready'&&state.blob&&<>
+            <p role="status">Capture ready: {state.filename} · {(state.blob.size/1048576).toFixed(2)} MiB</p>
+            <div className="flex flex-wrap gap-2 my-2">
+                <button type="button" className={button} aria-pressed={preview} onClick={()=>setPreview(value=>!value)}>{preview?'Hide preview':'Preview capture'}</button>
+                <button type="button" className={button} onClick={()=>{session.current?.discard();setError(false)}}>Discard capture</button>
+            </div>
+            {preview&&previewUrl&&(state.blob.type==='image/png'?<img src={previewUrl} alt="Captured game frame" className="max-w-full max-h-80"/>:<video src={previewUrl} controls preload="metadata" playsInline className="max-w-full max-h-80"/>)}
+        </>}
         {(state.phase==='failed'||error)&&<p role="alert">Capture unavailable or failed. Check browser support and wait for decoded video.</p>}
     </section>
 }
