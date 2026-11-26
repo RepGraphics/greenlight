@@ -1,6 +1,6 @@
-# Android companion (experimental)
+# Android client (experimental)
 
-This is a native Android APK shell around the **existing authenticated desktop WebUI**, not an independent Xbox client. It does not implement Microsoft authentication, Xbox session signaling or a local replacement for Electron's IPC backend. The desktop must be running, signed in and serving its authenticated WebUI. The app does not modify the desktop listener (127.0.0.1), IPC permissions or firewall configuration.
+This experimental Android APK offers two modes. Desktop companion uses the existing authenticated desktop WebUI. Private V3 mode uses an independently hosted experimental V3 frontend and RPC backend, so it does not require Electron to run. Neither mode implements native Xbox signaling or native token storage. The app does not modify the desktop listener (127.0.0.1), IPC permissions or firewall configuration.
 
 ## Build
 
@@ -18,6 +18,14 @@ In the desktop, obtain the WebUI access token in settings. Enter the HTTPS origi
 
 End the Xbox stream using the WebUI before closing the companion. Closing the WebView does not acknowledge remote stop; desktop session cleanup remains the backend's responsibility. The companion is not a solution for exposing the desktop WebUI remotely.
 
+## Private V3 backend (experimental)
+
+Use an operator-managed, access-controlled HTTPS origin serving the experimental V3 static web export and same-origin /trpc RPC backend. Restrict access to a private network/VPN and enforce authorization at the gateway; this app does not provision or authenticate that gateway. Do not publicly deploy the experimental RPC backend. The web frontend must be updated to the memory-only device-code authentication implementation. Remote Play and Cloud Gaming integrations require their corresponding development branches until merged.
+
+Select Private V3 backend and enter its origin. No desktop access token is accepted or sent in this mode, and HTTP Basic challenges are rejected. Start Microsoft sign-in inside the web client, note its device code, then tap Open Microsoft device sign-in. The app opens the fixed official device-login URL in your system browser, without including any device code or credential in the URL. Complete authorization there, return to the app, and allow the web client to finish the exchange. No Microsoft password entry inside the WebView is needed. The backend is still trusted with tokens, which is why private deployment and gateway access control are mandatory.
+
+Session credentials remain in the experimental web client's memory; disconnect or process death requires signing in again. Android WebRTC playback, backgrounding during sign-in, gamepad support, and remote session cleanup are unverified. End sessions explicitly before disconnecting.
+
 ## Standalone roadmap
 
-Move the web player onto a reviewed Android-compatible signaling/authentication backend, use system-browser/device-code authorization, Android-backed secure token storage, handle lifecycle and acknowledged remote cleanup, and validate WebRTC decoding and input on real devices. The experimental desktop-v3 web frontend is not yet a substitute for this: it currently persists user tokens in browser storage and needs an authentication/security review.
+A truly backend-independent Android client still needs native authentication/token storage, Xbox signaling, media and input integration. Private V3 mode is an intermediate architecture, not a native standalone client or a production release.

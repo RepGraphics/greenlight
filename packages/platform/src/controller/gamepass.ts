@@ -47,7 +47,7 @@ export default class gamepassController {
             });
         }
 
-        const titles = await this._httpClient.getRequest('catalog.gamepass.com', '/sigls/v2?id='+this._sigls.new+'&market='+token.market+'&language='+token.language, {
+        const titles = await this._httpClient.getRequest('catalog.gamepass.com', '/sigls/v2?'+new URLSearchParams({id:this._sigls.new,market:token.market,language:token.language}).toString(), {
             'Authorization': `Bearer ${token.token}`,
         })
         
@@ -62,7 +62,7 @@ export default class gamepassController {
             });
         }
 
-        const result = await this._httpClient.postRequest('catalog.gamepass.com', `/v3/products?hydration=RemoteHighSapphire0&market=${token.market}&language=${token.language}`, {
+        const result = await this._httpClient.postRequest('catalog.gamepass.com', '/v3/products?'+new URLSearchParams({hydration:'RemoteHighSapphire0',market:token.market,language:token.language}).toString(), {
             'Authorization': `Bearer ${token.token}`,
             'ms-cv': '0.0',
             'calling-app-name': 'Greenlight',
