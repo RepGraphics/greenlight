@@ -264,7 +264,14 @@
       "includePrereleases": "Include prereleases",
       "noReleases": "No published versioned releases are available yet.",
       "releaseNotes": "Release notes",
-      "manualUpdateHint": "Updates are checked against the Greenlight fork only. Review and verify the installer before installing it; automatic installation is not enabled.",
+      "manualUpdateHint": "Updates are checked against the Greenlight fork only. Eligible installers can be downloaded and checked against their published SHA-256 digest. Review the installer and publisher before installing; downloads are never executed automatically.",
+      "downloadVerified": "Download and verify installer",
+      "download_choosing": "Preparing update download…",
+      "download_downloading": "Downloading and verifying installer…",
+      "download_ready": "Installer matches the published SHA-256 digest. Review it before running.",
+      "download_cancelled": "Update download cancelled.",
+      "download_failed": "Unable to download or verify the installer. Check the release page, available disk space, or choose a folder without an existing installer.",
+      "revealInstaller": "Show installer in folder",
       "closeBtn": "Close"
     },
     "errors": {

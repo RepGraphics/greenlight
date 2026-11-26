@@ -4,6 +4,7 @@ import electron from 'electron'
 import { exportCaptureFile,validateCaptureExport } from '../helpers/captureexport'
 import { isAbsolute } from 'node:path'
 import { checkForkUpdates } from '../helpers/updater'
+import { UpdateDownloadTask } from '../helpers/updatedownload'
 
 interface setForceRegionIpArgs {
     ip:string;
@@ -17,6 +18,7 @@ export default class IpcApp extends IpcBase {
     // _streamingSessions:any = {}
 
     private captureExportBusy=false
+    private updateDownload=new UpdateDownloadTask()
 
     getCaptureDirectory(){
         const value=this._application._store.get('captureExport.directory')
@@ -54,6 +56,26 @@ export default class IpcApp extends IpcBase {
 
     checkForUpdates(args:{includePrereleases?:boolean}={}){
         return checkForkUpdates(args?.includePrereleases===true)
+    }
+
+    startUpdateDownload(args:{tag?:string;includePrereleases?:boolean}={}){
+        if(!electron.app.isPackaged||typeof args.tag!=='string'||args.tag.length>100)throw Error('Installer download unavailable')
+        return this.updateDownload.start(async()=>{
+            const result=await checkForkUpdates(args.includePrereleases===true)
+            if(result.status!=='available'||result.release?.tag!==args.tag||!result.release.installer)throw Error('No verified installer for this release')
+            return result.release.installer
+        },async()=>{
+            const choice=await electron.dialog.showOpenDialog(this._application._mainWindow,{title:'Save verified update installer',properties:['openDirectory','createDirectory'],defaultPath:electron.app.getPath('downloads')})
+            return choice.canceled||!choice.filePaths[0]?null:choice.filePaths[0]
+        })
+    }
+    getUpdateDownloadStatus(){return this.updateDownload.status()}
+    cancelUpdateDownload(){return this.updateDownload.cancel()}
+    revealUpdateDownload(){
+        const file=this.updateDownload.readyPath
+        if(!file)throw Error('No verified installer')
+        electron.shell.showItemInFolder(file)
+        return true
     }
 
     loadCachedUser(){
