@@ -36,7 +36,7 @@ export default class xCloudPlayer {
     private videoReceivedAt = 0
     private videoStream: MediaStream | undefined
 
-    constructor(elementId: string, useWebGpu = true, private videoBitrate = 0, profiles: string[] = [], public consoleController = false, volume=1, muted=false) {
+    constructor(elementId: string, useWebGpu = true, private videoBitrate = 0, profiles: string[] = [], public consoleController = false, volume=1, muted=false, public readonly requestedResolution:720|1080=1080) {
         console.log('xCloudPlayer constructing...');
 
         this._elementId = elementId;

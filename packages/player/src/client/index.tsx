@@ -296,7 +296,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             const connect = async () => {
                 if(!active())return;
                 watchdog.beginHandshake();
-                instance = new xCloudPlayer('playerContainer', useWebGpu, videoBitrate, codecProfiles, consoleController,playback.current.volume,playback.current.muted);
+                instance = new xCloudPlayer('playerContainer', useWebGpu, videoBitrate, codecProfiles, consoleController,playback.current.volume,playback.current.muted,current.getStreamConfig().resolution===720?720:1080);
                 instance.init();
                 setPlayer(instance);
                 status('Connecting');
