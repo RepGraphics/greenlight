@@ -1,6 +1,7 @@
 import React, {useEffect,useRef,useState} from 'react'
 import Head from 'next/head'
 import Sidebar from '../components/sidebar'
+import RemotePlay from '../components/remoteplay'
 import {useAuth} from '../contexts/AuthContext'
 import {useTRPCClient} from '../utils/trpc'
 import {AuthAttempt} from '../contexts/authattempt'
@@ -14,6 +15,7 @@ export default function ConsolesPage(){
     const [loading,setLoading]=useState(true)
     const [failed,setFailed]=useState(false)
     const [search,setSearch]=useState('')
+    const [selected,setSelected]=useState<ConsoleSummary|null>(null)
     const attempts=useRef(new AuthAttempt())
     const locked=useRef(false)
     // Never put bearer tokens into a query-cache key or browser storage.
@@ -38,6 +40,7 @@ export default function ConsolesPage(){
         return()=>{attempts.current.cancel();locked.current=false}
     },[client,isAuthenticated,uhs,token])
     const visible=searchConsoles(items,search)
+    if(selected)return <RemotePlay console={selected} onExit={()=>setSelected(null)}/>
     return <React.Fragment>
         <Head><title>Greenlight — My Consoles</title></Head>
         <div className="flex min-h-screen flex-col md:h-screen md:flex-row bg-[#0d0d0d] text-white">
@@ -46,7 +49,7 @@ export default function ConsolesPage(){
                 <div className="p-4 md:p-8 max-w-5xl mx-auto">
                     <h1 className="text-2xl font-bold">My Consoles</h1>
                     <p className="text-white/60 mt-2">Discover Xbox consoles associated with your signed-in account.</p>
-                    <p className="text-white/50 mt-2 text-sm">Experimental web client — console discovery only. Streaming and power commands are not yet available here.</p>
+                    <p className="text-white/50 mt-2 text-sm">Experimental web client — Remote Play is unverified on hardware. Console power commands are not available here.</p>
                     <div className="flex flex-wrap gap-3 my-5">
                         <input type="search" aria-label="Search consoles" placeholder="Search consoles" value={search} onChange={event=>setSearch(event.target.value)} className="min-w-0 flex-1 rounded border border-white/20 bg-white/5 p-2"/>
                         <button type="button" disabled={loading||!token||!uhs} onClick={()=>void load()} className="rounded border border-white/20 px-4 py-2 disabled:opacity-50">{loading?'Refreshing…':'Refresh'}</button>
@@ -64,6 +67,7 @@ export default function ConsolesPage(){
                                 <p className="text-white/70">Remote management: {item.remoteManagementEnabled?'Enabled':'Disabled'}</p>
                                 <p className="text-white/70">Remote play: {item.consoleStreamingEnabled?'Enabled':'Disabled'}</p>
                                 <p className="mt-3 text-sm">{consoleReady(item)?'Console reports remote-play readiness':'Enable remote features in Xbox settings'}</p>
+                                <button type="button" disabled={!consoleReady(item)||loading} className="mt-3 rounded border border-white/20 px-4 py-2 disabled:opacity-50" onClick={()=>setSelected(item)}>Remote Play (experimental)</button>
                             </article>)}
                         </div>
                     </section>

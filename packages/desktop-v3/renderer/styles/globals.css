@@ -203,3 +203,21 @@ body {
 .gamepad-hud {
   animation: hudSlideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
+
+/* Shared player surface and touch controls in the experimental web client. */
+.web-remote-player { position:relative; width:100%; max-width:1280px; margin:12px auto; }
+.web-remote-player #playerContainer { aspect-ratio:16/9; width:100%; background:#000; overflow:hidden; }
+.web-remote-player .gl-performance-hud { display:flex; flex-wrap:wrap; gap:12px; padding:6px; font-size:12px; }
+.web-remote-player .gl-touch-overlay { position:absolute; inset:0; pointer-events:none; touch-action:none; }
+.web-remote-player .gl-touch-overlay button,.web-remote-player .gl-virtual-stick { pointer-events:auto; touch-action:none; user-select:none; background:#101827ba; border:1px solid #ffffff88; color:white; }
+.web-remote-player .gl-touch-overlay button { border-radius:50%; width:clamp(30px,6vw,52px); height:clamp(30px,6vw,52px); }
+.web-remote-player .gl-touch-shoulders { position:absolute; top:5%; left:2%; right:2%; display:flex; justify-content:space-between; }
+.web-remote-player .gl-touch-dpad,.web-remote-player .gl-touch-abxy { position:absolute; bottom:12%; display:grid; grid-template-columns:repeat(3,auto); }
+.web-remote-player .gl-touch-dpad { left:2%; }.web-remote-player .gl-touch-abxy { right:2%; }
+.web-remote-player .gl-touch-dpad button:first-child,.web-remote-player .gl-touch-abxy button:first-child { grid-column:2; }
+.web-remote-player .gl-touch-dpad button:nth-child(2),.web-remote-player .gl-touch-abxy button:nth-child(2) { grid-column:1; }
+.web-remote-player .gl-touch-dpad button:nth-child(3),.web-remote-player .gl-touch-abxy button:nth-child(3) { grid-column:3; }
+.web-remote-player .gl-touch-dpad button:last-child,.web-remote-player .gl-touch-abxy button:last-child { grid-column:2; }
+.web-remote-player .gl-virtual-stick { position:absolute; width:clamp(48px,12vw,100px); aspect-ratio:1; border-radius:50%; bottom:14%; display:grid; place-items:center; }
+.web-remote-player .gl-stick-left { left:24%; }.web-remote-player .gl-stick-right { right:24%; }
+.web-remote-player .gl-virtual-stick span { width:48%; aspect-ratio:1; border-radius:50%; background:#ffffffaa; }
