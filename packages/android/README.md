@@ -26,6 +26,10 @@ Select Private V3 backend and enter its origin. No desktop access token is accep
 
 Session credentials remain in the experimental web client's memory; disconnect or process death requires signing in again. Android WebRTC playback, backgrounding during sign-in, gamepad support, and remote session cleanup are unverified. End sessions explicitly before disconnecting.
 
+## Remembering a connection
+
+Optionally select **Remember endpoint and connection mode (not credentials)** before connecting. The app stores only the canonical HTTPS origin and the selected mode in private app preferences. Next launch pre-fills these fields but never automatically connects or signs in. Desktop tokens and Microsoft credentials are not saved by this feature. Uncheck the option or tap **Forget saved connection** on the connection screen to clear the saved preference; the latter also clears the current input fields. Android app backup remains disabled. Remembering an origin does not verify its trustworthiness or bypass TLS checks.
+
 ## Fullscreen playback
 
 In either connected mode, tap **Fullscreen (Back to exit)** to hide the native controls and system bars without recreating the WebView. Swipe from the screen edge to temporarily reveal the system bars; use Android Back to restore the controls before disconnecting. The connected WebView requests that the screen stay awake while visible; this does not keep the device awake in the background. Disconnecting resets fullscreen. Real device, gesture navigation and rotation testing remain necessary.
