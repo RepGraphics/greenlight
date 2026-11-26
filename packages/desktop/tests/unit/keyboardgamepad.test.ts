@@ -30,6 +30,7 @@ test('independent physical keys can own the same emulated button until both are 
     const state=new KeyboardGamepadState()
     state.press(key('a','KeyA'),mapping)
     state.press(key('a','OtherA'),mapping)
+    assert.deepEqual(state.read(),['A'])
     state.release(key('a','KeyA'))
     assert.deepEqual(state.read(),['A'])
     state.release(key('a','OtherA'))
@@ -45,5 +46,49 @@ test('release without a physical code falls back to its key label',()=>{
     const state=new KeyboardGamepadState()
     state.press({key:'a',code:'Unidentified'},mapping)
     assert.equal(state.release({key:'a'}),true)
+    assert.deepEqual(state.read(),['A'])
     assert.deepEqual(state.read(),[])
+})
+
+test('short keyboard taps emit one pressed frame and a subsequent release',()=>{
+    const state=new KeyboardGamepadState()
+    state.press(key('a','KeyA'),mapping)
+    state.release(key('a','KeyA'))
+    assert.equal(state.pending,true)
+    assert.deepEqual(state.read(),['A'])
+    assert.equal(state.pending,true)
+    assert.deepEqual(state.read(),[])
+    assert.equal(state.pending,false)
+})
+
+test('simultaneous taps preserve distinct buttons and other held inputs',()=>{
+    const state=new KeyboardGamepadState()
+    state.press(key('-','Minus'),mapping)
+    for(const [label,code] of [['a','KeyA'],['b','KeyB']]){
+        state.press(key(label,code),mapping)
+        state.release(key(label,code))
+    }
+    assert.deepEqual(new Set(state.read()),new Set(['A','B','LeftTrigger']))
+    assert.deepEqual(state.read(),['LeftTrigger'])
+    state.release(key('-','Minus'))
+    assert.deepEqual(state.read(),[])
+    assert.equal(state.pending,false)
+})
+
+test('focus loss cancels queued taps before they can be emitted',()=>{
+    const state=new KeyboardGamepadState()
+    state.press(key('a','KeyA'),mapping)
+    state.release(key('a','KeyA'))
+    state.clear()
+    assert.equal(state.pending,false)
+    assert.deepEqual(state.read(),[])
+})
+
+test('a sampled key release does not generate a second press',()=>{
+    const state=new KeyboardGamepadState()
+    state.press(key('b','KeyB'),mapping)
+    assert.deepEqual(state.read(),['B'])
+    state.release(key('b','KeyB'))
+    assert.deepEqual(state.read(),[])
+    assert.equal(state.pending,false)
 })
