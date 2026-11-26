@@ -25,6 +25,18 @@ test('Discord paths are local IPC only and IDs must be numeric strings',()=>{
     assert.ok(discordSocketPaths('linux',{XDG_RUNTIME_DIR:'/run/user/1000'}).every(path=>path.startsWith('/run/user/1000/')))
     assert.deepEqual(discordSocketPaths('freebsd',{}),[])
 })
+test('Discord POSIX sockets use the target platform rather than the host path separator',()=>{
+    const linux=discordSocketPaths('linux',{XDG_RUNTIME_DIR:'/run/user/1000',TMPDIR:'/tmp'})
+    assert.deepEqual(linux,[
+        ...Array.from({length:10},(_,i)=>'/run/user/1000/discord-ipc-'+i),
+        ...Array.from({length:10},(_,i)=>'/run/user/1000/app/com.discordapp.Discord/discord-ipc-'+i)
+    ])
+    assert.deepEqual(discordSocketPaths('darwin',{TMPDIR:'/var/folders/discord/'}),
+        Array.from({length:10},(_,i)=>'/var/folders/discord/discord-ipc-'+i))
+    assert.equal(discordSocketPaths('linux',{XDG_RUNTIME_DIR:'relative',TMPDIR:'C:\\Temp',TEMP:'/tmp/discord'})[0],'/tmp/discord/discord-ipc-0')
+    assert.equal(discordSocketPaths('darwin',{XDG_RUNTIME_DIR:'C:\\Temp',TMPDIR:'relative'})[0],'/tmp/discord-ipc-0')
+    assert.equal(discordSocketPaths('win32',{XDG_RUNTIME_DIR:'/run/user/1000'})[9],String.raw`\\?\pipe\discord-ipc-9`)
+})
 test('presence contains no account, console or session identifiers and is desktop opt-in only',()=>{
     assert.deepEqual(discordActivity('home',10000),{type:0,details:'Xbox Remote Play',state:'Streaming with Greenlight',timestamps:{start:10},instance:false})
     assert.equal(isAllowedIpc('streaming','setDiscordPresence'),true)
