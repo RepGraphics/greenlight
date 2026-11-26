@@ -125,3 +125,46 @@ test('provisioning messages expose only known status labels',()=>{
     assert.equal(provisioningMessage({state:'secret-token'}),null)
     assert.equal(provisioningMessage(null),null)
 })
+
+test('timed-out signaling drain never races DELETE and retains ownership for retry',async()=>{
+    const f=fixture()
+    let release!:()=>void
+    f.rpc.connect=async input=>{f.calls.push(['connect',input]);await new Promise<void>(resolve=>{release=resolve})}
+    const session=createRemoteSession(f.rpc,config,token,'refresh',undefined,{drainMs:1,stopMs:1000})
+    const id=await session.start(),player=session.player(id)
+    const connecting=player.sendMSALToken()
+    await flush()
+    await assert.rejects(session.stop(id),/signaling still pending/)
+    assert.deepEqual(f.calls.map(item=>item[0]),['start','connect'])
+    await assert.rejects(player.sendKeepalive(),/not active/)
+    release();await connecting
+    await session.stop(id)
+    assert.deepEqual(f.calls.map(item=>item[0]),['start','connect','stop'])
+})
+test('timed-out DELETE stays single flight and late acknowledgement is retained',async()=>{
+    const f=fixture()
+    let acknowledge!:(value:{status:number})=>void
+    f.rpc.stop=async input=>{f.calls.push(['stop',input]);return new Promise(resolve=>{acknowledge=resolve})}
+    const session=createRemoteSession(f.rpc,config,token,'refresh',undefined,{drainMs:1000,stopMs:1})
+    const id=await session.start()
+    await assert.rejects(session.stop(id),/acknowledgement timed out/)
+    await assert.rejects(session.stop(id),/acknowledgement timed out/)
+    assert.deepEqual(f.calls.map(item=>item[0]),['start','stop'])
+    acknowledge({status:204});await flush()
+    await session.stop(id)
+    assert.deepEqual(f.calls.map(item=>item[0]),['start','stop'])
+    await assert.rejects(session.stop('/v5/sessions/home/other'),/not owned/)
+})
+test('late failed DELETE permits a fresh explicit retry without reopening signaling',async()=>{
+    const f=fixture()
+    let reject!:(error:Error)=>void
+    f.rpc.stop=async input=>{f.calls.push(['stop',input]);return new Promise((_resolve,fail)=>{reject=fail})}
+    const session=createRemoteSession(f.rpc,config,token,'refresh',undefined,{drainMs:1000,stopMs:1})
+    const id=await session.start(),player=session.player(id)
+    await assert.rejects(session.stop(id),/acknowledgement timed out/)
+    reject(Error('network'));await flush()
+    await assert.rejects(player.getStreamStatus(),/not active/)
+    f.rpc.stop=async input=>{f.calls.push(['stop',input]);return {status:410}}
+    await session.stop(id)
+    assert.deepEqual(f.calls.map(item=>item[0]),['start','stop','stop'])
+})

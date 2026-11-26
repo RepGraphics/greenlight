@@ -40,13 +40,23 @@ export function provisioningMessage(value:unknown):string|null{
     if(state==='Provisioning')return 'Provisioning Xbox session…'
     return null
 }
-export function createRemoteSession(rpc:RemoteRpc,config:xCloudStreamConfig,token:xStreamToken,refreshToken:string,onProvisioning?:(message:string)=>void){
+// Bound the caller's wait without pretending that an abandoned RPC was
+// cancelled. In particular, never race DELETE against pending signaling.
+function waitFor<T>(pending:Promise<T>,milliseconds:number,message:string):Promise<T>{
+    return new Promise((resolve,reject)=>{
+        const timer=setTimeout(()=>reject(Error(message)),milliseconds)
+        void pending.then(value=>{clearTimeout(timer);resolve(value)},error=>{clearTimeout(timer);reject(error)})
+    })
+}
+export function createRemoteSession(rpc:RemoteRpc,config:xCloudStreamConfig,token:xStreamToken,refreshToken:string,onProvisioning?:(message:string)=>void,deadlines={drainMs:75000,stopMs:25000}){
     if(!token.token||!refreshToken||!config.id)throw Error('Xbox streaming authorization unavailable')
     const request={token:{...token},xCloudStreamConfig:{...config,host:streamOrigin(config.host)}}
     let closing=false
     let ownedPath:string|undefined
     let starting:Promise<string>|undefined
     let stopping:Promise<void>|undefined
+    let stopRequest:Promise<void>|undefined
+    let closedPath:string|undefined
     const inFlight=new Set<Promise<unknown>>()
     const operate=<T>(path:string,operation:()=>Promise<T>):Promise<T>=>{
         if(closing||path!==ownedPath)return Promise.reject(Error('Xbox session is not active'))
@@ -68,15 +78,26 @@ export function createRemoteSession(rpc:RemoteRpc,config:xCloudStreamConfig,toke
         },
         stop(path:string){
             const sessionPath=sessionEndpoint(config.type,path)
+            if(sessionPath===closedPath)return Promise.resolve()
             if(sessionPath!==ownedPath)return Promise.reject(Error('Xbox session is not owned'))
             if(stopping)return stopping
             closing=true
             const operation=(async()=>{
-                await Promise.allSettled([...inFlight])
-                const result=await rpc.stop({...request,sessionPath}) as {status?:number}|null
-                const status=result?.status
-                if(typeof status!=='number'||!Number.isInteger(status)||!(status>=200&&status<300||status===404||status===410))throw Error('Xbox session stop not acknowledged')
-                ownedPath=undefined
+                await waitFor(Promise.allSettled([...inFlight]),deadlines.drainMs,'Xbox signaling still pending')
+                if(closedPath===sessionPath)return
+                if(!stopRequest){
+                    const requestPending=Promise.resolve().then(()=>rpc.stop({...request,sessionPath})).then(value=>{
+                        const result=value as {status?:number}|null
+                        const status=result?.status
+                        if(typeof status!=='number'||!Number.isInteger(status)||!(status>=200&&status<300||status===404||status===410))throw Error('Xbox session stop not acknowledged')
+                        closedPath=sessionPath
+                        ownedPath=undefined
+                    }).finally(()=>{if(stopRequest===requestPending)stopRequest=undefined})
+                    stopRequest=requestPending
+                }
+                // A retry shares any outstanding DELETE. A late acknowledgement
+                // is remembered for the exact owned path, even after timeout.
+                await waitFor(stopRequest,deadlines.stopMs,'Xbox session stop acknowledgement timed out')
             })()
             const pending=operation.finally(()=>{if(stopping===pending)stopping=undefined})
             stopping=pending
