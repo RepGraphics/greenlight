@@ -31,6 +31,8 @@ Resolution and bitrate are negotiated when connecting, not guaranteed or adjuste
 
 The Cloud Gaming library also offers Favourites and Recently opened collections. These contain only title identifiers in memory for the current sign-in, are cleared on sign-out or reload, and never bypass the current catalog or entitlement checks. Recently opened records opening session setup, not confirmed gameplay. Clear both collections from the library at any time.
 
+Before connecting, open Controller test and stick drift calibration to inspect the four axes of a standard-mapped physical controller. Measure drift with both sticks untouched for three seconds, then explicitly apply the suggested deadzone. A lost controller, interrupted sampling, unfocused tab or large stick movement invalidates the measurement. The recommendation applies to all local controllers for this session only.
+
 ## Development
 
 From the repository root, use Node.js 24 and Yarn Classic 1.22.22:
