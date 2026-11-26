@@ -7,6 +7,7 @@ export type { xStreamToken, startStreamResponse, xCloudStreamConfig };
 import xCloudPlayer from './lib/player';
 import { statsExpired } from './lib/statsfreshness';
 import { StreamConnectionWatchdog } from './lib/connectionwatchdog';
+import { StreamHeartbeat } from './lib/heartbeat';
 
 // Proxy inputs
 import Gamepad from './lib/input/gamepad';
@@ -269,7 +270,6 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
         useEffect(() => {
             let disposed = false;
             let timer: ReturnType<typeof setTimeout>;
-            let keepalive: ReturnType<typeof setTimeout>;
             let instance: xCloudPlayer | undefined;
             let authSent = false;
             let mediaWatchdog:ReturnType<typeof setInterval>;
@@ -279,7 +279,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             const active=()=>!disposed&&!terminal;
             const status=(value:string)=>{if(active())setPlayerState(value)};
             let removeConnectionListener:(()=>void)|undefined;
-            const clearTimers=()=>{clearTimeout(timer);clearTimeout(keepalive);clearInterval(mediaWatchdog);watchdog.dispose();removeConnectionListener?.();removeConnectionListener=undefined};
+            const clearTimers=()=>{clearTimeout(timer);heartbeat.dispose();clearInterval(mediaWatchdog);watchdog.dispose();removeConnectionListener?.();removeConnectionListener=undefined};
             const fail=(reason:string)=>{
                 if(!active())return;
                 terminal=true;clearTimers();
@@ -287,12 +287,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             };
             const watchdog=new StreamConnectionWatchdog(fail);
             watchdog.beginProvisioning();
-            const heartbeat = async () => {
-                if (disposed || terminal) return;
-                try { await current.sendKeepalive(); failures = 0 }
-                catch { if (++failures >= 3) { fail('heartbeat'); return } }
-                if (!disposed && !terminal) keepalive = setTimeout(heartbeat, failures ? 5000 : 20000);
-            };
+            const heartbeat = new StreamHeartbeat(()=>current.sendKeepalive(),()=>fail('heartbeat'));
             const connect = async () => {
                 if(!active())return;
                 watchdog.beginHandshake();
@@ -329,7 +324,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 removeConnectionListener=()=>peer.removeEventListener('connectionstatechange',onConnection);
                 status('Negotiated'); onConnection();
                 if(!active())return;
-                void heartbeat();
+                heartbeat.start();
                 let visibleConnectedAt=performance.now();
                 mediaWatchdog=setInterval(()=>{const now=performance.now();if(disposed||terminal)return;if(peer.connectionState==='new'||peer.connectionState==='connecting' && !instance?.getStats().lastStatsAt){visibleConnectedAt=now;return}if(instance?.serverDisconnected){fail('server');return}const stats=instance?.getStats();if(!stats)return;if(statsExpired(now,stats.lastStatsAt,visibleConnectedAt))fail('stats');else if(stats.mediaStalled)fail('media')},1000);
             };
