@@ -34,4 +34,4 @@ The static web export is in `packages/desktop-v3/web-out/`. On a POSIX shell, `y
 
 Use a trusted, access-controlled HTTPS origin serving the web frontend and same-origin RPC backend over a private network or VPN. The backend handles sensitive Xbox credentials. Do not deploy it publicly; gateway authorization and operational protections remain necessary.
 
-See [authentication boundaries](AUTH-BOUNDARY.md), [Android testing](../android/README.md) and the [main user guide](../../USER-GUIDE.md). End the active session before closing the browser. Real Xbox, mobile WebRTC and device/controller compatibility remain unverified.
+See [authentication boundaries](AUTH-BOUNDARY.md), [Android testing](../android/README.md) and the [main user guide](../../USER-GUIDE.md). End the active session before closing the browser. If teardown times out, retry ending the same session. The client retains ownership, waits for outstanding signaling before DELETE, and shares any pending stop request rather than issuing overlapping requests. A timeout does not confirm cancellation or remote termination. Real Xbox, mobile WebRTC and device/controller compatibility remain unverified.
