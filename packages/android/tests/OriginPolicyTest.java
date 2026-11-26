@@ -36,6 +36,18 @@ public final class OriginPolicyTest {
         check(ConnectionMode.DESKTOP_COMPANION.landingPage(origin).equals("https://private.example/"), "companion landing");
         check(ConnectionMode.PRIVATE_V3.landingPage(origin).equals("https://private.example/home/"), "V3 landing");
         check(ConnectionMode.MICROSOFT_DEVICE_LOGIN.equals("https://microsoft.com/devicelogin"), "fixed Microsoft browser destination");
+        SavedConnection saved = SavedConnection.parse("https://PRIVATE.example:443/", "PRIVATE_V3");
+        check(saved != null && saved.origin.home().equals("https://private.example/"), "saved origin normalized");
+        check(saved.mode == ConnectionMode.PRIVATE_V3, "saved V3 mode");
+        saved = SavedConnection.parse("https://desktop.example/", "DESKTOP_COMPANION");
+        check(saved != null && saved.mode == ConnectionMode.DESKTOP_COMPANION, "saved companion mode");
+        for (String value : new String[]{"https://private.example/?token=x", "https://user:secret@private.example/",
+            "http://private.example/", "https://private.example/path", "", null}) {
+            check(SavedConnection.parse(value, "PRIVATE_V3") == null, "reject invalid saved origin");
+        }
+        for (String value : new String[]{"", "unknown", "private_v3", null}) {
+            check(SavedConnection.parse("https://private.example/", value) == null, "reject invalid saved mode");
+        }
         PlaybackDisplay display = new PlaybackDisplay();
         check(!display.enter() && !display.exit(), "disconnected cannot enter fullscreen");
         display.connected();
