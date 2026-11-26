@@ -12,19 +12,22 @@
  */
 
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
-import { WorkerEntrypoint } from 'cloudflare:workers';
+import {isRpcPath,rpcRequestAllowed,rpcHeaders} from './rpcpolicy';
 import { appRouter } from '@greenlight/platform';
 
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
 		const url = new URL(request.url);
 
-		if(url.pathname.startsWith('/trpc')) {
+		if(isRpcPath(url.pathname)) {
+			if(!rpcRequestAllowed(request.method,url.search))return new Response('POST RPC requests required',{status:request.method==='POST'?400:405,headers:{...rpcHeaders,Allow:'POST'}});
 			return fetchRequestHandler({
 				endpoint: '/trpc',
 				req: request,
 				router: appRouter,
 				createContext: () => ({}),
+				allowMethodOverride: true,
+				responseMeta:()=>({headers:rpcHeaders}),
 			});
 		} else if(url.pathname === '/') {
 			const homepage = new URL('/home/', request.url).href;
