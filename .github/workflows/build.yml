@@ -254,6 +254,10 @@ jobs:
       - name: Install yarn dependencies
         run: yarn
 
+      - name: Run Windows regression tests before packaging
+        if: runner.os == 'Windows'
+        run: yarn desktop test
+
       - name: Build/release Electron app
         uses: samuelmeuli/action-electron-builder@v1.6.0
         with:
