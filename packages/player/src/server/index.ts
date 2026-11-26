@@ -1,10 +1,11 @@
 import type { xStreamToken, xCloudStreamConfig, SDPResponse, startStreamResponse, StatusResponse, ErrorResponse } from '../types/index';
 export type { xStreamToken, startStreamResponse, SDPResponse, xCloudStreamConfig, StatusResponse, ErrorResponse };
+import {streamOrigin,playPath,sessionEndpoint} from './requestpolicy';
 
 export const ping = () => 'pong';
 
 export const startStream = async (xStreamToken:xStreamToken, xCloudStreamConfig:xCloudStreamConfig) => {
-    return await httpPost<startStreamResponse>(xStreamToken, xCloudStreamConfig, '/v5/sessions/'+xCloudStreamConfig.type+'/play', JSON.stringify({
+    return await httpPost<startStreamResponse>(xStreamToken, xCloudStreamConfig, playPath(xCloudStreamConfig.type), JSON.stringify({
         clientSessionId: '',
         titleId: (xCloudStreamConfig.type === 'cloud') ? xCloudStreamConfig.id : '',
         systemUpdateGroup: '',
@@ -25,11 +26,11 @@ export const startStream = async (xStreamToken:xStreamToken, xCloudStreamConfig:
 }
 
 export const getStreamStatus = async (xStreamToken:xStreamToken, xCloudStreamConfig:xCloudStreamConfig, sessionPath:string) => {
-    return await httpGet<startStreamResponse>(xStreamToken, xCloudStreamConfig, '/'+sessionPath+'/state')
+    return await httpGet<startStreamResponse>(xStreamToken, xCloudStreamConfig, sessionEndpoint(xCloudStreamConfig.type,sessionPath,'state'))
 }
 
 export const sendSDPOffer = async (xStreamToken:xStreamToken, xCloudStreamConfig:xCloudStreamConfig, sessionPath:string, sdpOffer:RTCSessionDescriptionInit) => {
-    await httpPost<StatusResponse>(xStreamToken, xCloudStreamConfig, '/'+sessionPath+'/sdp', JSON.stringify({
+    await httpPost<StatusResponse>(xStreamToken, xCloudStreamConfig, sessionEndpoint(xCloudStreamConfig.type,sessionPath,'sdp'), JSON.stringify({
         'messageType':'offer',
         'sdp': sdpOffer.sdp,
         'requestId': '1',
@@ -71,21 +72,25 @@ export const sendSDPOffer = async (xStreamToken:xStreamToken, xCloudStreamConfig
         },
     }))
 
-    return await pollExchange<SDPResponse>(xStreamToken, xCloudStreamConfig, '/'+sessionPath+'/sdp')
+    return await pollExchange<SDPResponse>(xStreamToken, xCloudStreamConfig, sessionEndpoint(xCloudStreamConfig.type,sessionPath,'sdp'))
 }
 
 export const sendICECandidates = async (xStreamToken:xStreamToken, xCloudStreamConfig:xCloudStreamConfig, sessionPath:string, candidates:Array<any>) => {
-    await httpPost<StatusResponse>(xStreamToken, xCloudStreamConfig, '/'+sessionPath+'/ice', JSON.stringify({
+    await httpPost<StatusResponse>(xStreamToken, xCloudStreamConfig, sessionEndpoint(xCloudStreamConfig.type,sessionPath,'ice'), JSON.stringify({
         candidates: candidates
     }))
 
-    return await pollExchange<any>(xStreamToken, xCloudStreamConfig, '/'+sessionPath+'/ice')
+    return await pollExchange<any>(xStreamToken, xCloudStreamConfig, sessionEndpoint(xCloudStreamConfig.type,sessionPath,'ice'))
 }
 
 export const sendMsalToken = async (xStreamToken:xStreamToken, xCloudStreamConfig:xCloudStreamConfig, sessionPath:string, userRefreshToken:string) => {
+    // Validate the session and destination before exchanging a refresh token.
+    streamOrigin(xCloudStreamConfig.host)
+    sessionEndpoint(xCloudStreamConfig.type,sessionPath,'connect')
     // Fetch token server sided
     const tokenData = await fetch('https://login.live.com/oauth20_token.srf', {
       method: 'POST',
+      redirect: 'error',
       signal: AbortSignal.timeout(15000),
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -101,13 +106,26 @@ export const sendMsalToken = async (xStreamToken:xStreamToken, xCloudStreamConfi
     const token = await tokenData.json();
     if (typeof token.access_token !== 'string') throw new Error('Invalid console transfer token');
 
-    return await httpPost<StatusResponse>(xStreamToken, xCloudStreamConfig, '/'+sessionPath+'/connect', JSON.stringify({
+    return await httpPost<StatusResponse>(xStreamToken, xCloudStreamConfig, sessionEndpoint(xCloudStreamConfig.type,sessionPath,'connect'), JSON.stringify({
         userToken: token.access_token
     }))
 }
 
 export const sendKeepalive = async (xStreamToken:xStreamToken, xCloudStreamConfig:xCloudStreamConfig, sessionPath:string) => {
-    return await httpPost<StatusResponse>(xStreamToken, xCloudStreamConfig, '/'+sessionPath+'/keepalive', JSON.stringify({}))
+    return await httpPost<StatusResponse>(xStreamToken, xCloudStreamConfig, sessionEndpoint(xCloudStreamConfig.type,sessionPath,'keepalive'), JSON.stringify({}))
+}
+
+// A missing/expired session is already terminated. All other failures
+// remain failures; callers must retain ownership and explicitly retry.
+export const stopStream=async (token:xStreamToken,config:xCloudStreamConfig,sessionPath:string):Promise<StatusResponse>=>{
+    const path=sessionEndpoint(config.type,sessionPath)
+    const response=await fetch(streamOrigin(config.host)+path,{
+        method:'DELETE',redirect:'error',signal:AbortSignal.timeout(15000),
+        headers:requestHeaders(token,config),
+    })
+    await response.body?.cancel()
+    if(response.ok||response.status===404||response.status===410)return {status:response.status}
+    throw {error:{status:response.status}}
 }
 
 async function pollExchange<T>(token: xStreamToken, config: xCloudStreamConfig, url: string) {
@@ -120,90 +138,30 @@ async function pollExchange<T>(token: xStreamToken, config: xCloudStreamConfig, 
     throw new Error('Streaming handshake timed out')
 }
 
-const httpGet = <T>(xStreamToken:xStreamToken, xCloudStreamConfig:xCloudStreamConfig, url:string, headers = {}) => {
-    return new Promise<T | StatusResponse | ErrorResponse>((resolve, reject) => {
-        const deviceInfo = getDeviceInfo(xCloudStreamConfig)
+const requestHeaders=(token:xStreamToken,config:xCloudStreamConfig)=>({
+    'Accept':'application/json',
+    'Content-Type':'application/json',
+    'X-Gssv-Client':'XboxComBrowser',
+    'X-MS-Device-Info':getDeviceInfo(config),
+    ...(token.token!==''?{'Authorization':'Bearer '+token.token}:{}),
+})
 
-        try {
-            fetch(xCloudStreamConfig.host+url, {
-                method: 'GET',
-                signal: AbortSignal.timeout(15000),
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-Gssv-Client': 'XboxComBrowser',
-                    'X-MS-Device-Info': deviceInfo,
-                    ...(xStreamToken.token !== '' ? { 'Authorization': 'Bearer '+xStreamToken.token } : {}),
-                    ...headers,
-                }
-            }).then(response => {
-                if(response.ok === true){
-                    response.json().then(data => {
-                        resolve(data)
-                    }).catch((error) => {
-                        if(response.status >= 200 && response.status <= 299){
-                            resolve({ status: response.status })
-                        } else {
-                            reject({ error: error })
-                        }
-                    })
-                } else {
-                    reject({
-                        error: {
-                            status: response.status,
-                            data: response
-                        }
-                    } as ErrorResponse)
-                }
-            }).catch(reject)
-        } catch (error) {
-            reject({ error: error } as ErrorResponse)
-        }
+async function httpRequest<T>(token:xStreamToken,config:xCloudStreamConfig,path:string,method:'GET'|'POST',body?:string,headers={}):Promise<T|StatusResponse|ErrorResponse>{
+    const response=await fetch(streamOrigin(config.host)+path,{
+        method,redirect:'error',signal:AbortSignal.timeout(15000),
+        headers:{...requestHeaders(token,config),...headers},
+        ...(body===undefined?{}:{body}),
     })
+    if(!response.ok){
+        await response.body?.cancel()
+        // Never serialize response bodies, Request objects or credentials in RPC errors.
+        throw {error:{status:response.status}} as ErrorResponse
+    }
+    try{return await response.json() as T}
+    catch{return {status:response.status}}
 }
-
-const httpPost = <T>(xStreamToken:xStreamToken, xCloudStreamConfig:xCloudStreamConfig, url:string, body:string, headers = {}) => {
-    return new Promise<T | StatusResponse | ErrorResponse>((resolve, reject) => {
-        const deviceInfo = getDeviceInfo(xCloudStreamConfig)
-
-        try {
-            fetch(xCloudStreamConfig.host+url, {
-                method: 'POST',
-                signal: AbortSignal.timeout(15000),
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-Gssv-Client': 'XboxComBrowser',
-                    'X-MS-Device-Info': deviceInfo,
-                    ...(xStreamToken.token !== '' ? { 'Authorization': 'Bearer '+xStreamToken.token } : {}),
-                    ...headers,
-                },
-                body: body,
-            }).then(response => {
-                if(response.ok === true){
-                    response.json().then(data => {
-                        resolve(data)
-                    }).catch((error) => {
-                        if(response.status >= 200 && response.status <= 299){
-                            resolve({ status: response.status })
-                        } else {
-                            reject({ error: error })
-                        }
-                    })
-                } else {
-                    reject({
-                        error: {
-                            status: response.status,
-                            data: response.body
-                        }
-                    } as ErrorResponse)
-                }
-            }).catch(reject)
-        } catch (error) {
-            reject({ error: error } as ErrorResponse)
-        }
-    })
-}
+const httpGet=<T>(token:xStreamToken,config:xCloudStreamConfig,path:string,headers={})=>httpRequest<T>(token,config,path,'GET',undefined,headers)
+const httpPost=<T>(token:xStreamToken,config:xCloudStreamConfig,path:string,body:string,headers={})=>httpRequest<T>(token,config,path,'POST',body,headers)
 
 const getDeviceInfo = (xCloudStreamConfig:xCloudStreamConfig) => {
     return JSON.stringify({
