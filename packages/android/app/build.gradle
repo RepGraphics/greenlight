@@ -1,0 +1,19 @@
+plugins {
+    id 'com.android.application'
+}
+android {
+    namespace 'uk.repgraphics.greenlight.companion'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'uk.repgraphics.greenlight.companion'
+        minSdk 26
+        targetSdk 35
+        // Experimental companion build; separate from the desktop release.
+        versionCode 1
+        versionName '0.1.0-experimental'
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
