@@ -7,8 +7,10 @@ import {useTRPCClient} from '../utils/trpc'
 import {AuthAttempt} from '../contexts/authattempt'
 import {normalizeCloudTitles,catalogBatches,hydrateCloudTitles,filterCloudTitles,type CloudTitle} from '../utils/cloudlibrary'
 
+import {libraryView,type LibraryView} from '../utils/librarycollections'
+
 export default function HomePage(){
-    const {getxCloudToken,isAuthenticated}=useAuth()
+    const {getxCloudToken,isAuthenticated,libraryCollections,toggleLibraryFavorite,rememberLibraryTitle,clearLibraryCollections}=useAuth()
     const client=useTRPCClient()
     const {token,market,language}=getxCloudToken()
     const [titles,setTitles]=useState<CloudTitle[]>([])
@@ -19,6 +21,7 @@ export default function HomePage(){
     const [entitledOnly,setEntitledOnly]=useState(true)
     const [sort,setSort]=useState<'az'|'za'>('az')
     const [page,setPage]=useState(0)
+    const [view,setView]=useState<LibraryView>('all')
     const [selected,setSelected]=useState<CloudTitle|null>(null)
     const attempts=useRef(new AuthAttempt())
     const locked=useRef(false)
@@ -59,7 +62,7 @@ export default function HomePage(){
         else setLoading(false)
         return()=>{attempts.current.cancel();locked.current=false}
     },[client,isAuthenticated,token,market,language])
-    const visible=filterCloudTitles(titles,search,entitledOnly,sort)
+    const visible=libraryView(filterCloudTitles(titles,search,entitledOnly,sort),libraryCollections,view)
     const pageSize=48
     const lastPage=Math.max(0,Math.ceil(visible.length/pageSize)-1)
     const currentPage=Math.min(page,lastPage)
@@ -76,9 +79,12 @@ export default function HomePage(){
                     <div className="flex flex-wrap gap-3 my-5 items-center">
                         <input type="search" maxLength={100} value={search} onChange={event=>{setSearch(event.target.value);setPage(0)}} aria-label="Search games" placeholder="Search games or publishers" className="min-w-0 flex-1 rounded border border-white/20 bg-white/5 p-2"/>
                         <label><input type="checkbox" checked={entitledOnly} onChange={event=>{setEntitledOnly(event.target.checked);setPage(0)}}/> Entitled and free titles</label>
-                        <label>Sort <select value={sort} onChange={event=>{setSort(event.target.value==='za'?'za':'az');setPage(0)}} className="bg-[#202020] rounded p-2"><option value="az">A–Z</option><option value="za">Z–A</option></select></label>
+                        <label>Collection <select value={view} onChange={event=>{setView(event.target.value==='favorites'||event.target.value==='recent'?event.target.value:'all');setPage(0)}} className="bg-[#202020] rounded p-2"><option value="all">All games</option><option value="favorites">Favourites</option><option value="recent">Recently opened</option></select></label>
+                        <label>Sort <select disabled={view==='recent'} value={sort} onChange={event=>{setSort(event.target.value==='za'?'za':'az');setPage(0)}} className="bg-[#202020] rounded p-2"><option value="az">A–Z</option><option value="za">Z–A</option></select></label>
                         <button type="button" className={button} disabled={loading} onClick={()=>void load()}>{loading?'Refreshing…':'Refresh'}</button>
                     </div>
+                    <p className="text-sm text-white/60">Favourites and recently opened games are remembered only during this sign-in. Recently opened means session setup was opened, not necessarily played.</p>
+                    {(libraryCollections.favorites.length>0||libraryCollections.recent.length>0)&&<button type="button" className={button+' my-2'} onClick={()=>{clearLibraryCollections();setPage(0)}}>Clear favourites and recent games</button>}
                     <p role="status">{loading?'Loading catalog and metadata…':visible.length+' matching titles'}</p>
                     {failed&&<p role="alert" className="my-3">Unable to retrieve the Xbox catalog. Try refreshing.</p>}
                     {metadataFailed&&<p role="status" className="my-3">Some game names are unavailable. Title identifiers are shown instead.</p>}
@@ -88,7 +94,8 @@ export default function HomePage(){
                             <h2 className="font-semibold break-words">{title.name}</h2>
                             {title.publisher&&<p className="text-white/60 text-sm">{title.publisher}</p>}
                             <p className="text-sm mt-2">{title.entitled?'Available entitlement or free title':'Entitlement not reported'}</p>
-                            <button type="button" disabled={!title.entitled||!token||loading} className={button+' mt-3'} onClick={()=>setSelected(title)}>Play (experimental)</button>
+                            <button type="button" disabled={!title.entitled||!token||loading} className={button+' mt-3'} onClick={()=>{rememberLibraryTitle(title.id);setSelected(title)}}>Play (experimental)</button>
+                            <button type="button" aria-pressed={libraryCollections.favorites.includes(title.id)} className={button+' mt-3 ml-2'} onClick={()=>toggleLibraryFavorite(title.id)}>{libraryCollections.favorites.includes(title.id)?'Remove favourite':'Add favourite'}</button>
                         </article>)}
                     </section>
                     {lastPage>0&&<nav aria-label="Game pages" className="flex flex-wrap gap-3 items-center mt-5">
