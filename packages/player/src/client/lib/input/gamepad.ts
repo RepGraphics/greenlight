@@ -5,6 +5,7 @@ import { VibrationFrame } from '../channel/input'
 import { RumblePlayback, type RumbleActuator } from './rumble'
 import { KeyboardGamepadState, isEditableGamepadTarget } from './keyboardstate'
 import { GuidePulse } from './guidepulse'
+import { VirtualButtonState } from './virtualbuttons'
 
 export interface GamepadOptions {
     physical_gamepad_id?: number;
@@ -41,9 +42,7 @@ export default class Gamepad {
     private onVisibility=()=>{if(document.hidden)this.onWindowBlur();else if(document.hasFocus())this.onWindowFocus()}
     private rumblePlayback=new RumblePlayback()
     private _isFocused = true
-    private _gamepadOverride = {
-        buttons: {},
-    }
+    private virtualButtons=new VirtualButtonState()
 
     private _options:GamepadOptionsDefaults = {
         physical_gamepad_id: -1,
@@ -153,7 +152,7 @@ export default class Gamepad {
         }
         this._player._channels.control.sendGamepadState(this._index, false)
         this._physicalGamepadId = -1
-        this._gamepadOverride.buttons = {}
+        this.virtualButtons.clear()
         this.virtualAxes = {}
         this.virtualReleasePending=false
         this.guidePulse.clear()
@@ -194,16 +193,15 @@ export default class Gamepad {
         delete this.virtualAxes[y]
     }
 
-    sendButtonState(button:string,value:number){
+    sendButtonState(button:string,value:number,preserveTap=true){
         if(!this._player||!this._isFocused)return
         if(!Object.prototype.hasOwnProperty.call(this._options.gamepad_mapping,button))return
-        if(!Number.isFinite(value))return
-        const strength=Math.max(0,Math.min(1,value))
-        if(strength>0)this._gamepadOverride.buttons[button]=strength
-        else if(Object.prototype.hasOwnProperty.call(this._gamepadOverride.buttons,button)){
-            delete this._gamepadOverride.buttons[button]
-            this.virtualReleasePending=true
-        }
+        this.virtualButtons.set(button,value,preserveTap)
+    }
+
+    cancelVirtualButtons(){
+        if(this.virtualButtons.pending)this.virtualReleasePending=true
+        this.virtualButtons.clear()
     }
 
     onKeyDown(event:KeyboardEvent){
@@ -222,7 +220,7 @@ export default class Gamepad {
     onWindowBlur(){
         this.stopRumble()
         this._isFocused = false
-        this._gamepadOverride.buttons = {}
+        this.virtualButtons.clear()
         this.virtualAxes = {}
         this.virtualReleasePending=false
         this.guidePulse.clear()
@@ -291,7 +289,7 @@ export default class Gamepad {
     }
 
     hasOverrideButtons(){
-        return Object.keys(this._gamepadOverride.buttons).length > 0 || Object.keys(this.virtualAxes).length > 0 || this.virtualReleasePending || this.guidePulse.pending || this.keyboardState.pending
+        return this.virtualButtons.pending || Object.keys(this.virtualAxes).length > 0 || this.virtualReleasePending || this.guidePulse.pending || this.keyboardState.pending
     }
 
     getGamepadState(){
@@ -324,8 +322,8 @@ export default class Gamepad {
 
         // Virtual sources augment physical buttons. Releasing one source
         // must not overwrite another source's held input with zero.
-        for(const button of Object.keys(this._gamepadOverride.buttons)){
-            frame[button]=Math.max(frame[button],this._gamepadOverride.buttons[button])
+        for(const [button,value] of this.virtualButtons.read()){
+            frame[button]=Math.max(frame[button],value)
         }
         for(const button of this.keyboardState.read())frame[button]=1
         if(this.guidePulse.sample(performance.now()))frame.Nexus=1
