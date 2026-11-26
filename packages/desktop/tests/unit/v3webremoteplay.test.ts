@@ -51,3 +51,44 @@ test('failed stop retains remote session ownership for explicit retry',async()=>
     f.setStatus(410);assert.equal(await lifecycle.end(),true)
     assert.deepEqual(f.calls.map(item=>item[0]),['start','stop','stop'])
 })
+
+test('ending web Remote Play rejects new signaling and drains pending requests before DELETE',async()=>{
+    const f=fixture()
+    let release!:()=>void
+    f.rpc.connect=async input=>{f.calls.push(['connect',input]);await new Promise<void>(resolve=>{release=resolve})}
+    const session=createRemoteSession(f.rpc,config,token,'refresh')
+    const first=session.start();assert.equal(session.start(),first)
+    const id=await first,player=session.player(id)
+    const connecting=player.sendMSALToken()
+    await flush()
+    const stop=session.stop(id);assert.equal(session.stop(id),stop)
+    await assert.rejects(player.sendKeepalive(),/not active/)
+    await assert.rejects(player.getStreamStatus(),/not active/)
+    assert.throws(()=>session.player(id),/not owned/)
+    assert.deepEqual(f.calls.map(item=>item[0]),['start','connect'])
+    release();await connecting;await stop
+    assert.deepEqual(f.calls.map(item=>item[0]),['start','connect','stop'])
+    await assert.rejects(session.start(),/closing/)
+})
+test('failed in-flight signaling does not prevent remote teardown and failed DELETE stays closed to signaling',async()=>{
+    const f=fixture()
+    let reject!: (reason:Error)=>void
+    f.rpc.sdp=async input=>{f.calls.push(['sdp',input]);await new Promise<void>((_resolve,fail)=>{reject=fail})}
+    const session=createRemoteSession(f.rpc,config,token,'refresh'),id=await session.start(),player=session.player(id)
+    const pending=player.sendSDPOffer({type:'offer',sdp:'offer'})
+    const failure=assert.rejects(pending,/network/)
+    await flush();f.setStatus(503)
+    const stopping=assert.rejects(session.stop(id),/not acknowledged/)
+    reject(Error('network'));await failure;await stopping
+    await assert.rejects(player.sendKeepalive(),/not active/)
+    f.setStatus(410);await session.stop(id)
+    assert.deepEqual(f.calls.map(item=>item[0]),['start','sdp','stop','stop'])
+})
+test('cannot address an unrelated session even with a syntactically valid path',async()=>{
+    const f=fixture(),session=createRemoteSession(f.rpc,config,token,'refresh')
+    const id=await session.start()
+    assert.throws(()=>session.player('/v5/sessions/home/other'),/not owned/)
+    await assert.rejects(session.stop('/v5/sessions/home/other'),/not owned/)
+    assert.deepEqual(f.calls.map(item=>item[0]),['start'])
+    await session.stop(id)
+})
