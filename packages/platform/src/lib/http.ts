@@ -1,121 +1,64 @@
-import { IncomingHttpHeaders } from 'http'
-import https from 'https'
+// The catalog adapter only uses these production endpoints. Never include
+// request headers, response headers, upstream error bodies or URLs in RPC data.
+const trustedHosts=new Set(['weu.core.gssv-play-prod.xboxlive.com','catalog.gamepass.com'])
+export const platformResponseLimit=16*1024*1024
+export const platformRequestDeadline=15000
 
-export default class Http {
-
-    getRequest(host:string, path:string, headers:any, method = 'GET') {
-        return new Promise<HttpResponse>((resolve, reject) => {
-
-            const hostHeaders = {
-                ...headers,
-            }
-
-            const options = {
-                method: method,
-                hostname: host,
-                path: path,
-                port: 443,
-                headers: hostHeaders
-            }
-
-            const req = this.createRequest(options, resolve, reject)
-            
-            req.on('error', (error) => {
-                reject(new Error('Unhandled error:'+ JSON.stringify(error)))
-            })
-
-            req.end()
-
-        })
-    }
-
-    deleteRequest(host:string, path:string, headers:any) {
-        return this.getRequest(host, path, headers, 'DELETE')
-    }
-
-    postRequest(host:string, path:string, headers:any, data:any, method = 'POST') {
-        return new Promise<HttpResponse>((resolve, reject) => {
-
-            const hostHeaders = {
-                ...headers,
-            }
-
-            if(typeof data === 'object'){
-                data = JSON.stringify(data)
-            }
-
-            const options = {
-                method: method,
-                hostname: host,
-                path: path,
-                port: 443,
-                headers: hostHeaders
-            }
-
-            const req = this.createRequest(options, resolve, reject)
-            
-            req.on('error', (error) => {
-                reject(new Error('Unhandled error:'+ JSON.stringify(error)))
-            })
-
-            req.write(data)
-            req.end()
-
-        })
-    }
-
-    putRequest(host:string, path:string, headers:any, data:any) {
-        return this.postRequest(host, path, headers, data, 'PUT')
-    }
-
-    createRequest(options:any, resolve:any, reject:any){
-        return https.request(options, (res) => {
-            let responseData = ''
-            
-            res.on('data', (data) => {
-                responseData += data
-            })
-
-            res.on('close', () => {
-                if(res.statusCode == 200 || res.statusCode == 204){
-                    if(responseData.toString() === ''){
-                        resolve(new HttpResponse({}, res.headers, options))
-                    } else {
-                        resolve(new HttpResponse(JSON.parse(responseData.toString()), res.headers, options))
-                    }
-                } else {
-                    reject(new Error('Error fetching '+options.hostname+options.path+'. Details: '+ JSON.stringify({
-                        statuscode: res.statusCode,
-                        headers: res.headers,
-                        body: responseData.toString(),
-                        message: 'Error fetching '+options.hostname+options.path
-                    }, null, 2)))
-                }
-            })
-        })
-    }
+export class HttpResponse<T=any>{
+    constructor(public data:T){}
+    body(){return this.data}
 }
 
-
-export class HttpResponse<T = any> {
-
-    data:T
-    headers:IncomingHttpHeaders
-    options:any
-
-    constructor(data:any, headers:IncomingHttpHeaders, options:any){
-        this.data = data
-        this.headers = headers
-        this.options = options
-
-        // delete(this.options.headers['Authorization'])
+export default class Http {
+    constructor(private request:typeof fetch=fetch){}
+    private async send(host:string,path:string,headers:HeadersInit,method:string,body?:string):Promise<HttpResponse>{
+        if(!trustedHosts.has(host)||!path.startsWith('/')||path.startsWith('//')||path.includes('\\')||path.includes('#'))throw Error('Invalid catalog destination')
+        const url=new URL(path,'https://'+host)
+        if(url.hostname!==host||url.protocol!=='https:'||url.username||url.password||url.port)throw Error('Invalid catalog destination')
+        try{
+            const signal=AbortSignal.timeout(platformRequestDeadline)
+            const response=await this.request(url.href,{method,headers,body,redirect:'error',signal,cache:'no-store'})
+            if(!response.ok){
+                await response.body?.cancel().catch(()=>{})
+                throw Error('Catalog request failed (HTTP '+response.status+')')
+            }
+            const size=response.headers.get('content-length')
+            if(size!==null&&Number(size)>platformResponseLimit){
+                await response.body?.cancel().catch(()=>{})
+                throw Error('Catalog response too large')
+            }
+            if(response.status===204||!response.body)return new HttpResponse({})
+            const reader=response.body.getReader(),decoder=new TextDecoder()
+            let bytes=0,text=''
+            try{
+                while(true){
+                    signal.throwIfAborted()
+                    const {done,value}=await reader.read()
+                    if(done)break
+                    bytes+=value.byteLength
+                    if(bytes>platformResponseLimit)throw Error('Catalog response too large')
+                    text+=decoder.decode(value,{stream:true})
+                }
+                text+=decoder.decode()
+                signal.throwIfAborted()
+                return new HttpResponse(text.trim()?JSON.parse(text):{})
+            }finally{
+                await reader.cancel().catch(()=>{})
+                reader.releaseLock()
+            }
+        }catch(error){
+            // Upstream exceptions can include headers, URLs or response data.
+            // Do not expose them through the public RPC error formatter.
+            if(error instanceof Error&&/^Catalog (request failed \(HTTP \d{3}\)|response too large)$/.test(error.message))throw Error(error.message)
+            throw Error('Catalog request unavailable')
+        }
     }
-
-    header(){
-        return this.headers
+    getRequest(host:string,path:string,headers:HeadersInit,method='GET'){return this.send(host,path,headers,method)}
+    deleteRequest(host:string,path:string,headers:HeadersInit){return this.send(host,path,headers,'DELETE')}
+    postRequest(host:string,path:string,headers:HeadersInit,data:unknown,method='POST'){
+        const requestHeaders=new Headers(headers)
+        if(typeof data!=='string')requestHeaders.set('Content-Type','application/json')
+        return this.send(host,path,requestHeaders,method,typeof data==='string'?data:JSON.stringify(data))
     }
-
-    body(){
-        return this.data
-    }
+    putRequest(host:string,path:string,headers:HeadersInit,data:unknown){return this.postRequest(host,path,headers,data,'PUT')}
 }

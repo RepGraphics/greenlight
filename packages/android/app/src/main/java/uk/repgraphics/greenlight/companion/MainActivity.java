@@ -2,6 +2,9 @@ package uk.repgraphics.greenlight.companion;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Intent;
+import android.content.ActivityNotFoundException;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Build;
 import android.graphics.Color;
@@ -26,6 +29,8 @@ import android.webkit.WebViewDatabase;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.RadioGroup;
+import android.widget.RadioButton;
 import android.widget.TextView;
 import java.io.ByteArrayInputStream;
 import java.util.Collections;
@@ -36,6 +41,7 @@ public final class MainActivity extends Activity {
     private TextView status;
     private EditText endpoint, password;
     private OriginPolicy origin;
+    private ConnectionMode mode = ConnectionMode.DESKTOP_COMPANION;
     private String token;
     private boolean challenged;
     private String lastEndpoint = "";
@@ -43,7 +49,7 @@ public final class MainActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
-        showConnect("Connect to your own private HTTPS Greenlight WebUI endpoint.");
+        showConnect("Choose a connection mode and your trusted private HTTPS endpoint.");
     }
 
     private void layout() {
@@ -75,8 +81,20 @@ public final class MainActivity extends Activity {
 
     private void showConnect(String message) {
         layout();
-        root.addView(text("Greenlight Android Companion", 23));
-        root.addView(text("Experimental · Requires a signed-in desktop backend. Do not expose WebUI publicly. End any active stream before disconnecting.", 14));
+        root.addView(text("Greenlight Android (experimental)", 23));
+        RadioGroup modes = new RadioGroup(this);
+        RadioButton desktop = new RadioButton(this);
+        desktop.setId(View.generateViewId());
+        desktop.setText("Desktop companion");
+        RadioButton privateV3 = new RadioButton(this);
+        privateV3.setId(View.generateViewId());
+        privateV3.setText("Private V3 backend (no desktop required)");
+        modes.addView(desktop);
+        modes.addView(privateV3);
+        root.addView(modes);
+        modes.check(mode == ConnectionMode.PRIVATE_V3 ? privateV3.getId() : desktop.getId());
+        TextView modeHint = text("", 14);
+        root.addView(modeHint);
         endpoint = new EditText(this);
         endpoint.setSingleLine(true);
         endpoint.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
@@ -90,6 +108,17 @@ public final class MainActivity extends Activity {
         password.setHint("Desktop WebUI access token");
         password.setSaveEnabled(false);
         root.addView(password);
+        Runnable updateMode = () -> {
+            mode = modes.getCheckedRadioButtonId() == privateV3.getId()
+                ? ConnectionMode.PRIVATE_V3 : ConnectionMode.DESKTOP_COMPANION;
+            password.setText("");
+            password.setVisibility(mode == ConnectionMode.PRIVATE_V3 ? View.GONE : View.VISIBLE);
+            modeHint.setText(mode == ConnectionMode.PRIVATE_V3
+                ? "Experimental · Requires your own access-controlled V3 web backend over a private network or VPN. Sign in with Microsoft in your system browser. Never use an untrusted or public backend."
+                : "Requires a signed-in desktop backend. Do not expose WebUI publicly. End any active stream before disconnecting.");
+        };
+        modes.setOnCheckedChangeListener((group, id) -> updateMode.run());
+        updateMode.run();
         Button connect = new Button(this);
         connect.setText("Connect");
         root.addView(connect);
@@ -98,14 +127,16 @@ public final class MainActivity extends Activity {
         connect.setOnClickListener(view -> {
             OriginPolicy selected = OriginPolicy.parse(endpoint.getText().toString().trim());
             String credential = password.getText().toString();
-            if (selected == null || !credential.matches("[a-fA-F0-9]{64}")) {
-                status.setText("Enter an HTTPS origin on port 443 and the 64-character desktop WebUI token.");
+            if (selected == null || !mode.acceptsCredential(credential)) {
+                status.setText(mode == ConnectionMode.PRIVATE_V3
+                    ? "Enter a trusted private HTTPS V3 origin on port 443."
+                    : "Enter an HTTPS origin on port 443 and the 64-character desktop WebUI token.");
                 return;
             }
             password.setText("");
             lastEndpoint = selected.home();
             origin = selected;
-            token = credential;
+            token = mode == ConnectionMode.DESKTOP_COMPANION ? credential : null;
             challenged = false;
             openClient();
         });
@@ -114,10 +145,26 @@ public final class MainActivity extends Activity {
     private void openClient() {
         layout();
         Button leave = new Button(this);
-        leave.setText("Disconnect companion");
+        leave.setText("Disconnect");
         leave.setOnClickListener(view -> confirmDisconnect());
         root.addView(leave);
-        status = text("Connecting to " + origin.home(), 13);
+        final OriginPolicy selectedOrigin = origin;
+        final ConnectionMode selectedMode = mode;
+        if (selectedMode == ConnectionMode.PRIVATE_V3) {
+            Button signIn = new Button(this);
+            signIn.setText("Open Microsoft device sign-in");
+            signIn.setOnClickListener(view -> {
+                try {
+                    Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(ConnectionMode.MICROSOFT_DEVICE_LOGIN));
+                    intent.addCategory(Intent.CATEGORY_BROWSABLE);
+                    startActivity(intent);
+                } catch (ActivityNotFoundException error) {
+                    status.setText("No browser available. Visit microsoft.com/devicelogin on another device.");
+                }
+            });
+            root.addView(signIn);
+        }
+        status = text("Connecting to " + selectedOrigin.home(), 13);
         root.addView(status);
         WebView web = new WebView(this);
         browser = web;
@@ -136,18 +183,21 @@ public final class MainActivity extends Activity {
         WebView.setWebContentsDebuggingEnabled(false);
         web.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                return view != browser || origin == null || !origin.allows(request.getUrl().toString());
+                return view != browser || !selectedOrigin.allows(request.getUrl().toString());
             }
             @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                OriginPolicy selected = origin;
-                if (selected != null && selected.allows(request.getUrl().toString())) return null;
+                // Capture the policy of this WebView. A late callback from a
+                // disconnected view must not acquire a new endpoint's policy.
+                if (selectedOrigin.allows(request.getUrl().toString())) return null;
                 return new WebResourceResponse("text/plain", "UTF-8", 403, "Blocked",
                     Collections.emptyMap(), new ByteArrayInputStream(new byte[0]));
             }
             @Override public void onReceivedHttpAuthRequest(WebView view, HttpAuthHandler handler, String host, String realm) {
-                if (view != browser || origin == null || token == null || challenged || !origin.allowsChallenge(host, realm)) {
+                if (view != browser || token == null || challenged || !selectedMode.allowsChallenge(selectedOrigin, host, realm)) {
                     handler.cancel();
-                    if (view == browser) status.setText("Authentication failed. Disconnect and check the endpoint and token.");
+                    if (view == browser) status.setText(selectedMode == ConnectionMode.PRIVATE_V3
+                        ? "Unexpected HTTP authentication challenge. Check the private V3 access configuration."
+                        : "Authentication failed. Disconnect and check the endpoint and token.");
                     return;
                 }
                 challenged = true;
@@ -160,18 +210,20 @@ public final class MainActivity extends Activity {
             }
             @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap icon) {
                 if (view != browser) return;
-                if (origin == null || !origin.allows(url)) {
+                if (!selectedOrigin.allows(url)) {
                     view.stopLoading();
                     status.setText("Blocked navigation outside the selected endpoint.");
                 }
             }
             @Override public void onPageFinished(WebView view, String url) {
-                if (view == browser && origin != null && origin.allows(url) && status.getText().toString().startsWith("Connecting")) {
-                    status.setText("Private companion · End the stream before disconnecting");
+                if (view == browser && selectedOrigin.allows(url) && status.getText().toString().startsWith("Connecting")) {
+                    status.setText(selectedMode == ConnectionMode.PRIVATE_V3
+                        ? "Start sign-in in the web client, then use the Microsoft device sign-in button."
+                        : "Private companion · End the stream before disconnecting");
                 }
             }
             @Override public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
-                if (view == browser) disconnect("WebView stopped. Reconnect after checking the desktop session.");
+                if (view == browser) disconnect("WebView stopped. Check for an existing Xbox session before reconnecting.");
                 return true;
             }
         });
@@ -181,12 +233,12 @@ public final class MainActivity extends Activity {
         web.setDownloadListener((url, userAgent, disposition, mime, length) ->
             status.setText("File downloads are not supported in this companion build."));
         root.addView(web, new LinearLayout.LayoutParams(-1, 0, 1));
-        web.loadUrl(origin.home());
+        web.loadUrl(selectedMode.landingPage(selectedOrigin));
     }
 
     private void confirmDisconnect() {
         new AlertDialog.Builder(this).setTitle("Disconnect?")
-            .setMessage("End your Xbox stream in the WebUI first. Closing the companion cannot confirm remote session termination.")
+            .setMessage("End your Xbox stream in the client first. Closing this app cannot confirm remote session termination.")
             .setNegativeButton("Stay", null)
             .setPositiveButton("Disconnect", (dialog, which) -> disconnect("Disconnected."))
             .show();

@@ -77,8 +77,8 @@ export const appRouter = router({
     gamepass_get_recent_titles: publicProcedure.input(zodXhomeToken).query(async ({ input }) => await gamepass.getRecentTitles(input)),
     gamepass_get_new_titles: publicProcedure.input(zodXhomeToken).query(async ({ input }) => await gamepass.getNewTitles(input)),
 
-    gamepass_batch_productids: publicProcedure.input(z.object({ token: zodXhomeToken, productIds: z.array(z.string()) })).query(async ({ input }) => await gamepass.resolveTitles(input.token, input.productIds)),
-    gamepass_resolve_productid: publicProcedure.input(z.object({ token: zodXhomeToken, productId: z.string() })).query(async ({ input }) => await gamepass.resolveTitle(input.token, input.productId)),
+    gamepass_batch_productids: publicProcedure.input(z.object({ token: zodXhomeToken, productIds: z.array(z.string().min(1).max(128)).min(1).max(100) })).query(async ({ input }) => await gamepass.resolveTitles(input.token, input.productIds)),
+    gamepass_resolve_productid: publicProcedure.input(z.object({ token: zodXhomeToken, productId: z.string().min(1).max(128) })).query(async ({ input }) => await gamepass.resolveTitle(input.token, input.productId)),
 
     streaming_stop_stream: publicProcedure.input(z.object({ token: zodXhomeToken, xCloudStreamConfig: xCloudStreamConfig, sessionPath: z.string().max(256) })).mutation(async ({ input }) => await stopStream(input.token, input.xCloudStreamConfig, input.sessionPath)),
     streaming_start_stream: publicProcedure.input(z.object({ token: zodXhomeToken, xCloudStreamConfig: xCloudStreamConfig })).mutation(async ({ input }) => await startStream(input.token, input.xCloudStreamConfig)),
