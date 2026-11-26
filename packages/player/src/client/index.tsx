@@ -44,6 +44,8 @@ export interface StreamPlayerProps {
     buttonMapping?: Record<string, string>;
     onMetrics?: (metrics: StreamMetrics) => void;
     keyframeRequest?: number;
+    guideRequest?: number;
+    onGuideUnavailable?: ()=>void;
     onFailureReason?: (reason: string) => void;
     onMicrophoneStatus?: (active: boolean, error?: boolean) => void;
 }
@@ -69,7 +71,7 @@ export interface communicationHandler {
 export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
     ({
         onStatusChanged,
-        communicationHandler, useWebGpu = true, autoGamepad = false, multiController = false, consoleController = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false, codecProfiles = [], touchControls = false, directTouch = false, keyboardMapping, microphone = false, onMicrophoneStatus, nativeMouseKeyboard = false, deadzone = 0.08, invertY = false, swapSticks = false, mouseSensitivity = 1, buttonMapping, onMetrics, keyframeRequest = 0, onFailureReason
+        communicationHandler, useWebGpu = true, autoGamepad = false, multiController = false, consoleController = false, vibration = true, videoBitrate = 0, showStats = false, volume = 1, muted = false, codecProfiles = [], touchControls = false, directTouch = false, keyboardMapping, microphone = false, onMicrophoneStatus, nativeMouseKeyboard = false, deadzone = 0.08, invertY = false, swapSticks = false, mouseSensitivity = 1, buttonMapping, onMetrics, keyframeRequest = 0, guideRequest = 0, onGuideUnavailable, onFailureReason
     }, ref): ReactElement => {
         const playback=useRef({volume,muted});
         playback.current={volume,muted};
@@ -121,6 +123,15 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
         // let player = new xCloudPlayer('playerContainer');
         const [player, setPlayer] = useState<xCloudPlayer | undefined>(undefined);
 
+        const lastGuideRequest=useRef(guideRequest);
+        const guideUnavailable=useRef(onGuideUnavailable);
+        guideUnavailable.current=onGuideUnavailable;
+        useEffect(()=>{
+            if(guideRequest===lastGuideRequest.current)return;
+            lastGuideRequest.current=guideRequest;
+            if(playerState!=='Connected'||consoleController||!controller.current){guideUnavailable.current?.();return}
+            controller.current.pressGuide();
+        },[guideRequest,playerState,consoleController]);
         const lastKeyframeRequest = useRef(0);
         useEffect(() => {
             if (player && playerState === 'Connected' && keyframeRequest > lastKeyframeRequest.current) {

@@ -4,6 +4,7 @@ import { selectPhysicalGamepad } from './slots'
 import { VibrationFrame } from '../channel/input'
 import { resolveRumbleEffect, type RumbleActuator } from './rumble'
 import { KeyboardGamepadState, isEditableGamepadTarget } from './keyboardstate'
+import { GuidePulse } from './guidepulse'
 
 export interface GamepadOptions {
     physical_gamepad_id?: number;
@@ -34,6 +35,7 @@ export default class Gamepad {
     private neutralPending = false
     private virtualAxes: Record<string, number> = {}
     private virtualReleasePending=false
+    private guidePulse=new GuidePulse()
     private keyboardState=new KeyboardGamepadState()
     private get observesFocus(){return !this._options.gamepad_force_capture}
     private onVisibility=()=>{if(document.hidden)this.onWindowBlur();else if(document.hasFocus())this.onWindowFocus()}
@@ -154,6 +156,7 @@ export default class Gamepad {
         this._gamepadOverride.buttons = {}
         this.virtualAxes = {}
         this.virtualReleasePending=false
+        this.guidePulse.clear()
         this.keyboardState.clear()
         this._player = undefined
 
@@ -222,6 +225,7 @@ export default class Gamepad {
         this._gamepadOverride.buttons = {}
         this.virtualAxes = {}
         this.virtualReleasePending=false
+        this.guidePulse.clear()
         this.keyboardState.clear()
         this.neutralPending = true
     }
@@ -283,8 +287,12 @@ export default class Gamepad {
         }
     }
 
+    pressGuide(){
+        return Boolean(this._player&&this._isFocused&&this.guidePulse.request())
+    }
+
     hasOverrideButtons(){
-        return Object.keys(this._gamepadOverride.buttons).length > 0 || Object.keys(this.virtualAxes).length > 0 || this.virtualReleasePending || this.keyboardState.pending
+        return Object.keys(this._gamepadOverride.buttons).length > 0 || Object.keys(this.virtualAxes).length > 0 || this.virtualReleasePending || this.guidePulse.pending || this.keyboardState.pending
     }
 
     getGamepadState(){
@@ -321,6 +329,7 @@ export default class Gamepad {
             frame[button]=Math.max(frame[button],this._gamepadOverride.buttons[button])
         }
         for(const button of this.keyboardState.read())frame[button]=1
+        if(this.guidePulse.sample(performance.now()))frame.Nexus=1
         for(const axis of Object.keys(this.virtualAxes))frame[axis]=this.virtualAxes[axis]
         this.virtualReleasePending=false
 
