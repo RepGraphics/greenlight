@@ -26,6 +26,10 @@ Select Private V3 backend and enter its origin. No desktop access token is accep
 
 Session credentials remain in the experimental web client's memory; disconnect or process death requires signing in again. Android WebRTC playback, backgrounding during sign-in, gamepad support, and remote session cleanup are unverified. End sessions explicitly before disconnecting.
 
+## Fullscreen playback
+
+In either connected mode, tap **Fullscreen (Back to exit)** to hide the native controls and system bars without recreating the WebView. Swipe from the screen edge to temporarily reveal the system bars; use Android Back to restore the controls before disconnecting. The connected WebView requests that the screen stay awake while visible; this does not keep the device awake in the background. Disconnecting resets fullscreen. Real device, gesture navigation and rotation testing remain necessary.
+
 ## Standalone roadmap
 
 A truly backend-independent Android client still needs native authentication/token storage, Xbox signaling, media and input integration. Private V3 mode is an intermediate architecture, not a native standalone client or a production release.

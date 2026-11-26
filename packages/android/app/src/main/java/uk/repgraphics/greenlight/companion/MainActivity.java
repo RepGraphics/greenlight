@@ -12,6 +12,7 @@ import android.net.http.SslError;
 import android.text.InputType;
 import android.view.View;
 import android.view.WindowInsets;
+import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
 import android.webkit.HttpAuthHandler;
@@ -38,6 +39,9 @@ import java.util.Collections;
 public final class MainActivity extends Activity {
     private LinearLayout root;
     private WebView browser;
+    private LinearLayout clientControls;
+    private final PlaybackDisplay display = new PlaybackDisplay();
+    private int previousSystemUi;
     private TextView status;
     private EditText endpoint, password;
     private OriginPolicy origin;
@@ -144,10 +148,22 @@ public final class MainActivity extends Activity {
 
     private void openClient() {
         layout();
+        clientControls = new LinearLayout(this);
+        clientControls.setOrientation(LinearLayout.VERTICAL);
+        root.addView(clientControls);
         Button leave = new Button(this);
         leave.setText("Disconnect");
         leave.setOnClickListener(view -> confirmDisconnect());
-        root.addView(leave);
+        clientControls.addView(leave);
+        Button fullscreen = new Button(this);
+        fullscreen.setText("Fullscreen (Back to exit)");
+        fullscreen.setOnClickListener(view -> {
+            if (browser != null && display.enter()) {
+                previousSystemUi = getWindow().getDecorView().getSystemUiVisibility();
+                applyDisplay();
+            }
+        });
+        clientControls.addView(fullscreen);
         final OriginPolicy selectedOrigin = origin;
         final ConnectionMode selectedMode = mode;
         if (selectedMode == ConnectionMode.PRIVATE_V3) {
@@ -162,12 +178,14 @@ public final class MainActivity extends Activity {
                     status.setText("No browser available. Visit microsoft.com/devicelogin on another device.");
                 }
             });
-            root.addView(signIn);
+            clientControls.addView(signIn);
         }
         status = text("Connecting to " + selectedOrigin.home(), 13);
-        root.addView(status);
+        clientControls.addView(status);
         WebView web = new WebView(this);
         browser = web;
+        display.connected();
+        web.setKeepScreenOn(true);
         WebSettings settings = web.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -231,21 +249,43 @@ public final class MainActivity extends Activity {
             @Override public void onPermissionRequest(PermissionRequest request) { request.deny(); }
         });
         web.setDownloadListener((url, userAgent, disposition, mime, length) ->
-            status.setText("File downloads are not supported in this companion build."));
+            { if (web == browser) status.setText("File downloads are not supported in this companion build."); });
         root.addView(web, new LinearLayout.LayoutParams(-1, 0, 1));
         web.loadUrl(selectedMode.landingPage(selectedOrigin));
     }
 
+    private void applyDisplay() {
+        boolean immersive = display.isImmersive();
+        if (clientControls != null) clientControls.setVisibility(immersive ? View.GONE : View.VISIBLE);
+        if (Build.VERSION.SDK_INT >= 30) {
+            WindowInsetsController controller = getWindow().getInsetsController();
+            if (controller != null) {
+                if (immersive) {
+                    controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                    controller.hide(WindowInsets.Type.systemBars());
+                } else controller.show(WindowInsets.Type.systemBars());
+            }
+        } else {
+            getWindow().getDecorView().setSystemUiVisibility(immersive
+                ? previousSystemUi | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                : previousSystemUi);
+        }
+        root.requestApplyInsets();
+    }
+
     private void confirmDisconnect() {
+        final WebView selected = browser;
         new AlertDialog.Builder(this).setTitle("Disconnect?")
             .setMessage("End your Xbox stream in the client first. Closing this app cannot confirm remote session termination.")
             .setNegativeButton("Stay", null)
-            .setPositiveButton("Disconnect", (dialog, which) -> disconnect("Disconnected."))
+            .setPositiveButton("Disconnect", (dialog, which) -> { if (selected != null && selected == browser) disconnect("Disconnected."); })
             .show();
     }
 
     private void clearClient() {
         WebView web = browser;
+        if (display.disconnected()) applyDisplay();
+        clientControls = null;
         browser = null;
         origin = null;
         token = null;
@@ -269,7 +309,8 @@ public final class MainActivity extends Activity {
     }
 
     @Override public void onBackPressed() {
-        if (browser != null) confirmDisconnect();
+        if (display.exit()) applyDisplay();
+        else if (browser != null) confirmDisconnect();
         else super.onBackPressed();
     }
     @Override protected void onPause() {
@@ -278,7 +319,10 @@ public final class MainActivity extends Activity {
     }
     @Override protected void onResume() {
         super.onResume();
-        if (browser != null) browser.onResume();
+        if (browser != null) {
+            browser.onResume();
+            if (display.isImmersive()) applyDisplay();
+        }
     }
     @Override protected void onDestroy() {
         clearClient();
