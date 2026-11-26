@@ -1,6 +1,7 @@
 import {useEffect,useRef,useState,type CSSProperties} from 'react'
 import dynamic from 'next/dynamic'
 import CaptureControls from './capturecontrols'
+import ControllerCalibration from './controllercalibration'
 import VideoAppearance from './videoappearance'
 import {selectWebVideoPreset,webVideoPresentation} from '../utils/videoappearance'
 import {useAuth} from '../contexts/AuthContext'
@@ -124,6 +125,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
                 <p className="w-full text-sm text-white/60">These options apply to local physical controllers for this session. Vibration requires compatible browser and hardware support.</p>
             </div></details>}
             <p className="w-full text-sm text-white/60">Resolution and bitrate are requested at connection time, not guaranteed or adjusted live. Local multiplayer depends on Xbox service and game support.</p>
+            {!inputOptions.consoleController&&<ControllerCalibration deadzone={profile.v3_deadzone} onApply={value=>{setProfile(previous=>({...previous,v3_deadzone:value}));setPreset('custom')}}/>}
             <button type="button" className={button} onClick={start}>Start {mode}</button>
             <button type="button" className={button} onClick={()=>void end()}>Back to {cloud?'library':'consoles'}</button>
         </div>}
