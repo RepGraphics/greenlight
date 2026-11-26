@@ -76,6 +76,25 @@ export const sendSDPOffer = async (xStreamToken:xStreamToken, xCloudStreamConfig
     return await pollExchange<SDPResponse>(xStreamToken, xCloudStreamConfig, sessionEndpoint(xCloudStreamConfig.type,sessionPath,'sdp'))
 }
 
+// Match the desktop chat renegotiation configuration rather than creating a
+// second stream or using the initial SDP negotiation configuration.
+export const sendChatSDP = async (token:xStreamToken,config:xCloudStreamConfig,sessionPath:string,offer:RTCSessionDescriptionInit):Promise<string>=>{
+    const path=sessionEndpoint(config.type,sessionPath,'sdp')
+    if(offer?.type!=='offer'||typeof offer.sdp!=='string'||!offer.sdp.trim()||offer.sdp.length>262144)throw Error('Invalid chat SDP offer')
+    await httpPost<StatusResponse>(token,config,path,JSON.stringify({
+        messageType:'offer',
+        sdp:offer.sdp,
+        configuration:{isMediaStreamsChatRenegotiation:true},
+    }))
+    const response=await pollExchange<SDPResponse>(token,config,path) as {exchangeResponse?:unknown}|null
+    if(typeof response?.exchangeResponse!=='string')throw Error('Invalid chat SDP response')
+    try{
+        const answer=JSON.parse(response.exchangeResponse)
+        if(typeof answer?.sdp!=='string'||!answer.sdp.trim()||answer.sdp.length>262144||(answer.type!==undefined&&answer.type!=='answer'))throw Error('Invalid chat SDP answer')
+        return answer.sdp
+    }catch{throw Error('Invalid chat SDP answer')}
+}
+
 export const sendICECandidates = async (xStreamToken:xStreamToken, xCloudStreamConfig:xCloudStreamConfig, sessionPath:string, candidates:Array<any>) => {
     await httpPost<StatusResponse>(xStreamToken, xCloudStreamConfig, sessionEndpoint(xCloudStreamConfig.type,sessionPath,'ice'), JSON.stringify({
         candidates: candidates
