@@ -3,6 +3,7 @@ package uk.repgraphics.greenlight.companion;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.ActivityNotFoundException;
 import android.net.Uri;
 import android.os.Bundle;
@@ -28,6 +29,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.WebViewDatabase;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.RadioGroup;
@@ -49,10 +51,25 @@ public final class MainActivity extends Activity {
     private String token;
     private boolean challenged;
     private String lastEndpoint = "";
+    private boolean rememberEndpoint;
+    private SharedPreferences connectionPreferences;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        connectionPreferences = getSharedPreferences("connection", MODE_PRIVATE);
+        try {
+            SavedConnection saved = SavedConnection.parse(
+                connectionPreferences.getString("origin", null),
+                connectionPreferences.getString("mode", null));
+            if (saved != null) {
+                lastEndpoint = saved.origin.home();
+                mode = saved.mode;
+                rememberEndpoint = true;
+            } else connectionPreferences.edit().clear().apply();
+        } catch (ClassCastException error) {
+            connectionPreferences.edit().clear().apply();
+        }
         showConnect("Choose a connection mode and your trusted private HTTPS endpoint.");
     }
 
@@ -123,6 +140,27 @@ public final class MainActivity extends Activity {
         };
         modes.setOnCheckedChangeListener((group, id) -> updateMode.run());
         updateMode.run();
+        CheckBox remember = new CheckBox(this);
+        remember.setText("Remember endpoint and connection mode (not credentials)");
+        remember.setChecked(rememberEndpoint);
+        root.addView(remember);
+        remember.setOnCheckedChangeListener((button, checked) -> {
+            rememberEndpoint = checked;
+            if (!checked) connectionPreferences.edit().clear().apply();
+        });
+        Button forget = new Button(this);
+        forget.setText("Forget saved connection");
+        root.addView(forget);
+        forget.setOnClickListener(view -> {
+            remember.setChecked(false);
+            rememberEndpoint = false;
+            connectionPreferences.edit().clear().apply();
+            lastEndpoint = "";
+            endpoint.setText("");
+            password.setText("");
+            modes.check(desktop.getId());
+            status.setText("Saved connection cleared.");
+        });
         Button connect = new Button(this);
         connect.setText("Connect");
         root.addView(connect);
@@ -139,6 +177,10 @@ public final class MainActivity extends Activity {
             }
             password.setText("");
             lastEndpoint = selected.home();
+            if (rememberEndpoint) {
+                connectionPreferences.edit().putString("origin", selected.home())
+                    .putString("mode", mode.name()).apply();
+            } else connectionPreferences.edit().clear().apply();
             origin = selected;
             token = mode == ConnectionMode.DESKTOP_COMPANION ? credential : null;
             challenged = false;
