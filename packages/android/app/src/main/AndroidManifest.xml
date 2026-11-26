@@ -4,7 +4,7 @@
     <application
         android:allowBackup="false"
         android:usesCleartextTraffic="false"
-        android:label="Greenlight Companion (experimental)"
+        android:label="Greenlight Android (experimental)"
         android:icon="@drawable/ic_companion"
         android:theme="@android:style/Theme.Material.NoActionBar"
         android:enableOnBackInvokedCallback="false">
