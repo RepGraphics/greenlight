@@ -10,6 +10,7 @@ import {SessionLifecycle} from '../../../desktop/renderer/lib/sessionlifecycle'
 import {parseSessionBitrate,sessionBitrates,sessionBitrateLabel} from '../../../desktop/renderer/lib/sessionquality'
 import {webSessionInputOptions,type WebTouchMode} from '../utils/sessionoptions'
 import {webControllerPresets,selectWebControllerPreset,parseWebDeadzone,parseWebVolume,webControllerOptions} from '../utils/controlleroptions'
+import {webMicrophoneSupported,microphoneRequested,toggleWebMicrophone,webMicrophoneResult,type WebMicrophoneState} from '../utils/microphoneoptions'
 import type {communicationHandler} from '@greenlight/player/client'
 
 const SharedPlayer=dynamic(()=>import('@greenlight/player/client').then(module=>module.StreamPlayer),{ssr:false})
@@ -32,6 +33,8 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     const [multipleControllers,setMultipleControllers]=useState(true)
     const [keyframe,setKeyframe]=useState(0)
     const [muted,setMuted]=useState(false)
+    const [micAvailable,setMicAvailable]=useState(false)
+    const [mic,setMic]=useState<WebMicrophoneState>('off')
     const [volume,setVolume]=useState(1)
     const [showStats,setShowStats]=useState(true)
     const [filters,setFilters]=useState(()=>selectWebVideoPreset('neutral'))
@@ -48,6 +51,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     const transition=(value:Phase)=>{phaseRef.current=value;if(mounted.current)setPhase(value)}
     useEffect(()=>{
         mounted.current=true
+        setMicAvailable(webMicrophoneSupported(window.isSecureContext,navigator.mediaDevices))
         const warn=(event:BeforeUnloadEvent)=>{
             if(phaseRef.current==='idle')return
             event.preventDefault();event.returnValue=''
@@ -72,6 +76,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
                 stop:input=>client.streaming_stop_stream.mutate(input),
                 status:input=>client.streaming_get_status.mutate(input),
                 sdp:input=>client.streaming_send_sdp_offer.mutate(input),
+                chat:input=>client.streaming_send_chat_sdp.mutate({...input,offer:{type:'offer',sdp:input.offer.sdp??''}}),
                 ice:input=>client.streaming_send_ice_candidates.mutate(input),
                 connect:input=>client.streaming_send_msal_token.mutate(input),
                 keepalive:input=>client.streaming_send_keepalive.mutate(input),
@@ -93,7 +98,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     const end=async()=>{
         if(phaseRef.current==='stopping')return
         if(phaseRef.current==='idle'){onExit();return}
-        transition('stopping');setAdapter(null)
+        transition('stopping');setMic('off');setAdapter(null)
         const stopped=await lifecycle.current.end()
         if(!mounted.current)return
         if(stopped){transition('idle');onExit()}
@@ -128,14 +133,21 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         {phase==='startFailed'&&<p role="alert">Unable to start. If the provisioning response was lost, check for an existing Xbox session before retrying.</p>}
         {phase==='stopping'&&<p role="status">Waiting for Xbox to acknowledge session termination…</p>}
         {phase==='stopFailed'&&<p role="alert">Xbox termination is not confirmed. A previous request may still be pending. Retry before leaving.</p>}
-        {phase==='playing'&&adapter&&status!=='Error'&&<div ref={playerSurface} className="web-remote-player" style={{'--gl-web-video-filter':presentation.filter} as CSSProperties}>{presentation.kernel&&<svg width="0" height="0" aria-hidden="true" style={{position:'absolute',pointerEvents:'none'}}><defs><filter id="gl-stream-sharpen" colorInterpolationFilters="sRGB"><feConvolveMatrix order={3} kernelMatrix={presentation.kernel} divisor={1} edgeMode="duplicate" preserveAlpha={true}/></filter></defs></svg>}<SharedPlayer communicationHandler={adapter} onStatusChanged={setStatus} useWebGpu={false} {...inputOptions} {...controllerOptions} videoBitrate={bitrate} volume={volume} muted={muted} showStats={showStats} keyframeRequest={keyframe} guideRequest={guide} onGuideUnavailable={()=>setGuideMissing(true)}/></div>}
+        {phase==='playing'&&adapter&&status!=='Error'&&<div ref={playerSurface} className="web-remote-player" style={{'--gl-web-video-filter':presentation.filter} as CSSProperties}>{presentation.kernel&&<svg width="0" height="0" aria-hidden="true" style={{position:'absolute',pointerEvents:'none'}}><defs><filter id="gl-stream-sharpen" colorInterpolationFilters="sRGB"><feConvolveMatrix order={3} kernelMatrix={presentation.kernel} divisor={1} edgeMode="duplicate" preserveAlpha={true}/></filter></defs></svg>}<SharedPlayer communicationHandler={adapter} onStatusChanged={value=>{if(phaseRef.current!=='playing')return;setStatus(value);if(value!=='Connected')setMic('off')}} useWebGpu={false} {...inputOptions} {...controllerOptions} videoBitrate={bitrate} volume={volume} muted={muted} microphone={micAvailable&&status==='Connected'&&microphoneRequested(mic)} onMicrophoneStatus={(active,error)=>{if(phaseRef.current==='playing')setMic(previous=>webMicrophoneResult(previous,active,error))}} showStats={showStats} keyframeRequest={keyframe} guideRequest={guide} onGuideUnavailable={()=>setGuideMissing(true)}/></div>}
         {phase==='playing'&&status==='Connected'&&<div className="flex flex-wrap gap-3 my-3">
             {!inputOptions.consoleController&&<><label>Touch input <select className="bg-[#202020] rounded p-2" value={touch} onChange={event=>{const value=event.target.value;setTouch(value==='direct'||value==='controller'?value:'off');setGuideMissing(false)}}><option value="off">Off</option><option value="controller">On-screen controller</option><option value="direct">Direct touch (experimental)</option></select></label><button type="button" className={button} aria-pressed={keyboard} onClick={()=>{setKeyboard(value=>!value);setGuideMissing(false)}}>Keyboard controller</button></>}
             <button type="button" className={button} aria-pressed={muted} onClick={()=>setMuted(value=>!value)}>Mute</button>
+            {micAvailable&&adapter?.sendChatSDP&&<button type="button" className={button} aria-pressed={microphoneRequested(mic)} onClick={()=>setMic(previous=>toggleWebMicrophone(previous,micAvailable,phaseRef.current==='playing'&&status==='Connected'))}>{mic==='requesting'?'Cancel microphone request':mic==='active'?'Disable microphone':'Enable microphone (experimental)'}</button>}
             <label>Volume: {Math.round(volume*100)}% <input type="range" min="0" max="100" step="1" value={Math.round(volume*100)} onChange={event=>{const value=parseWebVolume(event.target.value);if(value!==null)setVolume(value)}}/></label>
             <button type="button" className={button} aria-pressed={showStats} onClick={()=>setShowStats(value=>!value)}>Streaming statistics</button>
             {!inputOptions.consoleController&&<button type="button" className={button} onClick={()=>{setGuideMissing(false);setGuide(value=>value+1)}}>Xbox guide</button>}
             <button type="button" className={button} onClick={()=>setKeyframe(value=>value+1)}>Request video refresh</button>
+        </div>}
+        {phase==='playing'&&status==='Connected'&&<div className="text-sm text-white/60 my-2">
+            {micAvailable?<p>Microphone chat is opt-in and requires browser permission and Xbox support. Playback mute does not mute your microphone. Android companion microphone permission remains disabled.</p>:<p>Microphone capture is unavailable in this browser or insecure context.</p>}
+            {mic==='requesting'&&<p role="status">Requesting microphone permission and negotiating voice chat…</p>}
+            {mic==='active'&&<p role="status" className="font-semibold text-white">Microphone active — your voice may be transmitted to Xbox.</p>}
+            {mic==='failed'&&<p role="alert">Microphone unavailable or disconnected. Check permissions, device and Xbox chat support before retrying.</p>}
         </div>}
         {phase==='playing'&&status==='Connected'&&inputOptions.directTouch&&<p className="text-sm text-white/60">Direct touch requires compatible Xbox titles and is experimental. Switch to the on-screen controller for other games.</p>}
         {phase==='playing'&&status==='Connected'&&inputOptions.keyboardMapping&&<p className="text-sm text-white/60">Click the video to move focus away from controls. Arrow keys: D-pad · Enter/Backspace: A/B · X/Y: X/Y · M/V/N: Menu/View/Guide · [ / ]: shoulders · L/R: stick buttons · - / =: triggers.</p>}
