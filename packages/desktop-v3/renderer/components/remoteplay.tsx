@@ -1,13 +1,13 @@
-import React,{useEffect,useRef,useState} from 'react'
+import {useEffect,useRef,useState} from 'react'
 import dynamic from 'next/dynamic'
 import {useAuth} from '../contexts/AuthContext'
 import {useTRPCClient} from '../utils/trpc'
 import {createRemoteSession,defaultStreamOrigin} from '../utils/remotesession'
 import {SessionLifecycle} from '../../../desktop/renderer/lib/sessionlifecycle'
-import type {communicationHandler} from '../../../player/src/client/index'
+import type {communicationHandler} from '@greenlight/player/client'
 import type {ConsoleSummary} from '../utils/consoles'
 
-const SharedPlayer=dynamic(()=>import('../../../player/src/client/index').then(module=>module.StreamPlayer),{ssr:false})
+const SharedPlayer=dynamic(()=>import('@greenlight/player/client').then(module=>module.StreamPlayer),{ssr:false})
 type Phase='idle'|'starting'|'playing'|'startFailed'|'stopping'|'stopFailed'
 export default function RemotePlay({console:device,onExit}:{console:ConsoleSummary;onExit:()=>void}){
     const {getxHomeToken,getUserRefreshToken,authState}=useAuth()

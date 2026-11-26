@@ -1,5 +1,4 @@
-import type {xCloudStreamConfig,xStreamToken} from '../../../player/src/types/index'
-import type {communicationHandler} from '../../../player/src/client/index'
+import type {xCloudStreamConfig,xStreamToken,communicationHandler} from '@greenlight/player/client'
 import {streamOrigin,sessionEndpoint} from '../../../player/src/server/requestpolicy'
 
 type Request={token:xStreamToken;xCloudStreamConfig:xCloudStreamConfig}
