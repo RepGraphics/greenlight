@@ -3,6 +3,7 @@ import '../styles.css'
 import React from 'react'
 import Head from 'next/head'
 import Ipc from '../lib/ipc'
+import { brandName } from '../lib/brand'
 import { useRouter } from 'next/router'
 import HandheldLayout from '../components/ui/handheldlayout'
 import Appearance from '../components/ui/appearance'
@@ -126,7 +127,7 @@ export default function MyApp({ Component, pageProps }) {
     return (
         <React.Fragment>
             <Head>
-                <title>Greenlight</title>
+                <title>{brandName}</title>
             </Head>
 
             <div className='gl-app-shell'>

@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { useTranslation } from 'react-i18next'
 import Ipc from '../lib/ipc'
+import BrandMark from './ui/brandmark'
+import { brandName } from '../lib/brand'
 
 interface HeaderProps {
     hidden?: boolean;
@@ -24,9 +26,9 @@ export default function Header({ hidden = false, gamertag, gamerpic, level = 0 }
     const isActive = (url: string) => router.pathname === url || (url === '/achievements' && router.pathname.startsWith('/achievements/')) || (url.startsWith('/xcloud') && router.pathname.startsWith('/xcloud/')) || (url.startsWith('/settings') && router.pathname.startsWith('/settings/'))
     return (
         <nav id="component_header" className={hidden ? 'disabled' : ''} aria-label="Main navigation">
-            <Link href="/home" className="gl-brand" aria-label="Greenlight home">
-                <i className="fa-brands fa-xbox" aria-hidden="true" />
-                <span>Greenlight</span>
+            <Link href="/home" className="gl-brand" aria-label={brandName+' home'}>
+                <BrandMark size={30} decorative/>
+                <span>{brandName}</span>
             </Link>
             <ul className="menu gl-nav">
                 {links.map(link => (
