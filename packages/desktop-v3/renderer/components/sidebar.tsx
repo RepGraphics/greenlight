@@ -16,18 +16,20 @@ export default function Sidebar() {
     const {authState, logout} = useAuth()
     const profile = authState?.webToken?.data.DisplayClaims?.xui?.[0]
     const name = profile && typeof profile === 'object' && 'gtg' in profile ? profile.gtg : undefined
+    const accountName = typeof name === 'string' && name.trim() ? name.trim() : 'Xbox account'
     const signOut = () => {
         if (window.confirm('Sign out of Greenlight?')) logout()
     }
 
     return <aside className="v3-sidebar">
-        <Brand/>
+        <Brand showVersion={false}/>
         <nav aria-label="Greenlight">
             {pages.map(({path, label, Icon}) => <Link key={path} href={path + '/'} aria-current={pathname === path ? 'page' : undefined}><Icon size={19} aria-hidden="true"/>{label}</Link>)}
         </nav>
         <div className="v3-sidebar-account">
-            <p title={typeof name === 'string' ? name : undefined}>{typeof name === 'string' && name ? name : 'Xbox account'}</p>
-            <button className="v3-button v3-sign-out" type="button" onClick={signOut}><LogOut size={16} aria-hidden="true"/>Sign out</button>
+            <span className="v3-account-icon" aria-hidden="true">{accountName[0]?.toUpperCase()}</span>
+            <p title={accountName}>{accountName}</p>
+            <button className="v3-button v3-sign-out" aria-label="Sign out" title="Sign out" type="button" onClick={signOut}><LogOut size={17} aria-hidden="true"/></button>
         </div>
     </aside>
 }

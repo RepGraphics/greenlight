@@ -35,7 +35,7 @@ export class WebCaptureSession{
             if(generation===this.generation)this.publish({phase:'ready',blob,filename:screenshotFilename()})
         }catch{if(generation===this.generation)this.publish({phase:'failed'})}
     }
-    startRecording(video:HTMLVideoElement|null,audio:HTMLAudioElement|null,preferences?:{seconds?:unknown;videoBitsPerSecond?:unknown}){
+    startRecording(video:HTMLVideoElement|null,audio:HTMLAudioElement|null,preferences?:{seconds?:unknown;videoBitsPerSecond?:unknown;includeAudio?:boolean}){
         if(!this.available()||!canCapture(video))return
         const generation=++this.generation
         this.publish({phase:'recording'})
@@ -44,12 +44,15 @@ export class WebCaptureSession{
                 if(generation!==this.generation)return
                 this.recording=undefined
                 this.publish(blob&&!error?{phase:'ready',blob,filename:recordingFilename()}:{phase:'failed'})
-            },audio,webRecordingPreferences(preferences?.seconds,preferences?.videoBitsPerSecond))
+            },audio,{
+                ...webRecordingPreferences(preferences?.seconds,preferences?.videoBitsPerSecond),
+                ...(preferences?.includeAudio===false?{includeAudio:false}:{}),
+            })
             if(generation===this.generation&&this.state.phase==='recording')this.recording=recording
             else recording.stop()
         }catch{if(generation===this.generation)this.publish({phase:'failed'})}
     }
-    startReplay(video:HTMLVideoElement|null,audio:HTMLAudioElement|null,seconds:unknown){
+    startReplay(video:HTMLVideoElement|null,audio:HTMLAudioElement|null,seconds:unknown,includeAudio=true){
         if(!this.available()||!canCapture(video))return
         const generation=++this.generation
         this.publish({phase:'replay',replayReady:false})
@@ -64,7 +67,7 @@ export class WebCaptureSession{
         try{
             const replay=this.beginReplay(video,ready=>{
                 if(generation===this.generation&&this.state.phase==='replay')this.publish({phase:'replay',replayReady:ready})
-            },fail,replayDuration(seconds),audio)
+            },fail,replayDuration(seconds),audio,includeAudio)
             if(generation===this.generation&&this.state.phase==='replay')this.replay=replay
             else replay.dispose()
         }catch{fail()}

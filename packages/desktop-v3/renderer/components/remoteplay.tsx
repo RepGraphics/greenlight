@@ -11,9 +11,10 @@ import type {DiagnosticSample} from '../../../desktop/renderer/lib/streamdiagnos
 import ControllerCalibration from './controllercalibration'
 import PictureInPictureControl from './pictureinpicturecontrol'
 import VideoAppearance from './videoappearance'
-import {selectWebVideoPreset,webVideoPresentation} from '../utils/videoappearance'
+import {webVideoPresentation} from '../utils/videoappearance'
 import {useAuth} from '../contexts/AuthContext'
 import {useStreamPreferences} from '../contexts/StreamPreferencesContext'
+import {preferredControllerProfile, preferredStreamQuality} from '../utils/streampreferences'
 import {useTRPCClient} from '../utils/trpc'
 import {createRemoteSession,selectStreamCredentials,type WebStreamTarget} from '../utils/remotesession'
 import {SessionLifecycle} from '../../../desktop/renderer/lib/sessionlifecycle'
@@ -30,6 +31,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     const {getxHomeToken,getxCloudToken,getUserRefreshToken,authState}=useAuth()
     const {preferences}=useStreamPreferences()
     const cloud=target.type==='cloud'
+    const quality=preferredStreamQuality(preferences,target.type)
     const mode=cloud?'Cloud Gaming':'Remote Play'
     const client=useTRPCClient()
     const lifecycle=useRef(new SessionLifecycle())
@@ -43,26 +45,26 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     const [failureReason,setFailureReason]=useState('')
     const diagnosticStart=useRef(0)
     const [adapter,setAdapter]=useState<communicationHandler|null>(null)
-    const [resolution,setResolution]=useState(preferences.resolution)
-    const [bitrate,setBitrate]=useState(preferences.bitrate)
-    const [consolePaired,setConsolePaired]=useState(false)
+    const [resolution,setResolution]=useState(quality.resolution)
+    const [bitrate,setBitrate]=useState(quality.bitrate)
+    const [consolePaired,setConsolePaired]=useState(preferences.consolePaired)
     const [multipleControllers,setMultipleControllers]=useState(preferences.multipleControllers)
     const [keyframe,setKeyframe]=useState(0)
-    const [muted,setMuted]=useState(false)
+    const [muted,setMuted]=useState(preferences.muted)
     const [micAvailable,setMicAvailable]=useState(false)
     const [mic,setMic]=useState<WebMicrophoneState>('off')
-    const [volume,setVolume]=useState(1)
+    const [volume,setVolume]=useState(preferences.volume)
     const [showStats,setShowStats]=useState(preferences.showStats)
-    const [filters,setFilters]=useState(()=>selectWebVideoPreset('neutral'))
+    const [filters,setFilters]=useState(preferences.videoFilters)
     const presentation=webVideoPresentation(filters)
-    const [profile,setProfile]=useState(()=>{
-        const defaults=selectWebControllerPreset(preferences.preset)
-        return preferences.deadzone===null?defaults:{...defaults,v3_deadzone:preferences.deadzone}
-    })
-    const [preset,setPreset]=useState<string>(preferences.deadzone===null?preferences.preset:'custom')
+    const [profile,setProfile]=useState(()=>preferredControllerProfile(preferences))
+    const [preset,setPreset]=useState<string>(
+        preferences.deadzone!==null||preferences.invertY!==null||preferences.swapSticks!==null||preferences.buttonMapping!==null
+            ?'custom':preferences.preset
+    )
     const [advancedOpen,setAdvancedOpen]=useState(false)
     const [vibration,setVibration]=useState(preferences.vibration)
-    const [touch,setTouch]=useState<WebTouchMode>('off')
+    const [touch,setTouch]=useState<WebTouchMode>(preferences.touch)
     const [keyboard,setKeyboard]=useState(preferences.keyboard)
     const inputOptions=webSessionInputOptions(target.type,consolePaired,multipleControllers,touch,keyboard)
     const controllerOptions=webControllerOptions(profile,vibration,inputOptions.consoleController)
@@ -101,7 +103,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
                 ice:input=>client.streaming_send_ice_candidates.mutate(input),
                 connect:input=>client.streaming_send_msal_token.mutate(input),
                 keepalive:input=>client.streaming_send_keepalive.mutate(input),
-            },{id:target.id,type:target.type,host,language:token.language,resolution},token,refresh||'',message=>{
+            },{id:target.id,type:target.type,host,language:preferences.gameLanguage||token.language,resolution},token,refresh||'',message=>{
                 if(mounted.current&&phaseRef.current==='playing')setStatus(message)
             })
             transition('starting');setStatus('Provisioning')
@@ -139,9 +141,10 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
                 <label className="v3-setting">Resolution <select className="v3-field" value={resolution} onChange={event=>setResolution(event.target.value==='720'?720:1080)}><option value="720">720p</option><option value="1080">1080p</option></select></label>
                 <label className="v3-setting">Requested bitrate <select className="v3-field" value={bitrate} onChange={event=>{const value=parseSessionBitrate(event.target.value);if(value!==null)setBitrate(value)}}>{sessionBitrates.map(cap=><option key={cap} value={cap}>{sessionBitrateLabel(cap,'Automatic')}</option>)}</select></label>
             </div>
-            {!cloud&&<label className="flex items-center gap-2"><input type="checkbox" checked={consolePaired} onChange={event=>{setConsolePaired(event.target.checked);if(event.target.checked){setTouch('off');setKeyboard(false);setAdvancedOpen(false)}}}/> Controller connected directly to Xbox</label>}
+            {!cloud&&<label className="flex items-center gap-2"><input type="checkbox" checked={consolePaired} onChange={event=>{setConsolePaired(event.target.checked);if(event.target.checked)setAdvancedOpen(false)}}/> Controller connected directly to Xbox</label>}
             {!inputOptions.consoleController&&<label className="flex items-center gap-2"><input type="checkbox" checked={multipleControllers} onChange={event=>setMultipleControllers(event.target.checked)}/> Multiple local controllers (experimental)</label>}
             {!inputOptions.consoleController&&<label className="flex items-center gap-2"><input type="checkbox" checked={keyboard} onChange={event=>setKeyboard(event.target.checked)}/> Keyboard controller emulation</label>}
+            {!inputOptions.consoleController&&<label className="v3-setting">Touch input <select className="v3-field" value={touch} onChange={event=>{const value=event.target.value;setTouch(value==='direct'||value==='controller'?value:'off')}}><option value="off">Off</option><option value="controller">On-screen controller</option><option value="direct">Direct touch (experimental)</option></select></label>}
             {!inputOptions.consoleController&&<details className="w-full rounded border border-white/10 p-3" onToggle={event=>{if(event.target===event.currentTarget)setAdvancedOpen(event.currentTarget.open)}}><summary className="cursor-pointer">Advanced physical controller options</summary><div className="flex flex-wrap gap-3 mt-3 items-center">
                 <label>Preset <select className="bg-[#202020] rounded p-2" value={preset} onChange={event=>{if(event.target.value==='custom')return;setProfile(selectWebControllerPreset(event.target.value));setPreset(event.target.value)}}>{Object.entries(webControllerPresets).map(([id,item])=><option key={id} value={id}>{item.name}</option>)}{preset==='custom'&&<option value="custom">Custom</option>}</select></label>
                 <label>Stick deadzone: {Math.round(profile.v3_deadzone*100)}% <input type="range" min="0" max="50" step="1" value={Math.round(profile.v3_deadzone*100)} onChange={event=>{const value=parseWebDeadzone(event.target.value);if(value!==null){setProfile(previous=>({...previous,v3_deadzone:value}));setPreset('custom')}}}/></label>

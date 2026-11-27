@@ -1,14 +1,16 @@
 import {useEffect,useRef,useState} from 'react'
 import {WebCaptureSession,webCaptureMedia,downloadWebCapture,webRecordingDurations,webRecordingBitrates,webReplayDurations,type WebCaptureState} from '../utils/webcapture'
 import {recordingMimeType} from '../../../desktop/renderer/lib/streamrecording'
+import {useStreamPreferences} from '../contexts/StreamPreferencesContext'
 
 export default function CaptureControls({surface}:{surface:()=>HTMLElement|null}){
+    const {preferences}=useStreamPreferences()
     const [state,setState]=useState<WebCaptureState>({phase:'idle'})
     const [supported,setSupported]=useState(false)
     const [error,setError]=useState(false)
-    const [seconds,setSeconds]=useState<number>(60)
-    const [bitrate,setBitrate]=useState<number>(3000000)
-    const [replaySeconds,setReplaySeconds]=useState<number>(30)
+    const [seconds,setSeconds]=useState(preferences.clipSeconds)
+    const [bitrate,setBitrate]=useState(preferences.clipBitrate)
+    const [replaySeconds,setReplaySeconds]=useState(preferences.replaySeconds)
     const [preview,setPreview]=useState(false)
     const [previewUrl,setPreviewUrl]=useState<string|null>(null)
     const session=useRef<WebCaptureSession|null>(null)
@@ -41,17 +43,17 @@ export default function CaptureControls({surface}:{surface:()=>HTMLElement|null}
         setError(false)
         const {video,audio}=webCaptureMedia(surface())
         if(!video){setError(true);return}
-        session.current?.startRecording(video,audio,{seconds,videoBitsPerSecond:bitrate})
+        session.current?.startRecording(video,audio,{seconds,videoBitsPerSecond:bitrate,includeAudio:preferences.captureAudio})
     }
     const startReplay=()=>{
         setError(false)
         const {video,audio}=webCaptureMedia(surface())
         if(!video){setError(true);return}
-        session.current?.startReplay(video,audio,replaySeconds)
+        session.current?.startReplay(video,audio,replaySeconds,preferences.captureAudio)
     }
     return <section aria-label="Local game captures" className="my-3 rounded border border-white/10 p-3">
         <h2 className="font-semibold">Game captures (experimental)</h2>
-        <p className="text-sm text-white/60 my-2">Capture decoded game video only. Clips include available remote audio, up to the selected duration or the 128 MiB recorder size limit. Higher recording quality may shorten the clip. Save before leaving or starting another capture. Browser downloads may not be supported in Android WebView.</p>
+        <p className="text-sm text-white/60 my-2">{preferences.captureAudio?'Captures include game audio when available.':'Captures use video only.'} Save before leaving or starting another capture. Manual clips stop at the selected duration or the 128 MiB limit.</p>
         {supported&&<div className="flex flex-wrap gap-3 my-3">
             <label>Maximum clip duration <select className="bg-[#202020] rounded p-2" disabled={busy} value={seconds} onChange={event=>setSeconds(Number(event.target.value))}>{webRecordingDurations.map(value=><option key={value} value={value}>{value/60} min</option>)}</select></label>
             <label>Recording video bitrate <select className="bg-[#202020] rounded p-2" disabled={busy} value={bitrate} onChange={event=>setBitrate(Number(event.target.value))}>{webRecordingBitrates.map(value=><option key={value} value={value}>{value/1000000} Mbps</option>)}</select></label>

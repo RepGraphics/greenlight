@@ -7,11 +7,11 @@ export interface ReplaySegment { blob:Blob; startedAt:number; endedAt:number }
 export function validReplaySegment(segment:ReplaySegment, now:number, duration=30){
     return segment.blob.size>0&&segment.blob.size<=replayMaxBytes&&segment.blob.type.startsWith('video/webm')&&Number.isFinite(segment.startedAt)&&Number.isFinite(segment.endedAt)&&segment.endedAt>=segment.startedAt&&segment.endedAt<=now&&now-segment.endedAt<=replayDuration(duration)*2000
 }
-export function startInstantReplay(video:HTMLVideoElement,onReady:(ready:boolean)=>void,onError:()=>void,duration:unknown=30,audio:HTMLAudioElement|null=document.querySelector<HTMLAudioElement>('.gl-experimental-stream #playerContainer audio')){
+export function startInstantReplay(video:HTMLVideoElement,onReady:(ready:boolean)=>void,onError:()=>void,duration:unknown=30,audio:HTMLAudioElement|null=document.querySelector<HTMLAudioElement>('.gl-experimental-stream #playerContainer audio'),includeAudio=true){
     const seconds=replayDuration(duration)
     const mime=recordingMimeType()
     if(!mime)throw Error('Replay unavailable')
-    const {source,tracks,stream}=cloneRemoteMedia(video,audio)
+    const {source,tracks,stream}=cloneRemoteMedia(video,audio,includeAudio)
     let disposed=false
     let recorder:MediaRecorder|undefined
     let timer:ReturnType<typeof setTimeout>|undefined

@@ -108,6 +108,10 @@ export default function DashboardInput({ enabled, onBack, scope, keyboardNavigat
                 resetController()
                 return
             }
+            if (root.querySelector('[data-gamepad-capture="active"]')) {
+                controller.reset()
+                return
+            }
             const input = controller.sample(readGamepad(), now)
             if (!input) return
             const { direction, activate, back, previous } = input

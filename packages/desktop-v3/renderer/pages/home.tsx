@@ -1,12 +1,13 @@
 import {useEffect,useRef,useState} from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
-import {ChevronLeft, ChevronRight, Cloud, History, LayoutGrid, Play, RefreshCw, Search, Star} from 'lucide-react'
+import {ChevronLeft, ChevronRight, Cloud, History, LayoutGrid, List, Play, RefreshCw, Search, Star} from 'lucide-react'
 import DashboardLayout from '../components/dashboardlayout'
 import GameArt from '../components/gameart'
 import GameDetails from '../components/gamedetails'
 import RemotePlay from '../components/remoteplay'
 import {useAuth} from '../contexts/AuthContext'
+import {useStreamPreferences} from '../contexts/StreamPreferencesContext'
 import {useTRPCClient} from '../utils/trpc'
 import {AuthAttempt} from '../contexts/authattempt'
 import {normalizeCloudTitles,catalogBatches,hydrateCloudTitles,filterCloudTitles,type CloudTitle} from '../utils/cloudlibrary'
@@ -21,6 +22,7 @@ const collections = [
 
 export default function HomePage(){
     const {getxCloudToken,isAuthenticated,libraryCollections,toggleLibraryFavorite,rememberLibraryTitle,clearLibraryCollections}=useAuth()
+    const {preferences,savePreferences}=useStreamPreferences()
     const client=useTRPCClient()
     const {token,market,language}=getxCloudToken()
     const [titles,setTitles]=useState<CloudTitle[]>([])
@@ -29,7 +31,7 @@ export default function HomePage(){
     const [failed,setFailed]=useState(false)
     const [metadataFailed,setMetadataFailed]=useState(false)
     const [search,setSearch]=useState('')
-    const [entitledOnly,setEntitledOnly]=useState(true)
+    const [entitledOnly,setEntitledOnly]=useState(!preferences.showUnavailable)
     const [sort,setSort]=useState<'az'|'za'>('az')
     const [page,setPage]=useState(0)
     const [view,setView]=useState<LibraryView>('all')
@@ -80,9 +82,7 @@ export default function HomePage(){
     const lastPage=Math.max(0,Math.ceil(visible.length/pageSize)-1)
     const currentPage=Math.min(page,lastPage)
     const details=titles.find(title=>title.id===detailsId)
-    const featured=view==='all'&&!search.trim()&&currentPage===0
-        ? visible.find(title=>title.entitled&&title.hero) ?? visible.find(title=>title.entitled)
-        : undefined
+    const listLayout=preferences.libraryLayout==='list'
     const openStream=(title:CloudTitle)=>{
         if(!token||!title.entitled)return
         rememberLibraryTitle(title.id)
@@ -94,7 +94,7 @@ export default function HomePage(){
     const emptyDescription=search.trim()?'Try another game or publisher.':view==='favorites'?'Select the star on a game to add it here.':view==='recent'?'Games appear here after you open their stream setup.':'Try changing the availability filter.'
     if(selected)return <RemotePlay target={{id:selected.id,name:selected.name,type:'cloud',entitled:selected.entitled}} onExit={()=>setSelected(null)}/>
     return <DashboardLayout>
-        <Head><title>Greenlight — Cloud Gaming library</title></Head>
+        <Head><title>Cloud Gaming · Greenlight V3</title></Head>
         <header className="v3-page-header">
             <h1>Cloud Gaming</h1>
             {token&&refresh}
@@ -104,17 +104,6 @@ export default function HomePage(){
             <p>Xbox didn’t provide Cloud Gaming access for this sign-in.</p>
             <Link href="/consoles/" className="v3-button v3-button-primary">Open My Consoles</Link>
         </section>:<>
-            {featured&&<section className={featured.hero||featured.cover?'v3-feature v3-feature-with-art':'v3-feature'}>
-                <GameArt src={featured.hero??featured.cover} lazy={false}/>
-                <div className="v3-feature-content">
-                    <h2>{featured.name}</h2>
-                    {featured.publisher&&<p>{featured.publisher}</p>}
-                    <div className="v3-actions">
-                        <button type="button" className="v3-button v3-button-primary" onClick={()=>openStream(featured)}><Play size={17} aria-hidden="true"/> Play</button>
-                        <button type="button" className="v3-button v3-button-secondary" onClick={()=>setDetailsId(featured.id)}>Game details</button>
-                    </div>
-                </div>
-            </section>}
             <div className="v3-library-tools">
                 <div className="v3-collections" role="group" aria-label="Library collections">
                     {collections.map(({id,label,Icon})=><button type="button" key={id} aria-pressed={id===view} onClick={()=>{setView(id);setPage(0)}}><Icon size={17} aria-hidden="true"/>{label}</button>)}
@@ -130,6 +119,10 @@ export default function HomePage(){
                     {view!=='recent'&&<select className="v3-field" aria-label="Sort games" value={sort} onChange={event=>{setSort(event.target.value==='za'?'za':'az');setPage(0)}}>
                         <option value="az">A–Z</option><option value="za">Z–A</option>
                     </select>}
+                    <div className="v3-view-switch" role="group" aria-label="Library layout">
+                        <button type="button" aria-label="Cover grid" title="Cover grid" aria-pressed={!listLayout} onClick={()=>savePreferences({...preferences,libraryLayout:'grid'})}><LayoutGrid size={17} aria-hidden="true"/></button>
+                        <button type="button" aria-label="Compact list" title="Compact list" aria-pressed={listLayout} onClick={()=>savePreferences({...preferences,libraryLayout:'list'})}><List size={18} aria-hidden="true"/></button>
+                    </div>
                 </div>
             </div>
             <div className="v3-library-summary">
@@ -142,18 +135,19 @@ export default function HomePage(){
                 <h2>{emptyHeading}</h2><p>{emptyDescription}</p>
             </section>}
             {loading&&<div className="v3-game-grid" aria-hidden="true">{Array.from({length:4},(_,index)=><div key={index} className="v3-game-skeleton"/>)}</div>}
-            <section aria-busy={loading} aria-label="Cloud games" className="v3-game-grid">
+            <section aria-busy={loading} aria-label="Cloud games" className={listLayout?'v3-game-grid v3-game-list':'v3-game-grid'}>
                 {visible.slice(currentPage*pageSize,(currentPage+1)*pageSize).map(title=>{
                     const favorite=libraryCollections.favorites.includes(title.id)
                     return <article key={title.id} className="v3-game-card">
                         <button type="button" className="v3-game-link" onClick={()=>setDetailsId(title.id)}>
                             <GameArt src={title.cover??title.hero}/>
                             <span className="v3-game-card-body">
-                                <strong>{title.name}</strong>
+                                    <strong title={title.name}>{title.name}</strong>
                                 <small>{title.entitled?title.publisher||'Cloud Gaming':'Cloud access unavailable'}</small>
                             </span>
                         </button>
                         <button type="button" className="v3-button v3-icon-button v3-favorite" aria-label={title.name+' favourite'} title={favorite?'Remove from favourites':'Add to favourites'} aria-pressed={favorite} onClick={()=>toggleLibraryFavorite(title.id)}><Star size={17} fill={favorite?'currentColor':'none'} aria-hidden="true"/></button>
+                        {title.entitled&&<button type="button" className="v3-button v3-icon-button v3-card-play" aria-label={'Play '+title.name} title={'Play '+title.name} onClick={()=>openStream(title)}><Play size={16} aria-hidden="true"/></button>}
                     </article>
                 })}
             </section>
