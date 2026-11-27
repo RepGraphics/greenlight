@@ -41,6 +41,8 @@ Connection history and diagnostics retains at most 300 samples or five minutes o
 
 During a connected stream, select Keep screen awake in the playback toolbar to request a screen wake lock on compatible secure browsers. The opt-in lasts only for that connected session. Hiding the tab or disconnecting releases the lock; returning to a visible tab requests it again while enabled. Battery-saving or browser policies can revoke or deny it; use Retry wake lock or Allow screen sleep. The Android companion already requests native screen-awake behavior while connected. This does not keep the device awake in the background.
 
+Connection diagnostics can suggest a lower requested bitrate after sustained recent latency or jitter. Choose End and use suggested cap to stop the stream and return to the current title's setup with that cap, only after confirmed teardown. You can also end and return to setup without changing quality, including after a failed connection. Save captures first. Starting another session is always explicit, may rejoin a cloud queue, and does not provide live bitrate adaptation. A failed stop retains ownership and requires a retry; the suggested cap is not applied when teardown fails.
+
 ## Development
 
 From the repository root, use Node.js 24 and Yarn Classic 1.22.22:
