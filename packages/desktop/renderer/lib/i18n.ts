@@ -1,9 +1,9 @@
-import i18n from "i18next";
+import i18n, { type Resource } from "i18next";
 import { initReactI18next } from "react-i18next";
 
 // Import all JSON files from the languages directory
-function importAllLanguages(): Record<string, { translation: any }> {
-  const resources: Record<string, { translation: any }> = {};
+function importAllLanguages(): Resource {
+  const resources: Resource = {};
   // @ts-ignore
   const context = require.context("../languages", false, /\.json$/);
   context.keys().forEach((key: string) => {
@@ -14,28 +14,22 @@ function importAllLanguages(): Record<string, { translation: any }> {
   return resources;
 }
 
-const resources = importAllLanguages();
+const defaultLanguage = 'en-US';
 
-// Function to initialize i18n with language from settings
-export function initI18nWithLanguage(settings) {
-  const initialLanguage = settings?.language || "en-US";
-  console.log("[i18n] Initializing i18n with language:", initialLanguage);
-  if (i18n.isInitialized) {
-    if (i18n.language !== initialLanguage) void i18n.changeLanguage(initialLanguage);
-    return;
+// Bundled translations are available before static rendering or hydration.
+void i18n.use(initReactI18next).init({
+  resources: importAllLanguages(),
+  lng: defaultLanguage,
+  fallbackLng: defaultLanguage,
+  initAsync: false,
+  interpolation: { escapeValue: false },
+}).catch(error => console.error('[i18n] Unable to initialize translations:', error));
+
+export function setI18nLanguage(language?: string) {
+  const selected = language || defaultLanguage;
+  if (i18n.language !== selected) {
+    void i18n.changeLanguage(selected).catch(error => console.error('[i18n] Unable to change language:', error));
   }
-  i18n.use(initReactI18next).init({
-    resources,
-    lng: initialLanguage,
-    fallbackLng: 'en-US',
-    interpolation: {
-      escapeValue: false,
-    },
-  }).then(() => {
-    console.log("[i18n] i18n initialized. Current language:", i18n.language);
-  }).catch((err) => {
-    console.error("[i18n] i18n initialization error:", err);
-  });
 }
 
 export default i18n;

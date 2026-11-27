@@ -22,7 +22,7 @@ interface startupFlags {
 export default class Application {
 
     private _log
-    public _store = new Store()
+    public _store: Store
     private _startupFlags: startupFlags = {
         fullscreen: false,
         autoStream: '',
@@ -58,6 +58,8 @@ export default class Application {
         ElectronApp.commandLine.appendSwitch('enable-zero-copy')
 
         this.readStartupFlags()
+        this.configureProfile()
+        this._store = new Store()
         this.loadApplicationDefaults()
 
         // ElectronApp.removeAsDefaultProtocolClient('ms-xal-public-beta-000000004c20a908')
@@ -101,21 +103,21 @@ export default class Application {
         this.log('application', __filename+'[readStartupFlags()] End result of startupFlags:', this._startupFlags)
     }
 
-    loadApplicationDefaults(){
-        if(this._isProduction === true && this._isCi === false) {
-            serve({ directory: 'app' })
+    private configureProfile(){
+        if(this._isProduction && !this._isCi) return
+        const suffix = this._isCi ? Math.random() * 100 : 'development'
+        const profile = `${ElectronApp.getPath('userData')} (${suffix})`
+        ElectronApp.setPath('userData', profile)
+        ElectronApp.setPath('sessionData', profile)
+    }
 
-        } else if(this._isCi === true) {
-            const random = Math.random()*100
-            ElectronApp.setPath('userData', `${ElectronApp.getPath('userData')} (${random})`)
-            ElectronApp.setPath('sessionData', `${ElectronApp.getPath('userData')} (${random})`)
+    loadApplicationDefaults(){
+        if(this._isCi) {
             this._store.delete('user')
             this._store.delete('auth')
-
+        }
+        if(this._isProduction || this._isCi) {
             serve({ directory: 'app' })
-        } else {
-
-            ElectronApp.setPath('userData', `${ElectronApp.getPath('userData')} (development)`)
         }
 
         ElectronApp.whenReady().then(() => {

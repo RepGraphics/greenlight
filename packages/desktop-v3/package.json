@@ -14,6 +14,7 @@
     "dev": "nextron",
     "dev:web": "cd renderer && BUILD_TARGET=web next build && cd ../ && npx wrangler pages dev",
     "build": "nextron build",
+    "test:smoke": "yarn build --no-pack && node ../desktop/tests/smoke.cjs v3",
     "build:web": "cd renderer && BUILD_TARGET=web next build",
     "postinstall": "electron-builder install-app-deps"
   },

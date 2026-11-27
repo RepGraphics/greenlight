@@ -2,20 +2,38 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "type": "npm",
-      "script": "dev",
+      "label": "Greenlight: Start desktop debugger",
+      "type": "shell",
+      "command": "yarn",
+      "args": ["desktop", "nextron", "dev", "--renderer-port", "8888", "--startup-delay", "30000"],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": { "DEBUG": "greenlight:electron" }
+      },
       "isBackground": true,
       "problemMatcher": {
-        "owner": "custom",
+        "owner": "greenlight-desktop",
         "pattern": {
-          "regexp": ""
+          "regexp": "^(.+):(\\d+):(\\d+):\\s+(.+)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "message": 4
         },
         "background": {
-          "beginsPattern": "started server",
-          "endsPattern": "Debugger listening on"
+          "activeOnStart": true,
+          "beginsPattern": "^\\[nextron\\] Run renderer process:",
+          "endsPattern": "^\\[nextron\\] Run main process:"
         }
-      },
-      "label": "dev"
+      }
+    },
+    {
+      "label": "Greenlight: Desktop smoke test",
+      "type": "shell",
+      "command": "yarn",
+      "args": ["desktop", "test:smoke"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
     }
   ]
 }
