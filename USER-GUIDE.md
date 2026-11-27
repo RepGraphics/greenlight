@@ -62,7 +62,7 @@ Maintainers can manually run the installer workflow with **draft_release** enabl
 
 Development installers are not guaranteed to be signed or notarized. Verify the source before running them. Artifacts expire according to GitHub retention settings.
 
-For published versioned releases, Settings → About → Update Checker offers an integrated download when exactly one compatible installer has a GitHub-published SHA-256 digest (Windows x64 NSIS, Linux x64 AppImage or universal macOS DMG). Choose a destination folder; the app validates size and digest before making the file available. Existing files are not overwritten. Other releases retain the release-page link. A matching digest detects corruption, not publisher identity; the application never automatically executes an unsigned installer.
+For published versioned releases, Settings → About → Update Checker offers an integrated download when exactly one compatible installer has a GitHub-published SHA-256 digest (Windows x64 NSIS, Linux x64 AppImage or universal macOS DMG). Choose a destination folder; the app validates size and digest before making the file available. Existing files are not overwritten. Other releases retain the release-page link. A matching digest detects corruption, not publisher identity; the application never automatically executes an unsigned installer. Before revealing the downloaded file, it rechecks its SHA-256 digest, size and regular-file identity. Modified or missing files must be downloaded again. This cannot prevent a later modification in the file manager.
 
 The original [Flathub package](https://flathub.org/apps/details/io.github.unknownskl.greenlight) belongs to upstream Greenlight and does not include this fork's changes.
 
