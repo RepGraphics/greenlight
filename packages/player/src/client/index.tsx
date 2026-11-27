@@ -18,7 +18,7 @@ import Touch from './lib/input/touch';
 
 // export { Gamepad, MouseKeyboard, Touch };
 
-import type {StreamMetrics} from './metrics';
+import {networkStatsFresh,nonnegativeMetric,type StreamMetrics} from './metrics';
 export type {StreamMetrics} from './metrics';
 
 export interface StreamPlayerProps {
@@ -222,9 +222,10 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             const update = () => {
                 if (showStats || metricsCallback.current) {
                     const stats = player.getStats();
-                    const age=stats.lastStatsAt?performance.now()-stats.lastStatsAt:0;
-                    const fresh=stats.lastStatsAt>0&&age<5000;
-                    const next = { width: stats._videoWidth, height: stats._videoHeight, fps: fresh?stats._videoFps:0, bitrate: fresh?stats._bitrate:0, jitter: fresh?stats._jitter:0, loss: stats._packetsLost, rtt: fresh?stats._rtt * 1000:0, statsAgeMs:age, statsFresh:fresh, peerState:player._peerConnection.connectionState, iceState:player._peerConnection.iceConnectionState, signalingState:player._peerConnection.signalingState };
+                    const now=performance.now();
+                    const age=stats.lastStatsAt?now-stats.lastStatsAt:0;
+                    const fresh=networkStatsFresh(stats.lastStatsAt,now);
+                    const next = { width: nonnegativeMetric(stats._videoWidth), height: nonnegativeMetric(stats._videoHeight), fps: fresh?nonnegativeMetric(stats._videoFps):0, bitrate: fresh?nonnegativeMetric(stats._bitrate):0, jitter: fresh?nonnegativeMetric(stats._jitter):0, loss: nonnegativeMetric(stats._packetsLost), rtt: fresh?nonnegativeMetric(stats._rtt * 1000):0, statsAgeMs:nonnegativeMetric(age), statsFresh:fresh, peerState:player._peerConnection.connectionState, iceState:player._peerConnection.iceConnectionState, signalingState:player._peerConnection.signalingState };
                     if (showStats) setMetrics(next);
                     metricsCallback.current?.(next);
                 }

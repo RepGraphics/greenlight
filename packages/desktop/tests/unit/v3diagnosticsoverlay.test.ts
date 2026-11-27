@@ -93,3 +93,26 @@ test('codec labels use literal text and invalid metrics are not rendered as nume
         assert.ok(f.labels().includes('Jitter: Unavailable'))
     }finally{f.restore()}
 })
+
+import {networkStatsFresh,nonnegativeMetric} from '../../../player/src/client/metrics'
+test('shared statistics freshness rejects future, expired and nonfinite timestamps',()=>{
+    assert.equal(networkStatsFresh(1000,5999),true)
+    for(const now of [999,6000,Infinity,NaN])assert.equal(networkStatsFresh(1000,now),false)
+    for(const last of [0,-1,NaN,Infinity])assert.equal(networkStatsFresh(last,1000),false)
+    for(const value of [NaN,Infinity,-1])assert.equal(nonnegativeMetric(value),0)
+    assert.equal(nonnegativeMetric(12.5),12.5)
+})
+test('unavailable network metrics are never shown with green healthy status',()=>{
+    const f=fixture()
+    try{
+        f.stats._videoWidth=NaN;f.stats._videoHeight=0
+        f.stats._rtt=NaN;f.stats._jitter=Infinity;f.stats._bitrate=Infinity;f.stats._packetsLost=-1
+        f.overlay.createDebugOverlay()
+        const labels=f.holder.children[0].children
+        for(const name of ['Resolution','RTT','Jitter','Bitrate','Packets lost (total)']){
+            const label=labels.find(child=>child.text().startsWith(name+':'))
+            assert.equal(label?.text(),name+': Unavailable')
+            assert.equal(label?.children[0].style.background,'rgb(255, 193, 7)')
+        }
+    }finally{f.restore()}
+})

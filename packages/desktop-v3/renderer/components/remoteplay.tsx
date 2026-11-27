@@ -56,6 +56,8 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     const [defaultsUpdated,setDefaultsUpdated]=useState(false)
     const [setupMessage,setSetupMessage]=useState('')
     const [captureRetained,setCaptureRetained]=useState(false)
+    const captureRetainedRef=useRef(false)
+    const captureChanged=(retained:boolean)=>{captureRetainedRef.current=retained;setCaptureRetained(retained)}
     const [leaveRequested,setLeaveRequested]=useState(false)
     const pendingSetupBitrate=useRef<number|undefined>(undefined)
     const exitDestination=useRef<'browse'|'setup'>('browse')
@@ -98,7 +100,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         mounted.current=true
         setMicAvailable(webMicrophoneSupported(window.isSecureContext,navigator.mediaDevices))
         const warn=(event:BeforeUnloadEvent)=>{
-            if(phaseRef.current==='idle')return
+            if(phaseRef.current==='idle'&&!captureRetainedRef.current)return
             event.preventDefault();event.returnValue=''
         }
         const hide=()=>{if(document.hidden)setMic('off')}
@@ -149,12 +151,12 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
             })
         }catch(cause){failStart(cause)}
     }
-    const leaveSetup=()=>{if(captureRetained){setLeaveRequested(true);return}onExit()}
+    const leaveSetup=()=>{if(captureRetainedRef.current){setLeaveRequested(true);return}onExit()}
     const end=async(destination:'browse'|'setup'='browse',nextBitrate?:number)=>{
         if(phaseRef.current==='stopping')return
         if(phaseRef.current==='idle'){leaveSetup();return}
         // Keep the page alive if an explicitly requested capture is pending or ready.
-        if(destination==='browse'&&captureRetained)destination='setup'
+        if(destination==='browse'&&captureRetainedRef.current)destination='setup'
         if(phaseRef.current!=='stopFailed'||destination!==exitDestination.current||nextBitrate!==undefined)pendingSetupBitrate.current=destination==='setup'?nextBitrate:undefined
         exitDestination.current=destination
         transition('stopping');setMic('off');setAdapter(null)
@@ -306,7 +308,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         {phase==='playing'&&status==='Connected'&&<VideoAppearance value={filters} onChange={setFilters}/>}
         {phase==='playing'&&status==='Connected'&&<PictureInPictureControl surface={()=>playerSurface.current}/>}
         {phase==='playing'&&status==='Connected'&&<div className="my-2"><button type="button" className={button} onClick={rememberCurrentSetup}>Remember current setup for this sign-in</button>{setupMessage&&<p role="status">{setupMessage}</p>}</div>}
-        <CaptureControls surface={()=>playerSurface.current} connected={phase==='playing'&&status==='Connected'} onRetainedChange={setCaptureRetained}/>
+        <CaptureControls surface={()=>playerSurface.current} connected={phase==='playing'&&status==='Connected'} onRetainedChange={captureChanged}/>
         {phase!=='idle'&&<StreamDiagnostics samples={samples} type={target.type} status={status} reason={failureReason} recommendedCap={advice} onApplyRecommendation={applyAdvice}/>}
         {guideMissing&&<p role='status'>Connect a controller or enable the on-screen or keyboard controller to open the guide.</p>}
         {phase!=='idle'&&phase!=='startFailed'&&<div className="v3-actions">
