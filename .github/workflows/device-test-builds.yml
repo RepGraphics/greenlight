@@ -1,0 +1,106 @@
+name: PC and Android test builds
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main-v2]
+    paths:
+      - '.github/workflows/device-test-builds.yml'
+      - 'packages/pages/scripts/**'
+      - 'packages/desktop-v3/scripts/**'
+      - 'packages/desktop/scripts/**'
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install Yarn Classic
+        run: npm install --global yarn@1.22.22
+      - name: Install matching dependencies
+        run: yarn install --frozen-lockfile
+      - name: Regression and portable asset-copy tests
+        run: |
+          yarn desktop test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --test packages/pages/scripts/copy-web.test.cjs
+      - name: Build V2 Windows desktop
+        run: |
+          yarn desktop build --no-pack
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          yarn desktop package:local --win --x64
+      - uses: actions/upload-artifact@v7
+        with:
+          name: greenlight-v2-windows-x64-${{ github.sha }}
+          path: |
+            packages/desktop/dist/*.exe
+            packages/desktop/dist/*.zip
+          if-no-files-found: error
+      - name: Build shared V3 dependencies and web assets
+        run: yarn build:pages
+      - name: Verify static export
+        run: |
+          if (!(Test-Path packages/desktop-v3/web-out/home/index.html)) { throw 'Missing web build' }
+          if (!(Test-Path packages/pages/public/home/index.html)) { throw 'Missing backend static assets' }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: greenlight-v3-web-${{ github.sha }}
+          path: packages/desktop-v3/web-out/
+          if-no-files-found: error
+      - name: Build experimental V3 desktop ZIP
+        run: |
+          yarn desktopv3 build --no-pack
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (!(Test-Path packages/desktop-v3/app/main.js)) { throw 'Missing V3 main entry' }
+          if (!(Test-Path packages/desktop-v3/app/preload.js)) { throw 'Missing V3 preload entry' }
+          yarn desktopv3 package:local --win zip --x64
+      - uses: actions/upload-artifact@v7
+        with:
+          name: greenlight-v3-windows-x64-${{ github.sha }}
+          path: packages/desktop-v3/dist/*.zip
+          if-no-files-found: error
+
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+          cache-read-only: true
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+      - name: Android connection policy tests
+        working-directory: packages/android
+        run: |
+          mkdir -p /tmp/android-policy-test
+          javac -d /tmp/android-policy-test app/src/main/java/uk/repgraphics/greenlight/companion/OriginPolicy.java app/src/main/java/uk/repgraphics/greenlight/companion/ConnectionMode.java app/src/main/java/uk/repgraphics/greenlight/companion/PlaybackDisplay.java app/src/main/java/uk/repgraphics/greenlight/companion/SavedConnection.java tests/OriginPolicyTest.java
+          java -cp /tmp/android-policy-test uk.repgraphics.greenlight.companion.OriginPolicyTest
+      - name: Build and lint debug APK
+        working-directory: packages/android
+        run: gradle --no-daemon :app:assembleDebug :app:lintDebug
+      - uses: actions/upload-artifact@v7
+        with:
+          name: greenlight-android-debug-${{ github.sha }}
+          path: packages/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
