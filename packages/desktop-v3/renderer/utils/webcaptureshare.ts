@@ -1,13 +1,13 @@
 export type ShareResult='shared'|'cancelled'|'unavailable'|'failed'
 type ShareHost={canShare?:(data:ShareData)=>boolean;share?:(data:ShareData)=>Promise<void>}
-const captureName=/^greenlight-(?:screenshot|clip)-[0-9TZ.-]+\.(?:png|webm)$/i
+const captureName=/^greenlight-(?:clip-)?[0-9TZ.-]{1,40}\.(?:png|webm)$/
 export function shareableCapture(blob:Blob,name:string){
     if(!captureName.test(name)||blob.size<=0||blob.size>128*1024*1024)return false
-    return (name.endsWith('.png')&&blob.type==='image/png')||(name.endsWith('.webm')&&/^video\/webm(?:;.*)?$/i.test(blob.type))
+    return (!name.startsWith('greenlight-clip-')&&name.endsWith('.png')&&blob.type==='image/png')||(name.startsWith('greenlight-clip-')&&name.endsWith('.webm')&&/^video\/webm(?:;.*)?$/i.test(blob.type))
 }
 function shareData(blob:Blob,name:string):ShareData{
     if(!shareableCapture(blob,name))throw Error('Invalid capture')
-    return {files:[new File([blob],name,{type:blob.type})]}
+    return {files:[new File([blob],name,{type:name.endsWith('.png')?'image/png':'video/webm'})]}
 }
 export function canShareCapture(host:ShareHost,blob:Blob,name:string){
     try{return typeof host.share==='function'&&typeof host.canShare==='function'&&host.canShare(shareData(blob,name))}catch{return false}
