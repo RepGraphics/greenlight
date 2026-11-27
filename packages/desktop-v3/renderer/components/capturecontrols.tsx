@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState} from 'react'
-import {WebCaptureSession,webCaptureMedia,downloadWebCapture,webRecordingDurations,webRecordingBitrates,webReplayDurations,type WebCaptureState} from '../utils/webcapture'
+import ClipPreview from './clippreview'
+import {WebCaptureSession,webCaptureMedia,downloadWebCapture,isWebCaptureClip,webRecordingDurations,webRecordingBitrates,webReplayDurations,type WebCaptureState} from '../utils/webcapture'
 import {recordingMimeType} from '../../../desktop/renderer/lib/streamrecording'
 
 export default function CaptureControls({surface}:{surface:()=>HTMLElement|null}){
@@ -10,8 +11,10 @@ export default function CaptureControls({surface}:{surface:()=>HTMLElement|null}
     const [bitrate,setBitrate]=useState<number>(3000000)
     const [replaySeconds,setReplaySeconds]=useState<number>(30)
     const [preview,setPreview]=useState(false)
-    const [previewUrl,setPreviewUrl]=useState<string|null>(null)
+    const [previewMedia,setPreviewMedia]=useState<{blob:Blob;url:string}|null>(null)
     const session=useRef<WebCaptureSession|null>(null)
+    const {blob,filename,trim}=state
+    const trimmedCopy=trim?.phase==='ready'?trim:null
     useEffect(()=>{
         const capture=new WebCaptureSession(setState)
         session.current=capture
@@ -21,15 +24,17 @@ export default function CaptureControls({surface}:{surface:()=>HTMLElement|null}
     },[])
     useEffect(()=>{
         setPreview(false)
-    },[state.blob])
+    },[blob])
     useEffect(()=>{
-        if(!preview||!state.blob){setPreviewUrl(null);return}
-        const url=URL.createObjectURL(state.blob)
-        setPreviewUrl(url)
+        if(!preview||!blob){setPreviewMedia(null);return}
+        const url=URL.createObjectURL(blob)
+        setPreviewMedia({blob,url})
         return()=>URL.revokeObjectURL(url)
-    },[preview,state.blob])
+    },[preview,blob])
+    const previewUrl=previewMedia?.blob===blob?previewMedia?.url:undefined
     const replayActive=state.phase==='replay'||state.phase==='savingReplay'
-    const busy=['capturing','recording','stopping'].includes(state.phase)||replayActive
+    const captureActive=['capturing','recording','stopping'].includes(state.phase)
+    const busy=captureActive||replayActive||trim?.phase==='running'
     const button='rounded border border-white/20 px-4 py-2 disabled:opacity-50'
     const screenshot=()=>{
         setError(false)
@@ -48,6 +53,14 @@ export default function CaptureControls({surface}:{surface:()=>HTMLElement|null}
         const {video,audio}=webCaptureMedia(surface())
         if(!video){setError(true);return}
         session.current?.startReplay(video,audio,replaySeconds)
+    }
+    const download=(blob:Blob,filename:string)=>{
+        setError(false)
+        try{downloadWebCapture(blob,filename)}catch{setError(true)}
+    }
+    const togglePreview=()=>{
+        if(preview)session.current?.cancelTrim()
+        setPreview(value=>!value)
     }
     return <section aria-label="Local game captures" className="my-3 rounded border border-white/10 p-3">
         <h2 className="font-semibold">Game captures (experimental)</h2>
@@ -72,16 +85,22 @@ export default function CaptureControls({surface}:{surface:()=>HTMLElement|null}
             <button type="button" className={button} disabled={busy} onClick={screenshot}>Take screenshot</button>
             {supported&&<button type="button" className={button} disabled={busy} onClick={record}>Record clip</button>}
             {state.phase==='recording'&&<button type="button" className={button} onClick={()=>session.current?.stop()}>Stop recording</button>}
-            {state.phase==='ready'&&state.blob&&state.filename&&<button type="button" className={button} onClick={()=>{try{downloadWebCapture(state.blob!,state.filename!)}catch{setError(true)}}}>Save capture</button>}
+            {state.phase==='ready'&&blob&&filename&&<button type="button" className={button} onClick={()=>download(blob,filename)}>Save capture</button>}
+            {trimmedCopy&&<button type="button" className={button} onClick={()=>download(trimmedCopy.blob,trimmedCopy.filename)}>Save trimmed copy</button>}
         </div>
-        {busy&&!replayActive&&<p role="status">{state.phase==='recording'?'Recording…':state.phase==='stopping'?'Finishing clip…':'Capturing frame…'}</p>}
-        {state.phase==='ready'&&state.blob&&<>
-            <p role="status">Capture ready: {state.filename} · {(state.blob.size/1048576).toFixed(2)} MiB</p>
+        {captureActive&&<p role="status">{state.phase==='recording'?'Recording…':state.phase==='stopping'?'Finishing clip…':'Capturing frame…'}</p>}
+        {state.phase==='ready'&&blob&&<>
+            <p role="status">Capture ready: {filename} · {(blob.size/1048576).toFixed(2)} MiB</p>
+            {trimmedCopy&&<p role="status">Trimmed copy ready to save.</p>}
             <div className="flex flex-wrap gap-2 my-2">
-                <button type="button" className={button} aria-pressed={preview} onClick={()=>setPreview(value=>!value)}>{preview?'Hide preview':'Preview capture'}</button>
+                <button type="button" className={button} aria-pressed={preview} onClick={togglePreview}>{preview?'Hide preview':'Preview capture'}</button>
                 <button type="button" className={button} onClick={()=>{session.current?.discard();setError(false)}}>Discard capture</button>
             </div>
-            {preview&&previewUrl&&(state.blob.type==='image/png'?<img src={previewUrl} alt="Captured game frame" className="max-w-full max-h-80"/>:<video src={previewUrl} controls preload="metadata" playsInline className="max-w-full max-h-80"/>)}
+            {preview&&previewUrl&&(blob.type==='image/png'
+                ?<img src={previewUrl} alt="Captured game frame" className="max-w-full max-h-80"/>
+                :isWebCaptureClip(blob)
+                    ?<ClipPreview key={previewUrl} url={previewUrl} trim={trim} onTrim={(video,range)=>void session.current?.trim(blob,video,range)} onCancel={()=>session.current?.cancelTrim()}/>
+                    :<video src={previewUrl} controls preload="metadata" playsInline className="max-w-full max-h-80"/>)}
         </>}
         {(state.phase==='failed'||error)&&<p role="alert">Capture unavailable or failed. Check browser support and wait for decoded video.</p>}
     </section>

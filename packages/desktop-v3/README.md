@@ -11,7 +11,7 @@ This separate V3 frontend supports Xbox Remote Play and Cloud Gaming through the
 - Physical and on-screen controllers, keyboard controller emulation, experimental direct touchscreen input and multiple-controller support, plus Remote Play console-paired mode.
 - Physical controller presets, stick deadzone, Y-axis inversion, stick swapping and optional vibration.
 - Audio mute and volume, Xbox guide, toggleable streaming statistics, video refresh requests and acknowledged session termination.
-- Experimental local PNG screenshots and bounded WebM clips in compatible browsers.
+- Experimental local PNG screenshots, bounded WebM clips and clip trimming in compatible browsers.
 - Live video appearance presets, brightness, contrast, saturation and experimental sharpening.
 - Experimental opt-in microphone voice chat in secure, compatible browsers.
 - Browser-native picture-in-picture playback where supported.
@@ -19,6 +19,8 @@ This separate V3 frontend supports Xbox Remote Play and Cloud Gaming through the
 During playback, choose either the on-screen controller or experimental direct touch for compatible Xbox titles. Keyboard controller emulation uses arrow keys for the D-pad, Enter/Backspace for A/B and the remaining bindings shown in the player. It is opt-in and is not native mouse/keyboard support. Console-paired mode disables local input.
 
 Local captures contain decoded game video, not the desktop or web UI. WebM clips use available remote audio and are limited to the selected 1, 3 or 5 minute duration or the shared 128 MiB recorder size limit. Choose 1.5, 3 or 6 Mbps recording video bitrate; higher quality may hit the size limit earlier. Preview screenshots and clips locally before saving, or discard the current capture. Preview media URLs are released when hidden or removed. Save the capture explicitly before leaving, reconnecting or starting another capture. Nothing is uploaded. Android WebView does not currently support saving these downloads.
+
+In a compatible browser, open a WebM recording or replay preview, choose the start and end in seconds, and select **Prepare trimmed copy**. The browser re-encodes the selection at normal playback speed. Output timing can vary slightly with browser seeking and recording. Save the original or the trimmed copy separately. Cancel the trim or hide the preview to stop processing. Both copies stay in memory until discarded, replaced by a new capture, or released when the stream ends.
 
 Before starting a session, expand Advanced physical controller options to select Standard, Southpaw, Inverted or Alternate face buttons and adjust the deadzone and axes. Settings apply to the selected session only; they are not stored across reloads. Console-paired mode bypasses local controller input. During playback, adjust volume independently of mute or toggle streaming statistics. Browser and hardware support determine vibration availability. Expand Custom button mappings to assign any supported Xbox button to a physical button index (0–63), or listen for a press on a selected connected controller. Listening requires focus and ends after ten seconds; held or simultaneous presses require release before capture. Confirm with Apply mapping. Mappings apply to all local physical controllers for the session and are not persisted.
 
