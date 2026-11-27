@@ -59,6 +59,31 @@ public final class OriginPolicyTest {
         check(!display.enter(), "cannot enter after disconnect");
         display.connected();
         check(!display.isImmersive() && display.enter(), "new connection starts windowed");
-        System.out.println("Android origin, connection mode and playback display tests passed");
+        ConnectionHealth health = new ConnectionHealth();
+        check(health.state() == ConnectionHealth.State.IDLE, "initial native connection state");
+        health.start(ConnectionMode.PRIVATE_V3);
+        health.fail(ConnectionHealth.State.TLS);
+        health.pageLoaded();
+        check(health.state() == ConnectionHealth.State.TLS, "failed page finish cannot overwrite TLS failure");
+        health.disconnected();
+        check(health.state() == ConnectionHealth.State.TLS, "failure remains available after disconnect");
+        health.start(ConnectionMode.DESKTOP_COMPANION);
+        health.pageLoaded();
+        check(health.state() == ConnectionHealth.State.PAGE_LOADED, "loaded page is not a streaming acknowledgement");
+        health.disconnected();
+        check(health.state() == ConnectionHealth.State.DISCONNECTED, "normal disconnect");
+        check(ConnectionHealth.networkError(-2) == ConnectionHealth.State.DNS, "DNS classification");
+        check(ConnectionHealth.networkError(-8) == ConnectionHealth.State.TIMEOUT, "timeout classification");
+        check(ConnectionHealth.networkError(-11) == ConnectionHealth.State.TLS, "TLS classification");
+        check(ConnectionHealth.networkError(-4) == ConnectionHealth.State.AUTH, "authentication classification");
+        check(ConnectionHealth.networkError(-999) == ConnectionHealth.State.NETWORK, "unknown error is generic");
+        check(ConnectionHealth.httpError(403) == ConnectionHealth.State.AUTH, "HTTP access denied");
+        check(ConnectionHealth.httpError(503) == ConnectionHealth.State.HTTP_SERVER, "HTTP server error");
+        check(ConnectionHealth.httpError(404) == ConnectionHealth.State.HTTP_CLIENT, "HTTP client error");
+        String report = health.report(35, "0.1.0-experimental", "123.0.456.0", false);
+        check(report.contains("DESKTOP_COMPANION") && report.contains("DISCONNECTED"), "report state and mode");
+        check(report.contains("123.0.456.0") && report.contains("Android API: 35"), "report environment");
+        check(!health.report(35, "https://secret.example/", "secret\\nvalue", false).contains("secret"), "reject unexpected version characters");
+        System.out.println("Android origin, connection mode, playback and connection health tests passed");
     }
 }
