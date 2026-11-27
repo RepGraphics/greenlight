@@ -1,9 +1,10 @@
-import {validSessionBitrate} from '../../../desktop/renderer/lib/sessionquality'
-import {validateVideoFilters, type VideoFilters} from '../../../desktop/renderer/lib/videofilters'
-import {validateButtonMapping} from '../../../player/src/client/lib/input/mapping'
-import {selectWebControllerPreset, webControllerPresets, type WebControllerPreset} from './controlleroptions'
-import {type WebTouchMode} from './sessionoptions'
-import {webRecordingPreferences, webReplayDurations} from './webcapture'
+import {validSessionBitrate} from '../../desktop/renderer/lib/sessionquality'
+import {validateVideoFilters, type VideoFilters} from '../../desktop/renderer/lib/videofilters'
+import {controllerPresets} from '../../desktop/renderer/lib/controllerprofiles'
+import {validateButtonMapping} from '../../player/src/client/lib/input/mapping'
+import type {WebControllerPreset} from '../renderer/utils/controlleroptions'
+import type {WebTouchMode} from '../renderer/utils/sessionoptions'
+import {webRecordingPreferences, webReplayDurations} from './recordingpreferences'
 
 export const preferencesKey = 'greenlight.v3.stream-preferences'
 export const streamLanguages = [
@@ -62,7 +63,7 @@ export function normalizeStreamPreferences(input: unknown): StreamPreferences {
         multipleControllers: typeof value.multipleControllers === 'boolean' ? value.multipleControllers : defaults.multipleControllers,
         keyboard: typeof value.keyboard === 'boolean' ? value.keyboard : defaults.keyboard,
         vibration: typeof value.vibration === 'boolean' ? value.vibration : defaults.vibration,
-        preset: value.preset && Object.prototype.hasOwnProperty.call(webControllerPresets, value.preset) ? value.preset : defaults.preset,
+        preset: value.preset && Object.prototype.hasOwnProperty.call(controllerPresets, value.preset) ? value.preset : defaults.preset,
         deadzone: typeof value.deadzone === 'number' && value.deadzone >= 0 && value.deadzone <= .5 ? value.deadzone : defaults.deadzone,
         remoteResolution: value.remoteResolution === 720 || value.remoteResolution === 1080 ? value.remoteResolution : null,
         remoteBitrate: validSessionBitrate(value.remoteBitrate) ? value.remoteBitrate : null,
@@ -86,7 +87,7 @@ export function normalizeStreamPreferences(input: unknown): StreamPreferences {
 }
 
 export function preferredControllerProfile(preferences: StreamPreferences) {
-    const preset = selectWebControllerPreset(preferences.preset)
+    const preset = controllerPresets[preferences.preset]
     return {
         ...preset,
         v3_deadzone: preferences.deadzone ?? preset.v3_deadzone,

@@ -1,4 +1,4 @@
-import {xboxImage} from './xboxart'
+import {xboxImage} from '../../shared/xboxart'
 
 export interface CloudTitle {
     id:string

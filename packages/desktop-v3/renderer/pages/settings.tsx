@@ -10,7 +10,7 @@ import {parseWebDeadzone, parseWebVolume, webControllerPresets, type WebControll
 import {
     defaultStreamPreferences, normalizeStreamPreferences, preferredControllerProfile,
     streamLanguages, type StreamPreferences,
-} from '../utils/streampreferences'
+} from '../../shared/streampreferences'
 import {selectWebVideoPreset, updateWebVideoFilter, webVideoPresets, webVideoSliders} from '../utils/videoappearance'
 import {webRecordingBitrates, webRecordingDurations, webReplayDurations} from '../utils/webcapture'
 import type {WebTouchMode} from '../utils/sessionoptions'

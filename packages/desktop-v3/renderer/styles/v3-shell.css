@@ -109,11 +109,13 @@
 .auth-phone-content p { flex: 1 1 9rem; }
 .auth-panel .auth-status { display: flex; align-items: center; gap: 9px; margin-top: 13px; }
 .auth-panel .auth-actions .auth-status { margin-top: 0; }
+.auth-panel .auth-storage-note { margin-top: 13px; font-size: .84rem; }
+.auth-picker-back { width: 100%; margin-top: 10px; }
 .auth-spinner { flex: 0 0 15px; height: 15px; border: 2px solid var(--v3-border); border-top-color: var(--v3-accent); border-radius: 100%; animation: auth-spin .9s linear infinite; }
 @keyframes auth-spin { to { transform: rotate(1turn); } }
 @media (prefers-reduced-motion: reduce) { .auth-spinner { animation: none; } }
 
-.v3-dashboard, .v3-session {
+.v3-dashboard, .v3-session, .v3-account-picker {
   --v3-background: #111419;
   --v3-surface: #191e25;
   --v3-border: #303842;
@@ -134,8 +136,8 @@
 .v3-dashboard-content { flex: 1; }
 .v3-dashboard-inner { width: min(100%, 1230px); margin-inline: auto; }
 .v3-dashboard .v3-button, .v3-session .v3-button { min-height: 36px; border-radius: 7px; font-size: .875rem; }
-.v3-dashboard :focus-visible, .v3-session :focus-visible,
-.gl-gamepad-focus .v3-dashboard :focus, .gl-gamepad-focus .v3-session :focus {
+.v3-dashboard :focus-visible, .v3-session :focus-visible, .v3-account-picker :focus-visible,
+.gl-gamepad-focus .v3-dashboard :focus, .gl-gamepad-focus .v3-session :focus, .gl-gamepad-focus .v3-account-picker button:focus {
   outline: 2px solid var(--v3-accent);
   outline-offset: 3px;
 }
@@ -159,10 +161,38 @@
 .v3-sidebar a[aria-current='page'] { border-color: #34424a; background: #28343a; color: var(--v3-text); }
 .v3-sidebar a[aria-current='page'] svg { color: var(--v3-accent); }
 .v3-sidebar-account { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; min-width: 0; gap: 8px; margin-top: auto; padding: 12px 1px 0; border-top: 1px solid var(--v3-border); }
-.v3-account-icon { display: grid; place-items: center; width: 27px; height: 27px; border: 1px solid #425455; border-radius: 50%; background: #293637; color: var(--v3-accent); font-size: .75rem; font-weight: 650; }
+.v3-account-icon { position: relative; display: grid; place-items: center; overflow: hidden; width: 27px; height: 27px; border: 1px solid #425455; border-radius: 50%; background: #293637; color: var(--v3-accent); font-size: .75rem; font-weight: 650; }
+.v3-account-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.v3-account-icon img[hidden] { display: none; }
+.v3-account-label { min-width: 0; }
+.v3-account-label small { display: block; color: var(--v3-muted); font-size: .69rem; }
 .v3-sidebar-account p { overflow: hidden; color: var(--v3-text); font-size: .83rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .v3-sidebar .v3-sign-out { min-height: 31px; width: 30px; padding: 0; color: var(--v3-muted); }
 .v3-sign-out:hover { background: var(--v3-hover); color: var(--v3-text); }
+
+.v3-account-picker { display: grid; align-items: safe center; min-height: 100dvh; height: 100dvh; overflow: auto; padding: clamp(20px, 6vw, 72px); }
+.v3-picker-inner { width: min(100%, 800px); margin-inline: auto; }
+.v3-picker-header { margin-bottom: 25px; }
+.v3-picker-header .v3-brand { margin-bottom: 20px; }
+.v3-picker-header .v3-brand img { width: 38px; height: 38px; }
+.v3-picker-header h1 { font-size: clamp(1.8rem, 4vw, 2.55rem); line-height: 1.15; font-weight: 680; letter-spacing: -.035em; }
+.v3-picker-header h1:focus { outline: none; }
+.v3-picker-header p { margin-top: 6px; color: var(--v3-muted); }
+.v3-account-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 205px), 1fr)); gap: 13px; }
+.v3-account-card { position: relative; min-width: 0; border-radius: 11px; }
+.v3-account-select, .v3-account-add { display: grid; align-items: start; gap: 14px; width: 100%; min-height: 151px; padding: 17px; border: 1px solid var(--v3-border); border-radius: 11px; background: var(--v3-surface); text-align: start; cursor: pointer; }
+.v3-account-select { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.v3-account-select .v3-account-icon { grid-column: 1 / -1; width: 57px; height: 57px; font-size: 1.35rem; border-radius: 13px; }
+.v3-account-select > span:nth-child(2) { font-weight: 650; overflow-wrap: anywhere; }
+.v3-account-select > svg { color: var(--v3-accent); }
+.v3-account-add { place-content: center; justify-items: center; align-self: stretch; border-style: dashed; background: transparent; color: var(--v3-text); font-weight: 640; }
+.v3-account-add svg { color: var(--v3-accent); }
+.v3-account-select:hover:enabled, .v3-account-add:hover:enabled { border-color: #627980; background: var(--v3-control); }
+.v3-account-select:disabled, .v3-account-add:disabled { opacity: .55; cursor: default; }
+.v3-account-remove { position: absolute; top: 9px; right: 9px; color: var(--v3-muted); }
+.v3-account-remove:hover:enabled { background: var(--v3-hover); color: var(--v3-text); }
+.v3-picker-progress { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 15px; }
+.v3-picker-progress p { display: flex; align-items: center; gap: 9px; color: var(--v3-muted); }
 
 .v3-page-header { display: flex; min-height: 41px; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-bottom: 22px; }
 .v3-page-header h1 { font-size: clamp(1.65rem, 3.1vw, 2.15rem); line-height: 1.1; font-weight: 690; letter-spacing: -.035em; overflow-wrap: anywhere; }

@@ -1,8 +1,9 @@
 import path from 'path'
-import { app, ipcMain, shell } from 'electron'
+import { app, shell, type IpcMainInvokeEvent } from 'electron'
 import serve from 'electron-serve'
 import { createWindow } from './helpers/create-window'
 import { setupTrpcHandler } from './trpc-handler'
+import { setupDesktopServices } from './desktop-services'
 import { isDeviceSignInUrl } from '../shared/devicesignin'
 
 const isProd = process.env.NODE_ENV === 'production'
@@ -13,8 +14,7 @@ if (isProd) {
   app.setPath('userData', `${app.getPath('userData')} (development)`)
 }
 
-;(async () => {
-  setupTrpcHandler()
+async function start() {
   await app.whenReady()
 
   const mainWindow = createWindow('main', {
@@ -29,6 +29,21 @@ if (isProd) {
     },
   })
 
+  const port = process.argv[2]
+  const isAppUrl = (value: string) => {
+    try {
+      const url = new URL(value)
+      return isProd ? url.protocol === 'app:' && url.host === '.'
+        : url.origin === `http://localhost:${port}`
+    } catch {return false}
+  }
+  const trusted = (event: IpcMainInvokeEvent) => event.sender === mainWindow.webContents
+    && event.senderFrame !== null && event.senderFrame === mainWindow.webContents.mainFrame
+    && isAppUrl(event.senderFrame.url)
+  const accounts = setupDesktopServices(trusted)
+  setupTrpcHandler(trusted, (type, token) => accounts.streamRefreshToken(type, token))
+  mainWindow.webContents.on('will-navigate', (event, url) => {if (!isAppUrl(url)) event.preventDefault()})
+
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (isDeviceSignInUrl(url)) void shell.openExternal(url).catch(() => {})
     return { action: 'deny' }
@@ -37,16 +52,25 @@ if (isProd) {
   if (isProd) {
     await mainWindow.loadURL('app://./home')
   } else {
-    const port = process.argv[2]
     await mainWindow.loadURL(`http://localhost:${port}/home`)
     mainWindow.webContents.openDevTools()
   }
-})()
+  app.on('second-instance', () => {
+    if (mainWindow.isDestroyed()) return
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
+  })
+}
+
+if (app.requestSingleInstanceLock()) {
+  void start().catch(() => {
+    console.error('Could not start the Greenlight V3 window.')
+    app.quit()
+  })
+} else {
+  app.quit()
+}
 
 app.on('window-all-closed', () => {
   app.quit()
-})
-
-ipcMain.on('message', async (event, arg) => {
-  event.reply('message', `${arg} World!`)
 })

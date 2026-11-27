@@ -6,8 +6,8 @@ import {useAuth} from '../../contexts/AuthContext'
 
 type SignInState = {phase: 'idle' | 'requesting' | 'failed'} | {phase: 'code'; code: string; url: string}
 
-export default function AuthHome() {
-    const {startAuth, verifyCode, logout} = useAuth()
+export default function AuthHome({onBack}: {onBack?: () => void}) {
+    const {startAuth, verifyCode, logout, desktop, canSaveAccounts} = useAuth()
     const [state, setState] = useState<SignInState>({phase: 'idle'})
     const [copyStatus, setCopyStatus] = useState('')
     const generation = useRef(0)
@@ -34,7 +34,7 @@ export default function AuthHome() {
         try {
             const flow = await startAuth()
             if (epoch !== generation.current) return
-            if (!flow?.device_code || !flow.user_code) throw Error('Sign-in code unavailable')
+            if (!flow?.user_code || (!desktop && !flow.device_code)) throw Error('Sign-in code unavailable')
             setState({phase: 'code', code: flow.user_code, url: deviceSignInUrl(flow.verification_uri)})
             const result = await verifyCode(flow.device_code)
             if (epoch === generation.current && !result) throw Error('Sign-in incomplete')
@@ -88,16 +88,18 @@ export default function AuthHome() {
                 {cancelButton}
             </div>
         </> : <>
-            <h2 id="auth-heading" ref={heading} tabIndex={-1}>{state.phase === 'requesting' ? 'Getting your sign-in code' : 'Sign in'}</h2>
+            <h2 id="auth-heading" ref={heading} tabIndex={-1}>{state.phase === 'requesting' ? 'Getting your sign-in code' : onBack ? 'Add an Xbox account' : 'Sign in'}</h2>
             {state.phase === 'requesting' ? <>
                 <p className="auth-status" role="status"><span className="auth-spinner" aria-hidden="true"/> Requesting a code from Microsoft…</p>
                 <div className="auth-actions">{cancelButton}</div>
             </> : <>
-                <p>Use the Microsoft account you use for Xbox.</p>
+                <p>{onBack ? 'Use the Microsoft account for the Xbox profile you want to add.' : 'Use the Microsoft account you use for Xbox.'}</p>
                 {state.phase === 'failed' && <p className="auth-error" role="alert">Sign-in couldn’t finish. Request a new code to try again.</p>}
                 <button ref={primaryButton} type="button" className="v3-button v3-button-primary auth-primary" onClick={() => void start()}>
                     {state.phase === 'failed' ? 'Try again' : 'Sign in with Microsoft'}
                 </button>
+                {desktop && !canSaveAccounts && <p className="auth-storage-note">Sign-in is available for this session.</p>}
+                {onBack && <button type="button" className="v3-button v3-button-secondary auth-picker-back" onClick={onBack}>Back to Xbox accounts</button>}
             </>}
         </>}
     </AuthLayout>

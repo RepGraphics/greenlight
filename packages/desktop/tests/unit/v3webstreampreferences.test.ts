@@ -1,6 +1,6 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {defaultStreamPreferences,normalizeStreamPreferences,preferredControllerProfile,preferredStreamQuality} from '../../../desktop-v3/renderer/utils/streampreferences'
+import {defaultStreamPreferences,normalizeStreamPreferences,preferredControllerProfile,preferredStreamQuality} from '../../../desktop-v3/shared/streampreferences'
 
 test('stream preferences preserve valid settings and default missing, invalid or unrelated fields',()=>{
     assert.deepEqual(normalizeStreamPreferences(null),defaultStreamPreferences)

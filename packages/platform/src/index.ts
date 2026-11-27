@@ -6,3 +6,4 @@ export default class GreenlightPlatform {
 
 export const appRouter = trpcAppRouter
 export const createCallerFactory = trpcCreateCallerFactory
+export {default as XboxAuthController} from './controller/auth.js'

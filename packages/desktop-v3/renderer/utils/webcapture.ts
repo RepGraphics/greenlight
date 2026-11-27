@@ -3,12 +3,8 @@ import {startStreamRecording,recordingFilename} from '../../../desktop/renderer/
 
 import {startInstantReplay,replayDuration,replayMaxBytes} from '../../../desktop/renderer/lib/instantreplay'
 
-export const webReplayDurations=[15,30,60] as const
-export const webRecordingDurations=[60,180,300] as const
-export const webRecordingBitrates=[1500000,3000000,6000000] as const
-export function webRecordingPreferences(seconds:unknown,videoBitsPerSecond:unknown){
-    return {seconds:webRecordingDurations.find(value=>value===seconds)??60,videoBitsPerSecond:webRecordingBitrates.find(value=>value===videoBitsPerSecond)??3000000}
-}
+import {webRecordingPreferences} from '../../shared/recordingpreferences'
+export {webReplayDurations, webRecordingDurations, webRecordingBitrates, webRecordingPreferences} from '../../shared/recordingpreferences'
 export type WebCaptureState={phase:'idle'|'capturing'|'recording'|'stopping'|'replay'|'savingReplay'|'ready'|'failed';blob?:Blob;filename?:string;replayReady?:boolean}
 export function webCaptureMedia(surface:HTMLElement|null){
     const video=surface?.querySelector<HTMLVideoElement>('#playerContainer video')??null

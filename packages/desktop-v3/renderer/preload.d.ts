@@ -1,8 +1,9 @@
-import { IpcHandler, TrpcIpcHandler } from '../main/preload'
+import type {TrpcIpcHandler} from '../main/preload'
+import type {DesktopBridge} from '../shared/desktopcontracts'
 
 declare global {
   interface Window {
-    ipc: IpcHandler
     trpcIpc: TrpcIpcHandler
+    greenlightDesktop?: DesktopBridge
   }
 }

@@ -4,7 +4,7 @@ This separate V3 frontend supports Xbox Remote Play and Cloud Gaming through the
 
 ## Features
 
-- Microsoft device-code sign-in and in-memory session credentials.
+- Microsoft device-code sign-in. The Windows Electron preview can save and switch between Xbox accounts.
 - Console discovery, cloud game artwork and details, entitlement filtering and session launch.
 - Xbox friends and presence, controller dashboard navigation and local streaming defaults.
 - 720p/1080p resolution preferences and requested bitrate caps.
@@ -33,6 +33,8 @@ Resolution and bitrate are negotiated when connecting, not guaranteed or adjuste
 The Cloud Gaming library offers Favourites and Recently opened collections. These contain only title identifiers in memory for the current sign-in, are cleared on sign-out or reload, and never bypass the current catalog or entitlement checks. Recently opened records opening session setup, not confirmed gameplay. Clear both collections from either collection view.
 
 Settings saves streaming quality by mode, preferred game language, video filters, audio, controller mappings, capture defaults, and library layout on this device. Export or import these preferences from Backup. The backup contains only settings. Changes made in stream setup apply to that session. Recording and replay still start only when you enable them during playback.
+
+Open the Windows preview with the same local app profile to keep settings and saved accounts between launches. The first launch with native settings imports any preferences already saved in that profile. On startup, choose a saved Xbox account or add one through Microsoft sign-in. Use the account control in the sidebar to return to the picker. Remove a profile from the picker to delete its saved sign-in on this device. The web preview signs in again after a reload.
 
 Before connecting, open Controller test and stick drift calibration to inspect the four axes of a standard-mapped physical controller. Measure drift with both sticks untouched for three seconds, then explicitly apply the suggested deadzone. A lost controller, interrupted sampling, unfocused tab or large stick movement invalidates the measurement. The recommendation applies to all local controllers for this session only.
 

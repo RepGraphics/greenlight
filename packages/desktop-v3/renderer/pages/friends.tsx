@@ -5,7 +5,7 @@ import DashboardLayout from '../components/dashboardlayout'
 import {useAuth} from '../contexts/AuthContext'
 import {AuthAttempt} from '../contexts/authattempt'
 import {useTRPCClient} from '../utils/trpc'
-import {xboxImage} from '../utils/xboxart'
+import {xboxImage} from '../../shared/xboxart'
 
 type Person = {id: string; name: string; image?: string; status?: string; online?: boolean}
 
