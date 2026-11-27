@@ -1,6 +1,6 @@
 import {sanitizeSample,createDiagnosticReport,type DiagnosticSample} from '../../../desktop/renderer/lib/streamdiagnostics'
 import {appendGraphSample} from '../../../desktop/renderer/lib/networkgraph'
-import type {StreamMetrics} from '../../../player/src/client/index'
+import type {StreamMetrics} from '../../../player/src/client/metrics'
 
 export function appendWebDiagnostic(samples:DiagnosticSample[],metrics:StreamMetrics,elapsedSeconds:number){
     if(!Number.isFinite(elapsedSeconds)||elapsedSeconds<0)return samples
