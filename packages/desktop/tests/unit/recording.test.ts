@@ -68,6 +68,25 @@ test('remote media prefers separate live audio and ignores ended tracks',()=>{
         fallback.tracks.forEach(track=>track.stop())
     }finally{restore()}
 })
+test('video-only clips and replay skip separate and multiplexed audio tracks',()=>{
+    const {source,video,restore}=setup()
+    try{
+        const embedded=new Track(), separate=new Track()
+        ;(video.srcObject as unknown as Stream).getAudioTracks=()=>[embedded]
+        const audioStream=new Stream([])
+        audioStream.getAudioTracks=()=>[separate]
+        const audio={srcObject:audioStream} as unknown as HTMLAudioElement
+        const recording=startStreamRecording(video,()=>{},audio,{includeAudio:false})
+        recording.stop()
+        Recorder.all[0].finish()
+        const replay=startInstantReplay(video,()=>{},()=>assert.fail('unexpected failure'),15,audio,false)
+        replay.dispose()
+        assert.equal(separate.copies.length,0)
+        assert.equal(embedded.copies.length,0)
+        assert.equal(source.copies.length,2)
+        assert.ok(source.copies.every(track=>track.stopped))
+    }finally{restore()}
+})
 test('failed audio cloning releases partially allocated video without stopping source',()=>{
     const {source,video,restore}=setup()
     try{

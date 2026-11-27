@@ -56,10 +56,7 @@ export default function MyApp({ Component, pageProps }) {
         })
 
         const authInterval = setInterval(() => {
-            console.log('Requesting AuthState...')
             Ipc.send('app', 'getAuthState').then((args) => {
-                console.log('Received AuthState:', args)
-
                 if(args.isAuthenticating === true){
                     setIsLoading(true)
                     setPrevUserState({ ...prevUserState, ...args.user})

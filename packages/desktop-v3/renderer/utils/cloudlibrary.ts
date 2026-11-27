@@ -1,9 +1,14 @@
+import {xboxImage} from '../../shared/xboxart'
+
 export interface CloudTitle {
     id:string
     productId:string
     name:string
     publisher:string
     entitled:boolean
+    cover?:string
+    hero?:string
+    description?:string
 }
 const textValue=(value:unknown,max:number)=>typeof value==='string'?value.trim().slice(0,max):''
 export function normalizeCloudTitles(response:unknown):CloudTitle[]{
@@ -31,13 +36,22 @@ export function catalogBatches(titles:CloudTitle[]){
 export function hydrateCloudTitles(titles:CloudTitle[],response:unknown):CloudTitle[]{
     const products=(response as {data?:{Products?:unknown}}|null)?.data?.Products
     if(!products||typeof products!=='object'||Array.isArray(products))throw Error('Cloud metadata unavailable')
-    const byProduct=new Map<string,{name:string;publisher:string}>()
+    const byProduct=new Map<string,Partial<CloudTitle>>()
     for(const [key,value] of Object.entries(products)){
         if(!value||typeof value!=='object')continue
         const item=value as Record<string,unknown>
         const productId=textValue(item.StoreId,128)||key
         const name=textValue(item.ProductTitle,160),publisher=textValue(item.PublisherName,128)
-        if(name)byProduct.set(productId,{name,publisher})
+        const cover=xboxImage((item.Image_Tile as {URL?:unknown}|undefined)?.URL)
+            ??xboxImage((item.Image_Poster as {URL?:unknown}|undefined)?.URL)
+        const hero=xboxImage((item.Image_Hero as {URL?:unknown}|undefined)?.URL)
+        const description=textValue(item.ProductDescriptionShort,1200)
+        byProduct.set(productId,{
+            ...(name?{name,publisher}:{}),
+            ...(cover?{cover}:{}),
+            ...(hero?{hero}:{}),
+            ...(description?{description}:{}),
+        })
     }
     return titles.map(title=>{const metadata=byProduct.get(title.productId);return metadata?{...title,...metadata}:title})
 }

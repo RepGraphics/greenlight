@@ -1,35 +1,53 @@
 import {useEffect,useRef,useState} from 'react'
-import {WebCaptureSession,webCaptureMedia,downloadWebCapture,webRecordingDurations,webRecordingBitrates,webReplayDurations,type WebCaptureState} from '../utils/webcapture'
+import ClipPreview from './clippreview'
+import {canShareCapture,shareCapture,type ShareResult} from '../utils/webcaptureshare'
+import {WebCaptureSession,webCaptureMedia,downloadWebCapture,isWebCaptureClip,webRecordingDurations,webRecordingBitrates,webReplayDurations,type WebCaptureState} from '../utils/webcapture'
 import {recordingMimeType} from '../../../desktop/renderer/lib/streamrecording'
+import {useStreamPreferences} from '../contexts/StreamPreferencesContext'
 
 export default function CaptureControls({surface}:{surface:()=>HTMLElement|null}){
+    const {preferences}=useStreamPreferences()
     const [state,setState]=useState<WebCaptureState>({phase:'idle'})
     const [supported,setSupported]=useState(false)
     const [error,setError]=useState(false)
-    const [seconds,setSeconds]=useState<number>(60)
-    const [bitrate,setBitrate]=useState<number>(3000000)
-    const [replaySeconds,setReplaySeconds]=useState<number>(30)
+    const [seconds,setSeconds]=useState<number>(preferences.clipSeconds)
+    const [bitrate,setBitrate]=useState<number>(preferences.clipBitrate)
+    const [replaySeconds,setReplaySeconds]=useState<number>(preferences.replaySeconds)
+    const [sharing,setSharing]=useState(false)
+    const [shareResult,setShareResult]=useState<ShareResult|null>(null)
+    const [shareOptions,setShareOptions]=useState({original:false,trimmed:false})
+    const shareLock=useRef(false)
+    const mounted=useRef(false)
     const [preview,setPreview]=useState(false)
-    const [previewUrl,setPreviewUrl]=useState<string|null>(null)
+    const [previewMedia,setPreviewMedia]=useState<{blob:Blob;url:string}|null>(null)
     const session=useRef<WebCaptureSession|null>(null)
+    const {blob,filename,trim}=state
+    const trimmedCopy=trim?.phase==='ready'?trim:null
     useEffect(()=>{
+        mounted.current=true
         const capture=new WebCaptureSession(setState)
         session.current=capture
         setState({phase:'idle'})
         try{setSupported(Boolean(recordingMimeType()))}catch{setSupported(false)}
-        return()=>{session.current=null;capture.reset()}
+        return()=>{mounted.current=false;session.current=null;capture.reset()}
     },[])
     useEffect(()=>{
         setPreview(false)
-    },[state.blob])
+    },[blob])
     useEffect(()=>{
-        if(!preview||!state.blob){setPreviewUrl(null);return}
-        const url=URL.createObjectURL(state.blob)
-        setPreviewUrl(url)
+        setShareResult(null)
+        setShareOptions({original:Boolean(blob&&filename&&canShareCapture(navigator,blob,filename)),trimmed:Boolean(trimmedCopy&&canShareCapture(navigator,trimmedCopy.blob,trimmedCopy.filename))})
+    },[blob,filename,trimmedCopy])
+    useEffect(()=>{
+        if(!preview||!blob){setPreviewMedia(null);return}
+        const url=URL.createObjectURL(blob)
+        setPreviewMedia({blob,url})
         return()=>URL.revokeObjectURL(url)
-    },[preview,state.blob])
+    },[preview,blob])
+    const previewUrl=previewMedia?.blob===blob?previewMedia?.url:undefined
     const replayActive=state.phase==='replay'||state.phase==='savingReplay'
-    const busy=['capturing','recording','stopping'].includes(state.phase)||replayActive
+    const captureActive=['capturing','recording','stopping'].includes(state.phase)
+    const busy=captureActive||replayActive||trim?.phase==='running'||sharing
     const button='rounded border border-white/20 px-4 py-2 disabled:opacity-50'
     const screenshot=()=>{
         setError(false)
@@ -41,17 +59,31 @@ export default function CaptureControls({surface}:{surface:()=>HTMLElement|null}
         setError(false)
         const {video,audio}=webCaptureMedia(surface())
         if(!video){setError(true);return}
-        session.current?.startRecording(video,audio,{seconds,videoBitsPerSecond:bitrate})
+        session.current?.startRecording(video,audio,{seconds,videoBitsPerSecond:bitrate,includeAudio:preferences.captureAudio})
     }
     const startReplay=()=>{
         setError(false)
         const {video,audio}=webCaptureMedia(surface())
         if(!video){setError(true);return}
-        session.current?.startReplay(video,audio,replaySeconds)
+        session.current?.startReplay(video,audio,replaySeconds,preferences.captureAudio)
+    }
+    const download=(blob:Blob,filename:string)=>{
+        setError(false)
+        try{downloadWebCapture(blob,filename)}catch{setError(true)}
+    }
+    const share=async(media:Blob,name:string)=>{
+        if(shareLock.current)return
+        shareLock.current=true;setSharing(true);setShareResult(null)
+        try{const result=await shareCapture(navigator,media,name);if(mounted.current)setShareResult(result)}
+        finally{shareLock.current=false;if(mounted.current)setSharing(false)}
+    }
+    const togglePreview=()=>{
+        if(preview)session.current?.cancelTrim()
+        setPreview(value=>!value)
     }
     return <section aria-label="Local game captures" className="my-3 rounded border border-white/10 p-3">
         <h2 className="font-semibold">Game captures (experimental)</h2>
-        <p className="text-sm text-white/60 my-2">Capture decoded game video only. Clips include available remote audio, up to the selected duration or the 128 MiB recorder size limit. Higher recording quality may shorten the clip. Save before leaving or starting another capture. Browser downloads may not be supported in Android WebView.</p>
+        <p className="text-sm text-white/60 my-2">{preferences.captureAudio?'Captures include game audio when available.':'Captures use video only.'} Save before leaving or starting another capture. Manual clips stop at the selected duration or the 128 MiB limit. Browser downloads may not be supported in Android WebView.</p>
         {supported&&<div className="flex flex-wrap gap-3 my-3">
             <label>Maximum clip duration <select className="bg-[#202020] rounded p-2" disabled={busy} value={seconds} onChange={event=>setSeconds(Number(event.target.value))}>{webRecordingDurations.map(value=><option key={value} value={value}>{value/60} min</option>)}</select></label>
             <label>Recording video bitrate <select className="bg-[#202020] rounded p-2" disabled={busy} value={bitrate} onChange={event=>setBitrate(Number(event.target.value))}>{webRecordingBitrates.map(value=><option key={value} value={value}>{value/1000000} Mbps</option>)}</select></label>
@@ -72,16 +104,25 @@ export default function CaptureControls({surface}:{surface:()=>HTMLElement|null}
             <button type="button" className={button} disabled={busy} onClick={screenshot}>Take screenshot</button>
             {supported&&<button type="button" className={button} disabled={busy} onClick={record}>Record clip</button>}
             {state.phase==='recording'&&<button type="button" className={button} onClick={()=>session.current?.stop()}>Stop recording</button>}
-            {state.phase==='ready'&&state.blob&&state.filename&&<button type="button" className={button} onClick={()=>{try{downloadWebCapture(state.blob!,state.filename!)}catch{setError(true)}}}>Save capture</button>}
+            {state.phase==='ready'&&blob&&filename&&<button type="button" className={button} onClick={()=>download(blob,filename)}>Save capture</button>}
+            {trimmedCopy&&<button type="button" className={button} onClick={()=>download(trimmedCopy.blob,trimmedCopy.filename)}>Save trimmed copy</button>}
+            {blob&&filename&&shareOptions.original&&<button type="button" className={button} disabled={busy} onClick={()=>void share(blob,filename)}>Share capture</button>}
+            {trimmedCopy&&shareOptions.trimmed&&<button type="button" className={button} disabled={busy} onClick={()=>void share(trimmedCopy.blob,trimmedCopy.filename)}>Share trimmed copy</button>}
         </div>
-        {busy&&!replayActive&&<p role="status">{state.phase==='recording'?'Recording…':state.phase==='stopping'?'Finishing clip…':'Capturing frame…'}</p>}
-        {state.phase==='ready'&&state.blob&&<>
-            <p role="status">Capture ready: {state.filename} · {(state.blob.size/1048576).toFixed(2)} MiB</p>
+        {shareResult&&<p role="status">{shareResult==='shared'?'Capture handed to the system share chooser.':shareResult==='cancelled'?'Sharing cancelled.':shareResult==='unavailable'?'File sharing unavailable in this browser.':'Unable to share capture.'}</p>}
+        {captureActive&&<p role="status">{state.phase==='recording'?'Recording…':state.phase==='stopping'?'Finishing clip…':'Capturing frame…'}</p>}
+        {state.phase==='ready'&&blob&&<>
+            <p role="status">Capture ready: {filename} · {(blob.size/1048576).toFixed(2)} MiB</p>
+            {trimmedCopy&&<p role="status">Trimmed copy ready to save.</p>}
             <div className="flex flex-wrap gap-2 my-2">
-                <button type="button" className={button} aria-pressed={preview} onClick={()=>setPreview(value=>!value)}>{preview?'Hide preview':'Preview capture'}</button>
-                <button type="button" className={button} onClick={()=>{session.current?.discard();setError(false)}}>Discard capture</button>
+                <button type="button" className={button} aria-pressed={preview} onClick={togglePreview}>{preview?'Hide preview':'Preview capture'}</button>
+                <button type="button" className={button} disabled={sharing} onClick={()=>{session.current?.discard();setError(false)}}>Discard capture</button>
             </div>
-            {preview&&previewUrl&&(state.blob.type==='image/png'?<img src={previewUrl} alt="Captured game frame" className="max-w-full max-h-80"/>:<video src={previewUrl} controls preload="metadata" playsInline className="max-w-full max-h-80"/>)}
+            {preview&&previewUrl&&(blob.type==='image/png'
+                ?<img src={previewUrl} alt="Captured game frame" className="max-w-full max-h-80"/>
+                :isWebCaptureClip(blob)
+                    ?<ClipPreview key={previewUrl} url={previewUrl} trim={trim} onTrim={(video,range)=>{if(!shareLock.current)void session.current?.trim(blob,video,range)}} onCancel={()=>session.current?.cancelTrim()}/>
+                    :<video src={previewUrl} controls preload="metadata" playsInline className="max-w-full max-h-80"/>)}
         </>}
         {(state.phase==='failed'||error)&&<p role="alert">Capture unavailable or failed. Check browser support and wait for decoded video.</p>}
     </section>

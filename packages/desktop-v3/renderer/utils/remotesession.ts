@@ -1,5 +1,6 @@
 import type {xCloudStreamConfig,xStreamToken,communicationHandler} from '@greenlight/player/client'
 import {streamOrigin,sessionEndpoint} from '../../../player/src/server/requestpolicy'
+import {StreamStartFailure} from './startfailure'
 
 type Request={token:xStreamToken;xCloudStreamConfig:xCloudStreamConfig}
 type SessionRequest=Request&{sessionPath:string}
@@ -28,10 +29,11 @@ export function returnedSessionPath(result:unknown,type:'home'|'cloud'){
 }
 export type WebStreamTarget={id:string;name:string;type:'home'}|{id:string;name:string;type:'cloud';entitled:boolean}
 export function selectStreamCredentials(target:WebStreamTarget,home:xStreamToken,cloud:xStreamToken,regions:{home:unknown;cloud:unknown}){
-    if(!target.id||target.id.length>160||(target.type==='cloud'&&target.entitled!==true))throw Error('Streaming target unavailable')
+    if(!target.id||target.id.length>160||(target.type==='cloud'&&target.entitled!==true))throw new StreamStartFailure('start-target')
     const token=target.type==='cloud'?cloud:home
-    if(!token.token)throw Error('Xbox streaming authorization unavailable')
-    return {token,host:defaultStreamOrigin(regions[target.type])}
+    if(!token.token)throw new StreamStartFailure('start-authorization')
+    try {return {token,host:defaultStreamOrigin(regions[target.type])}}
+    catch {throw new StreamStartFailure('start-region')}
 }
 export function provisioningMessage(value:unknown):string|null{
     const state=(value as {state?:unknown}|null)?.state
@@ -49,8 +51,12 @@ function waitFor<T>(pending:Promise<T>,milliseconds:number,message:string):Promi
         void pending.then(value=>{clearTimeout(timer);resolve(value)},error=>{clearTimeout(timer);reject(error)})
     })
 }
-export function createRemoteSession(rpc:RemoteRpc,config:xCloudStreamConfig,token:xStreamToken,refreshToken:string,onProvisioning?:(message:string)=>void,deadlines={drainMs:75000,stopMs:25000}){
-    if(!token.token||!refreshToken||!config.id)throw Error('Xbox streaming authorization unavailable')
+type StreamAuthorization = {kind:'desktop'} | {kind:'web'; refreshToken:string}
+
+export function createRemoteSession(rpc:RemoteRpc,config:xCloudStreamConfig,token:xStreamToken,authorization:StreamAuthorization,onProvisioning?:(message:string)=>void,deadlines={drainMs:75000,stopMs:25000}){
+    if(!token.token||(authorization.kind==='web'&&!authorization.refreshToken))throw new StreamStartFailure('start-authorization')
+    if(!config.id)throw new StreamStartFailure('start-target')
+    const refreshToken=authorization.kind==='web'?authorization.refreshToken:''
     const request={token:{...token},xCloudStreamConfig:{...config,host:streamOrigin(config.host)}}
     let closing=false
     let ownedPath:string|undefined

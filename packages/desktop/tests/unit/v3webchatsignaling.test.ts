@@ -57,12 +57,12 @@ function fixture(){
     return {rpc,calls}
 }
 test('chat adapter is optional and validates the answer from the owned session',async()=>{
-    const f=fixture(),without=createRemoteSession(f.rpc,config,token,'refresh')
+    const f=fixture(),without=createRemoteSession(f.rpc,config,token,{kind:'web',refreshToken:'refresh'})
     const id=await without.start()
     assert.equal(without.player(id).sendChatSDP,undefined)
     await without.stop(id)
     f.rpc.chat=async input=>{assert.equal(input.sessionPath,path);assert.deepEqual(input.offer,offer);return answer}
-    const session=createRemoteSession(f.rpc,config,token,'refresh'),player=session.player(await session.start())
+    const session=createRemoteSession(f.rpc,config,token,{kind:'web',refreshToken:'refresh'}),player=session.player(await session.start())
     assert.equal(await player.sendChatSDP!(offer),answer)
     f.rpc.chat=async()=>null
     await assert.rejects(player.sendChatSDP!(offer),/Invalid chat SDP answer/)
@@ -73,7 +73,7 @@ test('remote teardown drains pending chat negotiation before DELETE',async()=>{
     const f=fixture()
     let resolve!:(value:string)=>void
     f.rpc.chat=async()=>{f.calls.push('chat');return new Promise<string>(done=>{resolve=done})}
-    const session=createRemoteSession(f.rpc,config,token,'refresh'),player=session.player(await session.start())
+    const session=createRemoteSession(f.rpc,config,token,{kind:'web',refreshToken:'refresh'}),player=session.player(await session.start())
     const chat=player.sendChatSDP!(offer)
     await new Promise<void>(done=>setImmediate(done))
     const stop=session.stop(path)

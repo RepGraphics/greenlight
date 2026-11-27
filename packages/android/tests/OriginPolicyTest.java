@@ -84,6 +84,17 @@ public final class OriginPolicyTest {
         check(report.contains("DESKTOP_COMPANION") && report.contains("DISCONNECTED"), "report state and mode");
         check(report.contains("123.0.456.0") && report.contains("Android API: 35"), "report environment");
         check(!health.report(35, "https://secret.example/", "secret\\nvalue", false).contains("secret"), "reject unexpected version characters");
-        System.out.println("Android origin, connection mode, playback and connection health tests passed");
+        String[] audio = {MicrophonePolicy.AUDIO};
+        check(MicrophonePolicy.allows(origin, ConnectionMode.PRIVATE_V3, "https://PRIVATE.example:443", audio, true), "same origin V3 audio");
+        check(!MicrophonePolicy.allows(origin, ConnectionMode.DESKTOP_COMPANION, origin.home(), audio, true), "desktop mode audio denied");
+        check(!MicrophonePolicy.allows(origin, ConnectionMode.PRIVATE_V3, origin.home(), audio, false), "background request denied");
+        for (String foreign : new String[]{"https://evil.example/", "http://private.example/", "https://private.example:444/", "https://private.example/path", "null", null}) {
+            check(!MicrophonePolicy.allows(origin, ConnectionMode.PRIVATE_V3, foreign, audio, true), "invalid request origin");
+        }
+        for (String[] resources : new String[][]{null, {}, {"android.webkit.resource.VIDEO_CAPTURE"}, {MicrophonePolicy.AUDIO, "android.webkit.resource.VIDEO_CAPTURE"}, {MicrophonePolicy.AUDIO, MicrophonePolicy.AUDIO}, {"unknown"}}) {
+            check(!MicrophonePolicy.allows(origin, ConnectionMode.PRIVATE_V3, origin.home(), resources, true), "only a single audio resource allowed");
+        }
+        check(!MicrophonePolicy.allows(null, ConnectionMode.PRIVATE_V3, origin.home(), audio, true), "no selected origin denied");
+        System.out.println("Android origin, connection mode, playback, health and microphone policy tests passed");
     }
 }

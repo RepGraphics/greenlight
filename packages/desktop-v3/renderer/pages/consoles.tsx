@@ -1,6 +1,7 @@
-import React, {useEffect,useRef,useState} from 'react'
+import {useEffect,useRef,useState} from 'react'
 import Head from 'next/head'
-import Sidebar from '../components/sidebar'
+import {ArrowRight, Gamepad2, Power, RefreshCw, Search} from 'lucide-react'
+import DashboardLayout from '../components/dashboardlayout'
 import RemotePlay from '../components/remoteplay'
 import {useAuth} from '../contexts/AuthContext'
 import {useTRPCClient} from '../utils/trpc'
@@ -8,9 +9,10 @@ import {AuthAttempt} from '../contexts/authattempt'
 import {normalizeConsoles,searchConsoles,consoleReady,type ConsoleSummary} from '../utils/consoles'
 
 export default function ConsolesPage(){
-    const {getWebToken,isAuthenticated}=useAuth()
+    const {getWebToken,getxHomeToken,isAuthenticated}=useAuth()
     const client=useTRPCClient()
     const {uhs,token}=getWebToken()
+    const streamingAvailable=Boolean(getxHomeToken().token)
     const [items,setItems]=useState<ConsoleSummary[]>([])
     const [loading,setLoading]=useState(true)
     const [failed,setFailed]=useState(false)
@@ -41,38 +43,40 @@ export default function ConsolesPage(){
     },[client,isAuthenticated,uhs,token])
     const visible=searchConsoles(items,search)
     if(selected)return <RemotePlay target={{id:selected.id,name:selected.name,type:'home'}} onExit={()=>setSelected(null)}/>
-    return <React.Fragment>
+    return <DashboardLayout>
         <Head><title>Greenlight — My Consoles</title></Head>
-        <div className="flex min-h-screen flex-col md:h-screen md:flex-row bg-[#0d0d0d] text-white">
-            <Sidebar/>
-            <main className="flex-1 min-w-0 overflow-y-auto">
-                <div className="p-4 md:p-8 max-w-5xl mx-auto">
-                    <h1 className="text-2xl font-bold">My Consoles</h1>
-                    <p className="text-white/60 mt-2">Discover Xbox consoles associated with your signed-in account.</p>
-                    <p className="text-white/50 mt-2 text-sm">Experimental web client — Remote Play is unverified on hardware. Console power commands are not available here.</p>
-                    <div className="flex flex-wrap gap-3 my-5">
-                        <input type="search" aria-label="Search consoles" placeholder="Search consoles" value={search} onChange={event=>setSearch(event.target.value)} className="min-w-0 flex-1 rounded border border-white/20 bg-white/5 p-2"/>
-                        <button type="button" disabled={loading||!token||!uhs} onClick={()=>void load()} className="rounded border border-white/20 px-4 py-2 disabled:opacity-50">{loading?'Refreshing…':'Refresh'}</button>
-                    </div>
-                    <section aria-busy={loading} aria-label="Xbox consoles">
-                        {loading&&<p role="status">Loading consoles…</p>}
-                        {(!token||!uhs)&&<p role="alert">Xbox account authorization is unavailable. Sign in again.</p>}
-                        {failed&&<p role="alert">Unable to retrieve consoles. Check your connection and try again.</p>}
-                        {!loading&&!failed&&token&&uhs&&items.length===0&&<p>No consoles were returned for this account.</p>}
-                        {!loading&&!failed&&items.length>0&&visible.length===0&&<p>No consoles match your search.</p>}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {visible.map(item=><article key={item.id} className="rounded-xl border border-white/10 bg-white/5 p-5">
-                                <h2 className="text-lg font-semibold break-words">{item.name}</h2>
-                                <p className="text-white/70 mt-2">Power: {item.powerState}</p>
-                                <p className="text-white/70">Remote management: {item.remoteManagementEnabled?'Enabled':'Disabled'}</p>
-                                <p className="text-white/70">Remote play: {item.consoleStreamingEnabled?'Enabled':'Disabled'}</p>
-                                <p className="mt-3 text-sm">{consoleReady(item)?'Console reports remote-play readiness':'Enable remote features in Xbox settings'}</p>
-                                <button type="button" disabled={!consoleReady(item)||loading} className="mt-3 rounded border border-white/20 px-4 py-2 disabled:opacity-50" onClick={()=>setSelected(item)}>Remote Play (experimental)</button>
-                            </article>)}
-                        </div>
-                    </section>
-                </div>
-            </main>
+        <header className="v3-page-header">
+            <div><h1>My Consoles</h1><p>Stream games from your own Xbox with Remote Play.</p></div>
+            <button type="button" className="v3-button v3-button-secondary" disabled={loading||!token||!uhs} onClick={()=>void load()}><RefreshCw size={16} aria-hidden="true"/> Refresh</button>
+        </header>
+        <div className="v3-filters v3-section-spacing">
+            <label className="v3-search"><Search size={17} aria-hidden="true"/>
+                <input type="search" className="v3-field" aria-label="Search consoles" placeholder="Search consoles" maxLength={100} value={search} onChange={event=>setSearch(event.target.value)}/>
+            </label>
         </div>
-    </React.Fragment>
+        <section aria-busy={loading} aria-label="Xbox consoles" className="v3-section-spacing">
+            {loading&&<p role="status">Loading consoles…</p>}
+            {(!token||!uhs)&&<p className="v3-notice" role="alert">Xbox account authorization is unavailable. Sign in again.</p>}
+            {token&&uhs&&!streamingAvailable&&<p className="v3-notice" role="status">Remote Play authorization is unavailable for this account.</p>}
+            {failed&&<p className="v3-notice" role="alert">Unable to retrieve consoles. Check your connection and try again.</p>}
+            {!loading&&!failed&&token&&uhs&&visible.length===0&&<div className="v3-panel v3-empty">
+                <Gamepad2 size={32} aria-hidden="true"/>
+                <h2>{items.length===0?'No consoles found':'No matching consoles'}</h2>
+                <p>{items.length===0?'Sign in on your Xbox and turn on remote features in its settings, then refresh.':'Try another console name.'}</p>
+            </div>}
+            <div className="v3-console-grid">
+                {visible.map(item=>{
+                    const ready=consoleReady(item)
+                    return <article key={item.id} className="v3-panel v3-console-card">
+                        <div className="v3-console-heading">
+                            <span className="v3-console-icon"><Gamepad2 size={26} aria-hidden="true"/></span>
+                            <div><h2>{item.name}</h2><p><Power size={14} aria-hidden="true"/> {item.powerState}</p></div>
+                        </div>
+                        <p className={ready?'v3-console-ready':'v3-muted'}>{ready?'Remote features enabled':'Enable remote features on this Xbox to connect.'}</p>
+                        <button type="button" disabled={!ready||!streamingAvailable||loading} className="v3-button v3-button-primary" onClick={()=>setSelected(item)}>Remote Play <ArrowRight size={16} aria-hidden="true"/></button>
+                    </article>
+                })}
+            </div>
+        </section>
+    </DashboardLayout>
 }

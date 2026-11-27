@@ -1,6 +1,6 @@
 import {useState} from 'react'
 import {graphData,type GraphMetric} from '../../../desktop/renderer/lib/networkgraph'
-import {summarizeDiagnostics,type DiagnosticSample} from '../../../desktop/renderer/lib/streamdiagnostics'
+import {summarizeDiagnostics,streamFailureReasons,type DiagnosticSample} from '../../../desktop/renderer/lib/streamdiagnostics'
 import {sessionBitrateLabel} from '../../../desktop/renderer/lib/sessionquality'
 import {webDiagnosticReport} from '../utils/webdiagnostics'
 import {downloadWebCapture} from '../utils/webcapture'
@@ -53,7 +53,7 @@ export default function StreamDiagnostics({samples,type,status,reason,recommende
                 <Graph samples={samples} metric="fps" label="Frame rate" unit="fps" seconds={seconds}/>
                 <Graph samples={samples} metric="bitrate" label="Bitrate" unit="Mbps" seconds={seconds}/>
             </div>
-            <button type="button" className="rounded border border-white/20 px-4 py-2 disabled:opacity-50" disabled={!samples.length} onClick={exportReport}>Export diagnostics JSON</button>
+            <button type="button" className="rounded border border-white/20 px-4 py-2 disabled:opacity-50" disabled={!samples.length&&!streamFailureReasons.includes(reason)} onClick={exportReport}>Export diagnostics JSON</button>
             {error&&<p role="alert">Unable to download diagnostics in this browser.</p>}
         </div>}
     </details>

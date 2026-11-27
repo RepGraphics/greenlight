@@ -18,13 +18,13 @@ export function recordingMimeType() {
 
 // Some players expose remote audio on a separate element; others multiplex it
 // with video. Clone only these remote tracks and release any partial allocation.
-export function cloneRemoteMedia(video: HTMLVideoElement, audio: HTMLAudioElement | null) {
+export function cloneRemoteMedia(video: HTMLVideoElement, audio: HTMLAudioElement | null, includeAudio = true) {
     if(typeof MediaStream==='undefined'||!(video.srcObject instanceof MediaStream))throw new Error('Remote media unavailable')
     const source=video.srcObject.getVideoTracks().find(track=>track.readyState==='live')
     if(!source)throw new Error('No live video')
-    const audioTrack=(audio?.srcObject instanceof MediaStream
+    const audioTrack=includeAudio ? ((audio?.srcObject instanceof MediaStream
         ? audio.srcObject.getAudioTracks().find(track=>track.readyState==='live')
-        : undefined) ?? video.srcObject.getAudioTracks().find(track=>track.readyState==='live')
+        : undefined) ?? video.srcObject.getAudioTracks().find(track=>track.readyState==='live')) : undefined
     const tracks:MediaStreamTrack[]=[]
     try {
         tracks.push(source.clone())
@@ -36,11 +36,11 @@ export function cloneRemoteMedia(video: HTMLVideoElement, audio: HTMLAudioElemen
     }
 }
 
-export function startStreamRecording(video: HTMLVideoElement, onFinished:(blob:Blob|null,error:boolean)=>void, audio:HTMLAudioElement|null=document.querySelector<HTMLAudioElement>('.gl-experimental-stream #playerContainer audio'),preferences?:{seconds?:unknown;videoBitsPerSecond?:unknown}) {
+export function startStreamRecording(video: HTMLVideoElement, onFinished:(blob:Blob|null,error:boolean)=>void, audio:HTMLAudioElement|null=document.querySelector<HTMLAudioElement>('.gl-experimental-stream #playerContainer audio'),preferences?:{seconds?:unknown;videoBitsPerSecond?:unknown;includeAudio?:boolean}) {
     const options=recordingOptions(preferences?.seconds,preferences?.videoBitsPerSecond)
     const mimeType=recordingMimeType()
     if(!mimeType) throw new Error('Recording unavailable')
-    const {tracks,stream}=cloneRemoteMedia(video,audio)
+    const {tracks,stream}=cloneRemoteMedia(video,audio,preferences?.includeAudio)
     let recorder:MediaRecorder
     try {recorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:options.videoBitsPerSecond,audioBitsPerSecond:128000})}
     catch(error){tracks.forEach(track=>track.stop());throw error}

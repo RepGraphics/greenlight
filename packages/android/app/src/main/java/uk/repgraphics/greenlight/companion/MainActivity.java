@@ -1,6 +1,8 @@
 package uk.repgraphics.greenlight.companion;
 
+import android.Manifest;
 import android.app.Activity;
+import android.content.pm.PackageManager;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
@@ -58,6 +60,11 @@ public final class MainActivity extends Activity {
     private ConnectionMode mode = ConnectionMode.DESKTOP_COMPANION;
     private String token;
     private boolean challenged;
+    private boolean resumed;
+    private PermissionRequest pendingMicrophone;
+    private boolean systemMicrophonePrompt;
+    private AlertDialog microphoneDialog;
+    private static final int MICROPHONE_PERMISSION = 410;
     private String lastEndpoint = "";
     private boolean rememberEndpoint;
     private SharedPreferences connectionPreferences;
@@ -353,12 +360,76 @@ public final class MainActivity extends Activity {
             }
         });
         web.setWebChromeClient(new WebChromeClient() {
-            @Override public void onPermissionRequest(PermissionRequest request) { request.deny(); }
+            @Override public void onPermissionRequest(PermissionRequest request) { requestMicrophone(web, selectedOrigin, selectedMode, request); }
+            @Override public void onPermissionRequestCanceled(PermissionRequest request) {
+                if (pendingMicrophone == request) {
+                    pendingMicrophone = null;
+                    if (microphoneDialog != null) microphoneDialog.dismiss();
+                    microphoneDialog = null;
+                }
+            }
         });
         web.setDownloadListener((url, userAgent, disposition, mime, length) ->
             { if (web == browser) status.setText("File downloads are not supported in this companion build."); });
         root.addView(web, new LinearLayout.LayoutParams(-1, 0, 1));
         web.loadUrl(selectedMode.landingPage(selectedOrigin));
+    }
+
+    private boolean microphoneAllowed(WebView web, OriginPolicy selected, ConnectionMode selectedMode, PermissionRequest request) {
+        return web == browser && resumed && !isFinishing() && !isDestroyed()
+            && MicrophonePolicy.allows(selected, selectedMode, request.getOrigin().toString(), request.getResources(), true)
+            && selected.allows(web.getUrl());
+    }
+
+    private void denyPendingMicrophone() {
+        PermissionRequest request = pendingMicrophone;
+        pendingMicrophone = null;
+        if (microphoneDialog != null) microphoneDialog.dismiss();
+        microphoneDialog = null;
+        if (request != null) { try { request.deny(); } catch (RuntimeException ignored) { } }
+    }
+
+    private void requestMicrophone(WebView web, OriginPolicy selected, ConnectionMode selectedMode, PermissionRequest request) {
+        if (systemMicrophonePrompt || pendingMicrophone != null || !microphoneAllowed(web, selected, selectedMode, request)) {
+            request.deny();
+            return;
+        }
+        pendingMicrophone = request;
+        microphoneDialog = new AlertDialog.Builder(this)
+            .setTitle("Allow voice chat?")
+            .setMessage("Allow this private V3 client to use your microphone for voice chat? The selected backend is trusted. Disable the microphone in the stream controls or disconnect to end access.")
+            .setNegativeButton("Deny", (dialog, which) -> denyPendingMicrophone())
+            .setPositiveButton("Allow", (dialog, which) -> {
+                microphoneDialog = null;
+                if (pendingMicrophone != request || !microphoneAllowed(web, selected, selectedMode, request)) {
+                    denyPendingMicrophone();
+                    return;
+                }
+                if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                    pendingMicrophone = null;
+                    request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+                } else {
+                    systemMicrophonePrompt = true;
+                    try { requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, MICROPHONE_PERMISSION); }
+                    catch (RuntimeException error) { systemMicrophonePrompt = false; denyPendingMicrophone(); }
+                }
+            }).setOnCancelListener(dialog -> denyPendingMicrophone()).create();
+        microphoneDialog.show();
+    }
+
+    @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(code, permissions, results);
+        if (code != MICROPHONE_PERMISSION) return;
+        systemMicrophonePrompt = false;
+        // The OS permission prompt can pause the Activity. A paused/cancelled
+        // WebView request is never revived; the user may enable voice chat again.
+        PermissionRequest request = pendingMicrophone;
+        if (request == null) return;
+        pendingMicrophone = null;
+        if (results.length == 1 && results[0] == PackageManager.PERMISSION_GRANTED &&
+            browser != null && microphoneAllowed(browser, origin, mode, request)) {
+            request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+        } else request.deny();
     }
 
     private void applyDisplay() {
@@ -412,6 +483,7 @@ public final class MainActivity extends Activity {
     }
 
     private void clearClient(boolean rendererGone) {
+        denyPendingMicrophone();
         WebView web = browser;
         if (display.disconnected()) applyDisplay();
         clientControls = null;
@@ -455,11 +527,14 @@ public final class MainActivity extends Activity {
         else super.onBackPressed();
     }
     @Override protected void onPause() {
+        resumed = false;
+        denyPendingMicrophone();
         if (browser != null) browser.onPause();
         super.onPause();
     }
     @Override protected void onResume() {
         super.onResume();
+        resumed = true;
         if (browser != null) {
             browser.onResume();
             if (display.isImmersive()) applyDisplay();

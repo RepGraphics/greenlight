@@ -8,7 +8,7 @@ type Status='idle'|'waiting'|'ambiguous'|'ready'|'failed'
 const readPads=()=>{
     try{return readBindingPads(Array.from(navigator.getGamepads?.()??[]))}catch{return []}
 }
-export default function ControllerBindings({mapping,onChange}:{mapping:Record<string,string>;onChange:(mapping:Record<string,string>)=>void}){
+export default function ControllerBindings({mapping,onChange,persistent=false}:{mapping:Record<string,string>;onChange:(mapping:Record<string,string>)=>void;persistent?:boolean}){
     const [open,setOpen]=useState(false)
     const [target,setTarget]=useState('A')
     const [pads,setPads]=useState<BindingPad[]>([])
@@ -55,10 +55,10 @@ export default function ControllerBindings({mapping,onChange}:{mapping:Record<st
         manualCandidate.current=false;source.current={index:current.index,id:current.id};setSelected(String(current.index))
         setCandidate(null);setStatus('waiting');listener.current=new WebButtonListener(current,performance.now()+10000)
     }
-    return <details className="w-full rounded border border-white/10 p-3" onToggle={event=>{setOpen(event.currentTarget.open);if(!event.currentTarget.open)cancel()}}>
+    return <details className="w-full rounded border border-white/10 p-3" data-gamepad-capture={listening?'active':undefined} onToggle={event=>{setOpen(event.currentTarget.open);if(!event.currentTarget.open)cancel()}}>
         <summary className="cursor-pointer">Custom button mappings</summary>
         {open&&<div className="grid gap-3 mt-3">
-            <p className="text-sm text-white/60">Choose an Xbox button, then a physical button index (0–63), or listen for a press. Mappings apply to all local physical controllers for this session. Multiple Xbox buttons may share an index.</p>
+            <p className="text-sm text-white/60">Choose an Xbox button, then a physical button index (0–63), or listen for a press. Mappings apply to all local physical controllers {persistent?'in new streams.':'for this session.'} Multiple Xbox buttons may share an index.</p>
             <div className="flex flex-wrap gap-3 items-center">
                 <label>Xbox button <select className="bg-[#202020] rounded p-2" value={target} onChange={event=>{cancel();setTarget(event.target.value)}}>{webBindingTargets.map(key=><option key={key} value={key}>{key==='Nexus'?'Guide':key}</option>)}</select></label>
                 <label>Physical button index <select className="bg-[#202020] rounded p-2" value={candidate??mapping[target]??defaultButtonMapping[target]} onChange={event=>{listener.current=null;source.current=null;manualCandidate.current=true;setCandidate(event.target.value);setStatus('ready')}}>{Array.from({length:64},(_,index)=><option key={index} value={index}>{index}</option>)}</select></label>

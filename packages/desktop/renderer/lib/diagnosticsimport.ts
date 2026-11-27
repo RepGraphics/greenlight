@@ -1,10 +1,9 @@
-import { sanitizeSample } from './streamdiagnostics'
+import { sanitizeSample, streamFailureReasons } from './streamdiagnostics'
 import type { DiagnosticSample } from './streamdiagnostics'
 const object=(value:unknown):Record<string,unknown>=>value&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{}
 export const diagnosticFileLimit=2*1024*1024
 export interface ImportedAttempt {state:string;reason:string;samples:DiagnosticSample[]}
 const states=['Initializing','Connecting','Negotiated','Connected','Reconnecting','Error','Provisioning','Queued','Failed']
-const reasons=['media','transport','stats','heartbeat','server','closed','keepalive']
 function samples(value:unknown):DiagnosticSample[]{
     if(!Array.isArray(value))return []
     return value.slice(-300).flatMap(item=>{
@@ -15,7 +14,7 @@ function samples(value:unknown):DiagnosticSample[]{
     }).sort((a,b)=>a.elapsedSeconds-b.elapsedSeconds)
 }
 function attempt(raw:Record<string,unknown>):ImportedAttempt{
-    return {state:typeof raw.state==='string'&&states.includes(raw.state)?raw.state:'Unknown',reason:typeof raw.reason==='string'&&reasons.includes(raw.reason)?raw.reason:'',samples:samples(raw.samples)}
+    return {state:typeof raw.state==='string'&&states.includes(raw.state)?raw.state:'Unknown',reason:typeof raw.reason==='string'&&streamFailureReasons.includes(raw.reason)?raw.reason:'',samples:samples(raw.samples)}
 }
 export function parseDiagnostics(text:string){
     if(text.length>diagnosticFileLimit||new TextEncoder().encode(text).byteLength>diagnosticFileLimit)throw Error('Diagnostic report too large')

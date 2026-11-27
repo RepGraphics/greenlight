@@ -2,6 +2,7 @@ import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import {defaultStreamOrigin,returnedSessionPath,createRemoteSession,selectStreamCredentials,provisioningMessage,type RemoteRpc} from '../../../desktop-v3/renderer/utils/remotesession'
 import {SessionLifecycle} from '../../renderer/lib/sessionlifecycle'
+import {startFailureReason} from '../../../desktop-v3/renderer/utils/startfailure'
 const host='https://uks.core.gssv-play-prodxhome.xboxlive.com'
 const config={id:'console',type:'home' as const,host,language:'en-GB',resolution:720 as const}
 const token={token:'test',market:'GB',language:'en-GB'}
@@ -29,7 +30,7 @@ test('select only the token-provided default Xbox region and validate returned s
     assert.throws(()=>returnedSessionPath({sessionPath:'/v5/sessions/cloud/a'},'home'))
 })
 test('web player adapter sends object ICE candidates and routes signaling through the owned session',async()=>{
-    const f=fixture(),session=createRemoteSession(f.rpc,config,token,'refresh')
+    const f=fixture(),session=createRemoteSession(f.rpc,config,token,{kind:'web',refreshToken:'refresh'})
     const id=await session.start(),player=session.player(id)
     assert.equal(player.getSessionId(),'session-1')
     assert.equal(player.getStreamConfig().resolution,720)
@@ -42,8 +43,33 @@ test('web player adapter sends object ICE candidates and routes signaling throug
     assert.ok(f.calls.slice(1).every(item=>item[1].sessionPath===path))
     assert.throws(()=>player.sendICECandidates(['invalid']))
 })
+test('desktop session startup leaves the refresh credential in main while web startup requires it',async()=>{
+    const f=fixture()
+    assert.throws(()=>createRemoteSession(f.rpc,config,token,{kind:'web',refreshToken:''}),/start-authorization/)
+    const session=createRemoteSession(f.rpc,config,token,{kind:'desktop'})
+    await session.player(await session.start()).sendMSALToken()
+    assert.equal('refreshToken' in f.calls[0][1],false)
+    assert.equal(f.calls[1][1].refreshToken,'')
+    await session.stop(path)
+})
+test('startup errors distinguish recognized failures from unconfirmed provisioning',async()=>{
+    const f=fixture()
+    const rejection={cause:{code:'TOO_MANY_REQUESTS'}}
+    f.rpc.start=async()=>{throw rejection}
+    const session=createRemoteSession(f.rpc,config,token,{kind:'desktop'})
+    const lifecycle=new SessionLifecycle()
+    const reason=new Promise<string>(resolve=>lifecycle.begin({
+        start:session.start,stop:session.stop,
+        onSession:()=>assert.fail('unexpected session'),
+        onError:(_,cause)=>resolve(startFailureReason(cause)),
+    }))
+    assert.equal(await reason,'start-busy')
+    assert.equal(startFailureReason({data:{code:'UNAUTHORIZED'}}),'start-authorization')
+    assert.equal(startFailureReason(Error('token or private URL')),'start-unconfirmed')
+    assert.equal(await lifecycle.end(),true)
+})
 test('failed stop retains remote session ownership for explicit retry',async()=>{
-    const f=fixture(),session=createRemoteSession(f.rpc,config,token,'refresh'),lifecycle=new SessionLifecycle()
+    const f=fixture(),session=createRemoteSession(f.rpc,config,token,{kind:'web',refreshToken:'refresh'}),lifecycle=new SessionLifecycle()
     let owned=''
     lifecycle.begin({start:session.start,stop:session.stop,onSession:id=>{owned=id},onError:()=>assert.fail('unexpected error')})
     await flush();assert.equal(owned,path)
@@ -56,7 +82,7 @@ test('ending web Remote Play rejects new signaling and drains pending requests b
     const f=fixture()
     let release!:()=>void
     f.rpc.connect=async input=>{f.calls.push(['connect',input]);await new Promise<void>(resolve=>{release=resolve})}
-    const session=createRemoteSession(f.rpc,config,token,'refresh')
+    const session=createRemoteSession(f.rpc,config,token,{kind:'web',refreshToken:'refresh'})
     const first=session.start();assert.equal(session.start(),first)
     const id=await first,player=session.player(id)
     const connecting=player.sendMSALToken()
@@ -74,7 +100,7 @@ test('failed in-flight signaling does not prevent remote teardown and failed DEL
     const f=fixture()
     let reject!: (reason:Error)=>void
     f.rpc.sdp=async input=>{f.calls.push(['sdp',input]);await new Promise<void>((_resolve,fail)=>{reject=fail})}
-    const session=createRemoteSession(f.rpc,config,token,'refresh'),id=await session.start(),player=session.player(id)
+    const session=createRemoteSession(f.rpc,config,token,{kind:'web',refreshToken:'refresh'}),id=await session.start(),player=session.player(id)
     const pending=player.sendSDPOffer({type:'offer',sdp:'offer'})
     const failure=assert.rejects(pending,/network/)
     await flush();f.setStatus(503)
@@ -85,7 +111,7 @@ test('failed in-flight signaling does not prevent remote teardown and failed DEL
     assert.deepEqual(f.calls.map(item=>item[0]),['start','sdp','stop','stop'])
 })
 test('cannot address an unrelated session even with a syntactically valid path',async()=>{
-    const f=fixture(),session=createRemoteSession(f.rpc,config,token,'refresh')
+    const f=fixture(),session=createRemoteSession(f.rpc,config,token,{kind:'web',refreshToken:'refresh'})
     const id=await session.start()
     assert.throws(()=>session.player('/v5/sessions/home/other'),/not owned/)
     await assert.rejects(session.stop('/v5/sessions/home/other'),/not owned/)
@@ -110,7 +136,7 @@ test('cloud session adapter reports server queue states and stops its own cloud 
     const f=fixture(),messages:string[]=[]
     f.rpc.start=async input=>{f.calls.push(['start',input]);return {sessionId:'game-1',sessionPath:cloudPath}}
     f.rpc.status=async input=>{f.calls.push(['status',input]);return {state:'WaitingForResources'}}
-    const session=createRemoteSession(f.rpc,cloudConfig,token,'refresh',message=>messages.push(message))
+    const session=createRemoteSession(f.rpc,cloudConfig,token,{kind:'web',refreshToken:'refresh'},message=>messages.push(message))
     const id=await session.start(),player=session.player(id)
     await player.getStreamStatus()
     assert.deepEqual(messages,['Waiting in the Xbox Cloud Gaming queue…'])
@@ -130,7 +156,7 @@ test('timed-out signaling drain never races DELETE and retains ownership for ret
     const f=fixture()
     let release!:()=>void
     f.rpc.connect=async input=>{f.calls.push(['connect',input]);await new Promise<void>(resolve=>{release=resolve})}
-    const session=createRemoteSession(f.rpc,config,token,'refresh',undefined,{drainMs:1,stopMs:1000})
+    const session=createRemoteSession(f.rpc,config,token,{kind:'web',refreshToken:'refresh'},undefined,{drainMs:1,stopMs:1000})
     const id=await session.start(),player=session.player(id)
     const connecting=player.sendMSALToken()
     await flush()
@@ -145,7 +171,7 @@ test('timed-out DELETE stays single flight and late acknowledgement is retained'
     const f=fixture()
     let acknowledge!:(value:{status:number})=>void
     f.rpc.stop=async input=>{f.calls.push(['stop',input]);return new Promise(resolve=>{acknowledge=resolve})}
-    const session=createRemoteSession(f.rpc,config,token,'refresh',undefined,{drainMs:1000,stopMs:1})
+    const session=createRemoteSession(f.rpc,config,token,{kind:'web',refreshToken:'refresh'},undefined,{drainMs:1000,stopMs:1})
     const id=await session.start()
     await assert.rejects(session.stop(id),/acknowledgement timed out/)
     await assert.rejects(session.stop(id),/acknowledgement timed out/)
@@ -159,7 +185,7 @@ test('late failed DELETE permits a fresh explicit retry without reopening signal
     const f=fixture()
     let reject!:(error:Error)=>void
     f.rpc.stop=async input=>{f.calls.push(['stop',input]);return new Promise((_resolve,fail)=>{reject=fail})}
-    const session=createRemoteSession(f.rpc,config,token,'refresh',undefined,{drainMs:1000,stopMs:1})
+    const session=createRemoteSession(f.rpc,config,token,{kind:'web',refreshToken:'refresh'},undefined,{drainMs:1000,stopMs:1})
     const id=await session.start(),player=session.player(id)
     await assert.rejects(session.stop(id),/acknowledgement timed out/)
     reject(Error('network'));await flush()

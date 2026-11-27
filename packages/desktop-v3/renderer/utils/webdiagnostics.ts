@@ -1,4 +1,4 @@
-import {sanitizeSample,createDiagnosticReport,type DiagnosticSample} from '../../../desktop/renderer/lib/streamdiagnostics'
+import {sanitizeSample,createDiagnosticReport,streamFailureReasons,type DiagnosticSample} from '../../../desktop/renderer/lib/streamdiagnostics'
 import {appendGraphSample} from '../../../desktop/renderer/lib/networkgraph'
 import type {StreamMetrics} from '../../../player/src/client/metrics'
 
@@ -16,6 +16,6 @@ export function appendWebDiagnostic(samples:DiagnosticSample[],metrics:StreamMet
 }
 export function webDiagnosticReport(samples:DiagnosticSample[],type:'home'|'cloud',status:string,reason:string){
     const state=['Initializing','Connecting','Negotiated','Connected','Reconnecting','Error','Provisioning','Queued','Failed'].includes(status)?status:'Unknown'
-    const failure=['media','transport','stats','heartbeat','server','closed','keepalive'].includes(reason)?reason:''
+    const failure=streamFailureReasons.includes(reason)?reason:''
     return createDiagnosticReport(samples,type,state,'video',[],failure)
 }

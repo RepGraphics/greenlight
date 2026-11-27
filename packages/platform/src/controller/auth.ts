@@ -25,7 +25,10 @@ export default class authController {
     async getStreamingTokens(token:IUserToken) {
         const tokenStore = new ProxyStore(token);
         const msal = new Msal(tokenStore)
+        return this.getXboxStreamingTokens(msal)
+    }
 
+    private async getXboxStreamingTokens(msal: Msal) {
         const gssvToken = await msal.getGssvToken()
 
         if(gssvToken === undefined){
@@ -53,5 +56,22 @@ export default class authController {
         const tokenStore = new ProxyStore(token);
         const msal = new Msal(tokenStore)
         return await msal.getWebToken()
+    }
+
+    async refreshSavedAccount(refreshToken: string) {
+        const store = new ProxyStore({refresh_token: refreshToken, access_token: '', scope: '', token_type: 'Bearer', expires_in: 0})
+        return (await new Msal(store).refreshUserToken()).data
+    }
+
+    async getDesktopSession(token: IUserToken) {
+        // MSAL returns expires_in on fresh exchanges. Give xal-node the
+        // equivalent absolute expiry so it doesn't refresh each Xbox request.
+        const expires = Date.now() + Math.max(0, token.expires_in) * 1000
+        const expiresOn = Number.isFinite(expires) && expires <= 8640000000000000 ? new Date(expires).toISOString() : undefined
+        const store = new ProxyStore({...token, expires_on: expiresOn})
+        const msal = new Msal(store)
+        const webToken = await msal.getWebToken()
+        const streamingTokens = await this.getXboxStreamingTokens(msal).catch(() => null)
+        return {webToken, streamingTokens, refreshToken: store.getUserToken()?.data.refresh_token || token.refresh_token}
     }
 }

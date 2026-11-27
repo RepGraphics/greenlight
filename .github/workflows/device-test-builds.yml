@@ -11,6 +11,8 @@ on:
       - 'packages/desktop-v3/renderer/providers/trpc.tsx'
       - 'packages/desktop-v3/scripts/**'
       - 'packages/desktop/scripts/**'
+      - 'packages/desktop/tests/smoke.cjs'
+      - 'packages/android/**'
 
 permissions:
   contents: read
@@ -42,6 +44,8 @@ jobs:
         run: |
           yarn desktop build --no-pack
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node packages/desktop/tests/smoke.cjs v2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           yarn desktop package:local --win --x64
       - uses: actions/upload-artifact@v7
         with:
@@ -67,6 +71,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (!(Test-Path packages/desktop-v3/app/main.js)) { throw 'Missing V3 main entry' }
           if (!(Test-Path packages/desktop-v3/app/preload.js)) { throw 'Missing V3 preload entry' }
+          node packages/desktop/tests/smoke.cjs v3
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           yarn desktopv3 package:local --win zip --x64
       - uses: actions/upload-artifact@v7
         with:
@@ -96,7 +102,7 @@ jobs:
         working-directory: packages/android
         run: |
           mkdir -p /tmp/android-policy-test
-          javac -d /tmp/android-policy-test app/src/main/java/uk/repgraphics/greenlight/companion/OriginPolicy.java app/src/main/java/uk/repgraphics/greenlight/companion/ConnectionMode.java app/src/main/java/uk/repgraphics/greenlight/companion/PlaybackDisplay.java app/src/main/java/uk/repgraphics/greenlight/companion/SavedConnection.java app/src/main/java/uk/repgraphics/greenlight/companion/ConnectionHealth.java tests/OriginPolicyTest.java
+          javac -d /tmp/android-policy-test app/src/main/java/uk/repgraphics/greenlight/companion/OriginPolicy.java app/src/main/java/uk/repgraphics/greenlight/companion/ConnectionMode.java app/src/main/java/uk/repgraphics/greenlight/companion/PlaybackDisplay.java app/src/main/java/uk/repgraphics/greenlight/companion/SavedConnection.java app/src/main/java/uk/repgraphics/greenlight/companion/ConnectionHealth.java app/src/main/java/uk/repgraphics/greenlight/companion/MicrophonePolicy.java tests/OriginPolicyTest.java
           java -cp /tmp/android-policy-test uk.repgraphics.greenlight.companion.OriginPolicyTest
       - name: Build and lint debug APK
         working-directory: packages/android

@@ -52,3 +52,8 @@ test('web report round-trips through the desktop diagnostic importer',()=>{
     assert.equal(parsed.attempts[0].reason,'transport')
     assert.equal(parsed.attempts[0].samples.length,6)
 })
+test('a rejected startup produces an importable report before any metrics arrive',()=>{
+    const report=webDiagnosticReport([],'home','Failed','start-busy')
+    const parsed=parseDiagnostics(JSON.stringify(report))
+    assert.deepEqual(parsed.attempts,[{state:'Failed',reason:'start-busy',samples:[]}])
+})

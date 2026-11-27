@@ -1,21 +1,22 @@
 import React from 'react'
+import { DashboardGamepad, type DashboardDirection } from '../../lib/dashboardgamepad'
 
-type Direction = 'up' | 'down' | 'left' | 'right'
 const selector = 'a[href], button, input, select, textarea, summary, [tabindex]'
 
-function focusables() {
-    return Array.from(document.querySelectorAll<HTMLElement>(selector)).filter(el => {
+function focusables(root: ParentNode) {
+    return Array.from(root.querySelectorAll<HTMLElement>(selector)).filter(el => {
         const rect = el.getBoundingClientRect()
         return el.tabIndex >= 0 && !el.matches(':disabled') && !el.closest('[inert], [hidden], [aria-hidden="true"]') &&
             rect.width > 0 && rect.height > 0 && getComputedStyle(el).visibility === 'visible'
     })
 }
 
-function move(direction: Direction) {
-    const all = focusables()
+function move(root: ParentNode, direction: DashboardDirection) {
+    const all = focusables(root)
     const current = document.activeElement as HTMLElement
     if (!all.includes(current)) {
-        all[0]?.focus()
+        const initial = all.find(el => el.getAttribute('aria-current') === 'page') ?? all[0]
+        initial?.focus()
         return
     }
     const rect = current.getBoundingClientRect()
@@ -59,75 +60,102 @@ function adjust(el: HTMLElement, direction: number) {
     return false
 }
 
-export default function DashboardInput({ enabled, onBack }: { enabled: boolean; onBack?: () => void }) {
+type DashboardInputProps = {
+    enabled: boolean
+    onBack?: () => void
+    scope?: React.RefObject<HTMLElement | null>
+    keyboardNavigation?: boolean
+}
+
+function readGamepad() {
+    try {
+        return Array.from(navigator.getGamepads?.() ?? []).find(pad => pad?.connected && pad.mapping === 'standard') ?? undefined
+    } catch {
+        return undefined
+    }
+}
+
+export default function DashboardInput({ enabled, onBack, scope, keyboardNavigation = true }: DashboardInputProps) {
     React.useEffect(() => {
         if (!enabled) return
         let frame = 0
-        let lastDirection: Direction | undefined
-        let repeatAt = 0
-        let previousA = true
-        let previousB = true
-        let previousX = true
-        let previousPad = -1
-        const keys: Record<string, Direction> = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }
+        const controller = new DashboardGamepad()
+        const rootNode = () => {
+            const root = scope ? scope.current : document
+            return root?.querySelector('dialog[open]') ?? root
+        }
+        const keys: Record<string, DashboardDirection> = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }
         const onKey = (event: KeyboardEvent) => {
             if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
             const target = event.target as HTMLElement
             if (target?.closest('input:not([type="checkbox"]):not([type="radio"]), select, textarea, [contenteditable="true"]')) return
             const direction = keys[event.key]
-            if (direction) {
+            const root = rootNode()
+            if (root && direction) {
                 event.preventDefault()
-                move(direction)
+                move(root, direction)
             }
+        }
+        const clearFocusStyle = () => document.documentElement.classList.remove('gl-gamepad-focus')
+        const resetController = () => {
+            controller.reset()
+            clearFocusStyle()
         }
         const tick = (now: number) => {
             frame = requestAnimationFrame(tick)
-            if (!document.hasFocus() || document.hidden) { previousA = previousB = previousX = true; lastDirection = undefined; previousPad = -1; return }
-            const pad = Array.from(navigator.getGamepads?.() || []).find(p => p?.mapping === 'standard')
-            if (!pad) { previousA = previousB = previousX = true; lastDirection = undefined; previousPad = -1; return }
-            if (pad.index !== previousPad) { previousPad = pad.index; previousA = previousB = previousX = true; lastDirection = undefined }
-            const down = (n: number) => Boolean(pad.buttons[n]?.pressed)
-            const x = pad.axes[0] || 0
-            const y = pad.axes[1] || 0
-            const direction: Direction | undefined = down(12) || y < -.65 ? 'up' : down(13) || y > .65 ? 'down' : down(14) || x < -.65 ? 'left' : down(15) || x > .65 ? 'right' : undefined
-            if (direction && (direction !== lastDirection || now >= repeatAt)) {
-                document.documentElement.classList.add('gl-gamepad-focus')
-                const target = document.activeElement as HTMLElement
-                if (!((direction === 'left' || direction === 'right') && adjust(target, direction === 'left' ? -1 : 1))) move(direction)
-                repeatAt = now + (direction === lastDirection ? 140 : 350)
+            const root = rootNode()
+            if (!root || document.hidden || !document.hasFocus()) {
+                resetController()
+                return
             }
-            lastDirection = direction
-            if (down(0) && !previousA) {
+            if (root.querySelector('[data-gamepad-capture="active"]')) {
+                controller.reset()
+                return
+            }
+            const input = controller.sample(readGamepad(), now)
+            if (!input) return
+            const { direction, activate, back, previous } = input
+            if (direction || activate) {
                 document.documentElement.classList.add('gl-gamepad-focus')
+            }
+            if (direction) {
+                const target = document.activeElement
+                const horizontal = direction === 'left' || direction === 'right'
+                if (!(horizontal && target instanceof HTMLElement && root.contains(target) && adjust(target, direction === 'left' ? -1 : 1))) {
+                    move(root, direction)
+                }
+            }
+            if (activate) {
                 const target = document.activeElement as HTMLElement
-                if (focusables().includes(target)) {
+                if (focusables(root).includes(target)) {
                     if (target.matches('a, button, summary, input[type="checkbox"], input[type="radio"]')) target.click()
                     else if (target instanceof HTMLSelectElement) adjust(target, 1)
-                } else move('down')
+                } else move(root, 'down')
             }
-            if (down(1) && !previousB) {
-                const target = document.activeElement as HTMLElement
-                if (target?.matches('input, select, textarea')) target.blur()
+            if (back) {
+                const target = document.activeElement
+                if (target instanceof HTMLElement && root.contains(target) && target.matches('input, select, textarea')) target.blur()
+                else if (root instanceof HTMLDialogElement) root.close()
                 else onBack?.()
             }
-            if (down(2) && !previousX) {
-                const target = document.activeElement as HTMLElement
-                adjust(target, -1)
+            if (previous) {
+                const target = document.activeElement
+                if (target instanceof HTMLElement && root.contains(target)) adjust(target, -1)
             }
-            previousA = down(0)
-            previousB = down(1)
-            previousX = down(2)
         }
-        const mouse = () => document.documentElement.classList.remove('gl-gamepad-focus')
-        window.addEventListener('keydown', onKey)
-        window.addEventListener('pointerdown', mouse)
+        if (keyboardNavigation) window.addEventListener('keydown', onKey)
+        window.addEventListener('pointerdown', clearFocusStyle)
+        window.addEventListener('blur', resetController)
+        document.addEventListener('visibilitychange', resetController)
         frame = requestAnimationFrame(tick)
         return () => {
             cancelAnimationFrame(frame)
-            window.removeEventListener('keydown', onKey)
-            window.removeEventListener('pointerdown', mouse)
-            mouse()
+            if (keyboardNavigation) window.removeEventListener('keydown', onKey)
+            window.removeEventListener('pointerdown', clearFocusStyle)
+            window.removeEventListener('blur', resetController)
+            document.removeEventListener('visibilitychange', resetController)
+            clearFocusStyle()
         }
-    }, [enabled, onBack])
+    }, [enabled, keyboardNavigation, onBack, scope])
     return null
 }
