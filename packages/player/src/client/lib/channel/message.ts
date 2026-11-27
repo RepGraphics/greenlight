@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid'
 
 import Channel from './channel'
 import MessageHandler from './message/handler'
+import {decodeStreamMessage} from './message/protocol'
 import {streamDimensions} from './message/dimensions'
 
 export default class MessageChannel extends Channel {
@@ -34,10 +35,8 @@ export default class MessageChannel extends Channel {
 
     onMessage(event: MessageEvent<any>) {
         if(this.disposed)return
-        let data: any
-        try { data = JSON.parse(typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data)) } catch { return }
-        if (!data || typeof data.type !== 'string') return
-        // console.log('[MessageChannel] received:', data)
+        const data=decodeStreamMessage(event.data)
+        if(!data)return
 
         switch(data.type){
             case 'HandshakeAck':
@@ -55,8 +54,6 @@ export default class MessageChannel extends Channel {
                 new MessageHandler(this, data)
                 break
 
-            default:
-                console.log('[MessageChannel] Unhandled message type:', data.type, data)
         }
 
     }
@@ -126,6 +123,8 @@ export default class MessageChannel extends Channel {
             'cv': '',
         }
     }
+
+    onClose(){this.destroy()}
 
     destroy() {
         this.disposed=true
