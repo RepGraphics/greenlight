@@ -1,7 +1,7 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import {sendICECandidates,sendSDPOffer} from '../../../player/src/server/index'
-import {xboxIceAnswer} from '../../../player/src/server/iceexchange'
+import {xboxIceAnswer,validateXboxIceCandidates,iceCandidateLimit} from '../../../player/src/server/iceexchange'
 
 const config={id:'console',type:'home' as const,resolution:1080 as const,language:'en-GB',host:'https://uks.core.gssv-play-prodxhome.xboxlive.com'}
 const token={token:'test',market:'GB',language:'en-GB'}
@@ -49,4 +49,27 @@ test('an explicit signaling rejection is reported without upstream content',asyn
             :Response.json({exchangeResponse:null,errorDetails:{code:42,message:'sensitive upstream error'}})
         await assert.rejects(sendSDPOffer(token,config,path,{type:'offer',sdp:'v=0\r\n'}),/^Error: Xbox rejected the signaling exchange$/)
     }finally{globalThis.fetch=original}
+})
+
+test('ICE candidate validation bounds fields and drops unrelated upstream data',()=>{
+    const valid={candidate:'candidate:1 1 UDP 1 192.0.2.1 9002 typ host',sdpMid:'0',sdpMLineIndex:'0',usernameFragment:'abcd'}
+    assert.deepEqual(validateXboxIceCandidates([{...valid,token:'private'}]),[valid])
+    for(const value of [null,{},Array(iceCandidateLimit+1).fill(valid),[{candidate:'bad'}],[{...valid,candidate:'candidate:'+ 'x'.repeat(4096)}],[{...valid,candidate:'candidate:1\nmalicious'}],[{...valid,sdpMLineIndex:'65536'}],[{...valid,sdpMLineIndex:-1}],[{...valid,sdpMid:{}}],[{...valid,usernameFragment:'a b'}],[{...valid,messageType:'unexpected'}]])assert.throws(()=>validateXboxIceCandidates(value),/Invalid Xbox ICE candidates/)
+    assert.throws(()=>xboxIceAnswer(' '.repeat(1024*1024+1),true),/Invalid Xbox ICE response/)
+    assert.throws(()=>xboxIceAnswer(JSON.stringify([{candidate:'bad',secret:'private'}]),true),/^Error: Invalid Xbox ICE response$/)
+})
+test('invalid outgoing ICE does not reach the Xbox service',async()=>{
+    const original=globalThis.fetch
+    try{
+        globalThis.fetch=async()=>assert.fail('unexpected Xbox request')
+        await assert.rejects(sendICECandidates(token,config,path,[{candidate:'bad'}]),/Invalid Xbox ICE candidates/)
+    }finally{globalThis.fetch=original}
+})
+test('Teredo fallback expansion stays within the total candidate limit',()=>{
+    const teredo={candidate:'a=candidate:3 1 UDP 1 2001:0000:4136:e378:8000:63bf:3fff:fdd2 9002 typ host',sdpMid:'0',sdpMLineIndex:'0'}
+    const end={candidate:'a=end-of-candidates',sdpMid:'0',sdpMLineIndex:'0'}
+    const list=[...Array(iceCandidateLimit-1).fill(teredo),end]
+    const result=xboxIceAnswer(JSON.stringify(list),true)
+    assert.equal(result.length,iceCandidateLimit)
+    assert.deepEqual(result.at(-1),end)
 })

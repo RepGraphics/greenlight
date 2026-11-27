@@ -2,7 +2,7 @@ import type { xStreamToken, xCloudStreamConfig, SDPResponse, startStreamResponse
 export type { xStreamToken, startStreamResponse, SDPResponse, xCloudStreamConfig, StatusResponse, ErrorResponse };
 import {streamOrigin,playPath,sessionEndpoint} from './requestpolicy';
 import {readStreamingResponse,streamingResponseLimit,transferTokenResponseLimit} from './response';
-import {xboxIceAnswer} from './iceexchange'
+import {xboxIceAnswer,validateXboxIceCandidates} from './iceexchange'
 
 export const ping = () => 'pong';
 
@@ -96,11 +96,11 @@ export const sendChatSDP = async (token:xStreamToken,config:xCloudStreamConfig,s
     }catch{throw Error('Invalid chat SDP answer')}
 }
 
-export const sendICECandidates = async (xStreamToken:xStreamToken, xCloudStreamConfig:xCloudStreamConfig, sessionPath:string, candidates:Array<any>) => {
+export const sendICECandidates = async (xStreamToken:xStreamToken, xCloudStreamConfig:xCloudStreamConfig, sessionPath:string, candidates:unknown[]) => {
     const path = sessionEndpoint(xCloudStreamConfig.type,sessionPath,'ice')
     await httpPost<StatusResponse>(xStreamToken, xCloudStreamConfig, path, JSON.stringify({
         messageType: 'iceCandidate',
-        candidate: candidates,
+        candidate: validateXboxIceCandidates(candidates),
     }))
     const response = await pollExchange<SDPResponse>(xStreamToken, xCloudStreamConfig, path)
     const exchange = (response as SDPResponse)?.exchangeResponse

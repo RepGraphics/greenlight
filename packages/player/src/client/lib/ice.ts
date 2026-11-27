@@ -42,11 +42,10 @@ export default class Ice {
             if(typeof entry?.candidate!=='string')continue
             const line=entry.candidate.trim().replace(/^a=/,'')
             const candidate=line==='end-of-candidates'?'':line
-            await this._peerConnection.addIceCandidate({
-                candidate,
-                sdpMid:entry.sdpMid,
-                sdpMLineIndex:entry.sdpMLineIndex,
-            }).catch(()=>{})
+            const rawIndex:unknown=entry.sdpMLineIndex
+            const index=typeof rawIndex==='string'&&/^\d{1,5}$/.test(rawIndex)?Number(rawIndex):rawIndex
+            if(index!==undefined&&index!==null&&!(typeof index==='number'&&Number.isInteger(index)&&index>=0&&index<=65535))continue
+            try{await this._peerConnection.addIceCandidate({candidate,sdpMid:entry.sdpMid,sdpMLineIndex:index as number|null|undefined,usernameFragment:entry.usernameFragment})}catch{}
         }
     }
 }
