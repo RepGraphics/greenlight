@@ -28,6 +28,7 @@ export const TrpcProviderComponent = ({ children }: { children: ReactNode }) => 
           : httpBatchLink({
               url: '/trpc',
               methodOverride: 'POST',
+              maxItems: 16,
               fetch: (input,init)=>fetch(input,{...init,cache:'no-store'}),
             }),
       ],
