@@ -224,3 +224,20 @@ body {
 
 /* Presentation only: leave touch coordinates, overlays and captured media unchanged. */
 .web-remote-player #playerContainer video { filter:var(--gl-web-video-filter,none); }
+
+/* Fullscreen retains the shared player, its input overlay and a reachable exit. */
+.web-fullscreen-surface:fullscreen {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  width:100%; height:100%; overflow:auto; background:#000; color:white;
+}
+.web-fullscreen-surface:fullscreen .web-remote-player {
+  width:min(100%,calc(max(0px,100vh - 112px) * 16 / 9));
+  max-width:none; margin:0; flex-shrink:0;
+}
+.web-fullscreen-toolbar {
+  display:flex; align-items:center; justify-content:center; flex-wrap:wrap;
+  gap:8px; padding:8px;
+}
+.web-fullscreen-surface:fullscreen .web-fullscreen-toolbar {
+  flex-shrink:0; max-width:100%; padding-bottom:max(8px,env(safe-area-inset-bottom));
+}
