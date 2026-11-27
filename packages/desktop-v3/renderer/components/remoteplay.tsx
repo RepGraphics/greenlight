@@ -3,6 +3,7 @@ import dynamic from 'next/dynamic'
 import CaptureControls from './capturecontrols'
 import FullscreenSurface from './fullscreensurface'
 import StreamDiagnostics from './streamdiagnostics'
+import {webQualityAdvice} from '../utils/webqualityadvice'
 import {appendWebDiagnostic} from '../utils/webdiagnostics'
 import type {DiagnosticSample} from '../../../desktop/renderer/lib/streamdiagnostics'
 import ControllerCalibration from './controllercalibration'
@@ -107,14 +108,23 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
             })
         }catch{transition('startFailed')}
     }
-    const end=async()=>{
+    const end=async(returnToSetup=false,nextBitrate?:number)=>{
         if(phaseRef.current==='stopping')return
         if(phaseRef.current==='idle'){onExit();return}
         transition('stopping');setMic('off');setAdapter(null)
         const stopped=await lifecycle.current.end()
         if(!mounted.current)return
-        if(stopped){transition('idle');onExit()}
-        else transition('stopFailed')
+        if(stopped){
+            transition('idle');setStatus('Initializing');setGuideMissing(false)
+            if(returnToSetup){if(nextBitrate!==undefined)setBitrate(nextBitrate)}
+            else onExit()
+        }else transition('stopFailed')
+    }
+    const advice=phase==='playing'&&status==='Connected'?webQualityAdvice(samples,bitrate,Math.max(0,(typeof performance==='undefined'?0:performance.now())-diagnosticStart.current)/1000,status):null
+    const applyAdvice=()=>{
+        if(phaseRef.current!=='playing'||status!=='Connected')return
+        const cap=webQualityAdvice(samples,bitrate,(performance.now()-diagnosticStart.current)/1000,status)
+        if(cap!==null)void end(true,cap)
     }
     const button='rounded border border-white/20 px-4 py-2 disabled:opacity-50'
     return <section className="h-screen overflow-y-auto bg-[#0d0d0d] text-white p-4">
@@ -143,7 +153,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         </div>}
         {cloud&&phase!=='idle'&&<p className="text-sm text-white/60">Cloud queues may take several minutes. Cancelling will request termination of the current session; starting again may rejoin the queue.</p>}
         {phase==='starting'&&<p role="status">Starting Xbox session…</p>}
-        {phase==='playing'&&<p role="status">{status==='Error'?'Connection failed. End the session before trying again.':status}</p>}
+        {phase==='playing'&&<p role="status">{status==='Error'?'Connection failed. End the session and return to setup before trying again.':status}</p>}
         {phase==='startFailed'&&<p role="alert">Unable to start. If the provisioning response was lost, check for an existing Xbox session before retrying.</p>}
         {phase==='stopping'&&<p role="status">Waiting for Xbox to acknowledge session termination…</p>}
         {phase==='stopFailed'&&<p role="alert">Xbox termination is not confirmed. A previous request may still be pending. Retry before leaving.</p>}
@@ -198,8 +208,9 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         {phase==='playing'&&status==='Connected'&&<VideoAppearance value={filters} onChange={setFilters}/>}
         {phase==='playing'&&status==='Connected'&&<PictureInPictureControl surface={()=>playerSurface.current}/>}
         {phase==='playing'&&status==='Connected'&&<CaptureControls surface={()=>playerSurface.current}/>}
-        {phase!=='idle'&&<StreamDiagnostics samples={samples} type={target.type} status={status} reason={failureReason}/>}
+        {phase!=='idle'&&<StreamDiagnostics samples={samples} type={target.type} status={status} reason={failureReason} recommendedCap={advice} onApplyRecommendation={applyAdvice}/>}
         {guideMissing&&<p role='status'>Connect a controller or enable the on-screen or keyboard controller to open the guide.</p>}
+        {(phase==='playing'||phase==='startFailed'||phase==='stopFailed')&&<button type="button" className={button+' mr-2'} onClick={()=>void end(true)}>{phase==='stopFailed'?'Retry ending and return to setup':'End stream and return to setup'}</button>}
         {phase!=='idle'&&<button type="button" className={button} disabled={phase==='stopping'} onClick={()=>void end()}>{phase==='stopFailed'?'Retry ending session':phase==='starting'?'Cancel and end session':'End session'}</button>}
     </section>
 }
