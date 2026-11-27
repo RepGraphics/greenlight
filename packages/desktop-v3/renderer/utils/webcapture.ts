@@ -102,6 +102,18 @@ export class WebCaptureSession{
         this.publish({phase:'stopping'})
         this.recording.stop()
     }
+    // Stop live media work when the stream ceases to be connected. Completed
+    // captures and local clip edits belong to the current page, not the peer.
+    suspendLiveCapture(){
+        if(this.state.phase==='recording'){this.stop();return}
+        if(this.state.phase==='replay'){this.cancelReplay();return}
+        if(this.state.phase==='capturing'){
+            this.generation++
+            this.publish({phase:'failed'})
+        }
+        // An explicitly requested recording/replay finalization may finish.
+        // Local trim work is independent of the Xbox connection.
+    }
     async trim(original:Blob,video:HTMLVideoElement,range:ClipTrimRange){
         const source=this.state
         if(this.trimController||source.phase!=='ready'||source.blob!==original||!isWebCaptureClip(original)||!source.filename)return

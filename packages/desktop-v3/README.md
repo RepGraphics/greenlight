@@ -58,6 +58,8 @@ Settings includes a Compatibility category with local API and H.264 receiver cap
 
 Use Remember setup for this sign-in to override the device defaults independently for Remote Play and Cloud Gaming, including controller mappings, touch, volume, stats and appearance. Restore device defaults clears that mode’s override. Sign-out, account switches and reload discard both overrides. Mute remains a separate playback/device preference and microphone permission is never remembered. Hiding the page disables requested voice chat without automatically reenabling it.
 
+Completed captures survive a connection interruption or ending a stream and returning to setup, in memory for the current game page. Active recordings are stopped for finalization, unsaved rolling replay is discarded, and explicitly requested replay saves may finish. Local trimming, sharing and saving remain available without a connection. A new capture requires discarding the previous one. Ending a stream with a capture returns to setup, where leaving requires explicit discard confirmation. Browser fullscreen includes expandable essential playback controls and keeps the touch overlay aligned with the video rather than the statistics HUD. No capture persistence beyond the current page or device testing is implied.
+
 ## Development
 
 From the repository root, use Node.js 24 and Yarn Classic 1.22.22:

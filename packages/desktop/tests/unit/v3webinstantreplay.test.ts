@@ -83,3 +83,16 @@ test('missing or invalid replay output is not exposed for download',async()=>{
         assert.equal(f.counts().disposals,1)
     }
 })
+
+test('suspension disposes an unsaved replay but retains an explicitly requested replay save',async()=>{
+    const unsaved=fixture();unsaved.session.startReplay(video,audio,30)
+    unsaved.session.suspendLiveCapture()
+    assert.equal(unsaved.counts().disposals,1)
+    assert.deepEqual(unsaved.states.at(-1),{phase:'idle'})
+    const saving=fixture();saving.session.startReplay(video,audio,30)
+    const pending=saving.session.saveReplay();saving.session.suspendLiveCapture()
+    assert.equal(saving.states.at(-1)?.phase,'savingReplay')
+    saving.finish();await pending
+    assert.equal(saving.states.at(-1)?.blob,clip)
+    assert.equal(saving.counts().disposals,1)
+})

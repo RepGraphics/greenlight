@@ -208,7 +208,7 @@ body {
 .web-remote-player { position:relative; width:100%; max-width:1280px; margin:12px auto; }
 .web-remote-player #playerContainer { aspect-ratio:16/9; width:100%; background:#000; overflow:hidden; }
 .web-remote-player .gl-performance-hud { display:flex; flex-wrap:wrap; gap:12px; padding:6px; font-size:12px; }
-.web-remote-player .gl-touch-overlay { position:absolute; inset:0; pointer-events:none; touch-action:none; }
+.web-remote-player .gl-touch-overlay { position:absolute; top:0; left:0; right:0; aspect-ratio:16/9; pointer-events:none; touch-action:none; }
 .web-remote-player .gl-touch-overlay button,.web-remote-player .gl-virtual-stick { pointer-events:auto; touch-action:none; user-select:none; background:#101827ba; border:1px solid #ffffff88; color:white; }
 .web-remote-player .gl-touch-overlay button { border-radius:50%; width:clamp(30px,6vw,52px); height:clamp(30px,6vw,52px); }
 .web-remote-player .gl-touch-shoulders { position:absolute; top:5%; left:2%; right:2%; display:flex; justify-content:space-between; }
@@ -227,12 +227,16 @@ body {
 
 /* Fullscreen retains the shared player, its input overlay and a reachable exit. */
 .web-fullscreen-surface:fullscreen {
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  display:grid; grid-template-rows:minmax(0,1fr) auto; justify-items:center;
   width:100%; height:100%; overflow:auto; background:#000; color:white;
 }
+.web-fullscreen-surface:fullscreen .web-fullscreen-content {
+  width:100%; min-width:0; min-height:0; overflow:auto; display:grid; place-items:center; container-type:size;
+}
 .web-fullscreen-surface:fullscreen .web-remote-player {
-  width:min(100%,calc(max(0px,100vh - 112px) * 16 / 9));
-  max-width:none; margin:0; flex-shrink:0;
+  width:min(100%,calc(max(0px,100vh - 180px) * 16 / 9));
+  width:min(100%,calc(max(0px,100cqh - 52px) * 16 / 9));
+  max-width:none; margin:0;
 }
 .web-fullscreen-toolbar {
   display:flex; align-items:center; justify-content:center; flex-wrap:wrap;
@@ -241,3 +245,7 @@ body {
 .web-fullscreen-surface:fullscreen .web-fullscreen-toolbar {
   flex-shrink:0; max-width:100%; padding-bottom:max(8px,env(safe-area-inset-bottom));
 }
+
+.web-fullscreen-actions { max-width:100%; text-align:center; }
+.web-fullscreen-actions summary { cursor:pointer; padding:8px; }
+.web-fullscreen-surface:fullscreen .web-fullscreen-toolbar { max-height:45dvh; overflow:auto; }

@@ -55,6 +55,8 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     const [startupFailure,setStartupFailure]=useState<StartFailureReason>('start-unconfirmed')
     const [defaultsUpdated,setDefaultsUpdated]=useState(false)
     const [setupMessage,setSetupMessage]=useState('')
+    const [captureRetained,setCaptureRetained]=useState(false)
+    const [leaveRequested,setLeaveRequested]=useState(false)
     const pendingSetupBitrate=useRef<number|undefined>(undefined)
     const exitDestination=useRef<'browse'|'setup'>('browse')
     const diagnosticStart=useRef(0)
@@ -111,6 +113,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     },[])
     const start=()=>{
         if(phaseRef.current!=='idle')return
+        setLeaveRequested(false)
         diagnosticStart.current=performance.now();setSamples([]);setFailureReason('')
         try{
             const {token,host}=selectStreamCredentials(target,getxHomeToken(),getxCloudToken(),{
@@ -146,9 +149,12 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
             })
         }catch(cause){failStart(cause)}
     }
+    const leaveSetup=()=>{if(captureRetained){setLeaveRequested(true);return}onExit()}
     const end=async(destination:'browse'|'setup'='browse',nextBitrate?:number)=>{
         if(phaseRef.current==='stopping')return
-        if(phaseRef.current==='idle'){onExit();return}
+        if(phaseRef.current==='idle'){leaveSetup();return}
+        // Keep the page alive if an explicitly requested capture is pending or ready.
+        if(destination==='browse'&&captureRetained)destination='setup'
         if(phaseRef.current!=='stopFailed'||destination!==exitDestination.current||nextBitrate!==undefined)pendingSetupBitrate.current=destination==='setup'?nextBitrate:undefined
         exitDestination.current=destination
         transition('stopping');setMic('off');setAdapter(null)
@@ -186,11 +192,12 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     const button='v3-button v3-button-secondary'
     return <main className="v3-session" ref={setupScope}>
         <Head><title>{target.name} · Greenlight V3</title></Head>
-        <DashboardInput enabled={phase==='idle'} scope={setupScope} keyboardNavigation={false} onBack={onExit}/>
+        <DashboardInput enabled={phase==='idle'} scope={setupScope} keyboardNavigation={false} onBack={leaveSetup}/>
         <header className="v3-page-header v3-session-header">
             <div><p>{mode}</p><h1>{target.name}</h1></div>
             {phase==='idle'&&<button type="button" className={button} onClick={()=>void end()}><ArrowLeft size={17} aria-hidden="true"/> Back to {cloud?'library':'consoles'}</button>}
         </header>
+        {phase==='idle'&&leaveRequested&&captureRetained&&<section className="v3-panel" role="alert"><p>Leaving this game page discards its local captures. Save them below before leaving.</p><div className="v3-actions"><button type="button" className={button} onClick={()=>setLeaveRequested(false)}>Stay here</button><button type="button" className={button} onClick={onExit}>Discard captures and leave</button></div></section>}
         {phase==='idle'&&<div className="v3-panel v3-settings-panel v3-session-setup">
             <h2>Stream setup</h2>
             <div className="v3-settings-grid">
@@ -237,7 +244,18 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         </section>}
         {phase==='stopping'&&<p role="status">Waiting for Xbox to acknowledge session termination…</p>}
         {phase==='stopFailed'&&<p role="alert">Xbox termination is not confirmed. A previous request may still be pending. Retry before leaving.</p>}
-        {phase==='playing'&&adapter&&status!=='Error'&&<FullscreenSurface enabled={status==='Connected'}>
+        {phase==='playing'&&adapter&&status!=='Error'&&<FullscreenSurface enabled={status==='Connected'} fullscreenActions={<>
+            <button type="button" className={button} aria-pressed={muted} onClick={event=>{event.currentTarget.blur();setMuted(value=>!value)}}>{muted?'Unmute':'Mute'}</button>
+            {micAvailable&&adapter.sendChatSDP&&<button type="button" className={button} aria-pressed={microphoneRequested(mic)} onClick={event=>{event.currentTarget.blur();setMic(previous=>toggleWebMicrophone(previous,micAvailable,phaseRef.current==='playing'&&status==='Connected'))}}>{mic==='active'?'Disable microphone':mic==='requesting'?'Cancel microphone request':'Enable microphone'}</button>}
+            {!inputOptions.consoleController&&<button type="button" className={button} onClick={event=>{event.currentTarget.blur();setGuideMissing(false);setGuide(value=>value+1)}}>Xbox guide</button>}
+            <button type="button" className={button} aria-pressed={showStats} onClick={event=>{event.currentTarget.blur();setShowStats(value=>!value)}}>Statistics</button>
+            <button type="button" className={button} onClick={event=>{event.currentTarget.blur();setKeyframe(value=>value+1)}}>Refresh video</button>
+            <button type="button" className={button} onClick={()=>void end('setup')}>End and return to setup</button>
+            {mic==='active'&&<p role="status" className="w-full text-center">Microphone active</p>}
+            {mic==='requesting'&&<p role="status" className="w-full text-center">Requesting microphone…</p>}
+            {mic==='failed'&&<p role="alert" className="w-full text-center">Microphone unavailable</p>}
+            {guideMissing&&<p role="status" className="w-full text-center">Enable a local controller to open the guide.</p>}
+        </>}>
             <div ref={playerSurface} className="web-remote-player" style={{'--gl-web-video-filter':presentation.filter} as CSSProperties}>
                 {presentation.kernel&&<svg width="0" height="0" aria-hidden="true" style={{position:'absolute',pointerEvents:'none'}}><defs><filter id="gl-stream-sharpen" colorInterpolationFilters="sRGB"><feConvolveMatrix order={3} kernelMatrix={presentation.kernel} divisor={1} edgeMode="duplicate" preserveAlpha={true}/></filter></defs></svg>}
                 <SharedPlayer
@@ -288,7 +306,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         {phase==='playing'&&status==='Connected'&&<VideoAppearance value={filters} onChange={setFilters}/>}
         {phase==='playing'&&status==='Connected'&&<PictureInPictureControl surface={()=>playerSurface.current}/>}
         {phase==='playing'&&status==='Connected'&&<div className="my-2"><button type="button" className={button} onClick={rememberCurrentSetup}>Remember current setup for this sign-in</button>{setupMessage&&<p role="status">{setupMessage}</p>}</div>}
-        {phase==='playing'&&status==='Connected'&&<CaptureControls surface={()=>playerSurface.current}/>}
+        <CaptureControls surface={()=>playerSurface.current} connected={phase==='playing'&&status==='Connected'} onRetainedChange={setCaptureRetained}/>
         {phase!=='idle'&&<StreamDiagnostics samples={samples} type={target.type} status={status} reason={failureReason} recommendedCap={advice} onApplyRecommendation={applyAdvice}/>}
         {guideMissing&&<p role='status'>Connect a controller or enable the on-screen or keyboard controller to open the guide.</p>}
         {phase!=='idle'&&phase!=='startFailed'&&<div className="v3-actions">
