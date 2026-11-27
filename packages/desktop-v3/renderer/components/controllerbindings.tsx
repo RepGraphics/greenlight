@@ -17,9 +17,10 @@ export default function ControllerBindings({mapping,onChange}:{mapping:Record<st
     const [candidate,setCandidate]=useState<string|null>(null)
     const listener=useRef<WebButtonListener|null>(null)
     const source=useRef<ControllerIdentity|null>(null)
+    const manualCandidate=useRef(false)
     const selectedRef=useRef(selected)
     selectedRef.current=selected
-    const cancel=()=>{listener.current=null;source.current=null;setCandidate(null);setStatus('idle')}
+    const cancel=()=>{listener.current=null;source.current=null;manualCandidate.current=false;setCandidate(null);setStatus('idle')}
     useEffect(()=>{
         if(!open)return
         const tick=()=>{
@@ -51,7 +52,7 @@ export default function ControllerBindings({mapping,onChange}:{mapping:Record<st
     const start=()=>{
         const current=readPads().find(item=>item.index===pad?.index&&item.id===pad?.id)
         if(!current||document.hidden||!document.hasFocus()){setStatus('failed');return}
-        source.current={index:current.index,id:current.id};setSelected(String(current.index))
+        manualCandidate.current=false;source.current={index:current.index,id:current.id};setSelected(String(current.index))
         setCandidate(null);setStatus('waiting');listener.current=new WebButtonListener(current,performance.now()+10000)
     }
     return <details className="w-full rounded border border-white/10 p-3" onToggle={event=>{setOpen(event.currentTarget.open);if(!event.currentTarget.open)cancel()}}>
@@ -60,8 +61,8 @@ export default function ControllerBindings({mapping,onChange}:{mapping:Record<st
             <p className="text-sm text-white/60">Choose an Xbox button, then a physical button index (0–63), or listen for a press. Mappings apply to all local physical controllers for this session. Multiple Xbox buttons may share an index.</p>
             <div className="flex flex-wrap gap-3 items-center">
                 <label>Xbox button <select className="bg-[#202020] rounded p-2" value={target} onChange={event=>{cancel();setTarget(event.target.value)}}>{webBindingTargets.map(key=><option key={key} value={key}>{key==='Nexus'?'Guide':key}</option>)}</select></label>
-                <label>Physical button index <select className="bg-[#202020] rounded p-2" value={candidate??mapping[target]??defaultButtonMapping[target]} onChange={event=>{listener.current=null;source.current=null;setCandidate(event.target.value);setStatus('ready')}}>{Array.from({length:64},(_,index)=><option key={index} value={index}>{index}</option>)}</select></label>
-                <button type="button" className={button} disabled={candidate===null||listening} onClick={()=>{if(candidate===null)return;const current=readPads();const selectedPad=current.find(item=>String(item.index)===selected)??current[0];if(controllerConfirmationValid(source.current,selectedPad,current,!document.hidden&&document.hasFocus())){onChange(updateWebBinding(mapping,target,candidate));cancel()}else{cancel();setStatus('failed')}}}>Apply mapping</button>
+                <label>Physical button index <select className="bg-[#202020] rounded p-2" value={candidate??mapping[target]??defaultButtonMapping[target]} onChange={event=>{listener.current=null;source.current=null;manualCandidate.current=true;setCandidate(event.target.value);setStatus('ready')}}>{Array.from({length:64},(_,index)=><option key={index} value={index}>{index}</option>)}</select></label>
+                <button type="button" className={button} disabled={candidate===null||listening} onClick={()=>{if(candidate===null)return;const current=readPads();const selectedPad=current.find(item=>String(item.index)===selected)??current[0];if((manualCandidate.current||source.current!==null)&&controllerConfirmationValid(source.current,selectedPad,current,!document.hidden&&document.hasFocus())){onChange(updateWebBinding(mapping,target,candidate));cancel()}else{cancel();setStatus('failed')}}}>Apply mapping</button>
                 <button type="button" className={button} onClick={()=>{onChange(updateWebBinding(mapping,target,defaultButtonMapping[target]));cancel()}}>Reset selected button</button>
             </div>
             <div className="flex flex-wrap gap-2 items-center">
