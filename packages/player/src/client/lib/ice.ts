@@ -37,11 +37,11 @@ export default class Ice {
             console.warn('Error: No candidates received!')
         }
 
-        // The desktop session API already expands Teredo addresses. Do not add
-        // duplicate synthetic candidates or discard the server's end marker.
+        // The Xbox session API supplies compatibility routes before its end marker.
         for(const entry of candidates){
             if(typeof entry?.candidate!=='string')continue
-            const candidate=entry.candidate==='a=end-of-candidates'?'':entry.candidate
+            const line=entry.candidate.trim().replace(/^a=/,'')
+            const candidate=line==='end-of-candidates'?'':line
             await this._peerConnection.addIceCandidate({
                 candidate,
                 sdpMid:entry.sdpMid,

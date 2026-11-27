@@ -28,6 +28,13 @@ import type {communicationHandler} from '@greenlight/player/client'
 
 const SharedPlayer=dynamic(()=>import('@greenlight/player/client').then(module=>module.StreamPlayer),{ssr:false})
 type Phase='idle'|'starting'|'playing'|'startFailed'|'stopping'|'stopFailed'
+const handshakeFailureMessage: Record<string,string> = {
+    'sdp-offer': 'Greenlight couldn’t prepare the WebRTC offer.',
+    'sdp-exchange': 'Xbox didn’t complete the WebRTC offer exchange.',
+    'sdp-answer': 'Greenlight couldn’t apply the WebRTC answer from Xbox.',
+    'ice-exchange': 'Xbox didn’t complete the network route exchange.',
+    'ice-connect': 'Greenlight and Xbox couldn’t establish a working network route.',
+}
 export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExit:()=>void}){
     const {getxHomeToken,getxCloudToken,getUserRefreshToken,authState,desktop}=useAuth()
     const {preferences,savePreferences,storageAvailable}=useStreamPreferences()
@@ -188,7 +195,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         </div>}
         {cloud&&phase!=='idle'&&<p className="text-sm text-white/60">Cloud queues may take several minutes. Cancelling will request termination of the current session; starting again may rejoin the queue.</p>}
         {phase==='starting'&&<p role="status">Starting Xbox session…</p>}
-        {phase==='playing'&&<p role="status">{status==='Error'?'Connection failed. End the session before trying again.':status}</p>}
+        {phase==='playing'&&<p role="status">{status==='Error'?(handshakeFailureMessage[failureReason]??'Connection failed. End the session before trying again.'):status}</p>}
         {phase==='startFailed'&&<section className="v3-panel v3-start-failure">
             <div role="alert"><h2>Couldn’t start {mode}</h2><p>{startFailureDetails[startupFailure].message}</p></div>
             <div className="v3-actions">

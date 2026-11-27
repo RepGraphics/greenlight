@@ -2,6 +2,7 @@ import type { xStreamToken, xCloudStreamConfig, SDPResponse, startStreamResponse
 export type { xStreamToken, startStreamResponse, SDPResponse, xCloudStreamConfig, StatusResponse, ErrorResponse };
 import {streamOrigin,playPath,sessionEndpoint} from './requestpolicy';
 import {readStreamingResponse,streamingResponseLimit,transferTokenResponseLimit} from './response';
+import {xboxIceAnswer} from './iceexchange'
 
 export const ping = () => 'pong';
 
@@ -96,11 +97,14 @@ export const sendChatSDP = async (token:xStreamToken,config:xCloudStreamConfig,s
 }
 
 export const sendICECandidates = async (xStreamToken:xStreamToken, xCloudStreamConfig:xCloudStreamConfig, sessionPath:string, candidates:Array<any>) => {
-    await httpPost<StatusResponse>(xStreamToken, xCloudStreamConfig, sessionEndpoint(xCloudStreamConfig.type,sessionPath,'ice'), JSON.stringify({
-        candidates: candidates
+    const path = sessionEndpoint(xCloudStreamConfig.type,sessionPath,'ice')
+    await httpPost<StatusResponse>(xStreamToken, xCloudStreamConfig, path, JSON.stringify({
+        messageType: 'iceCandidate',
+        candidate: candidates,
     }))
-
-    return await pollExchange<any>(xStreamToken, xCloudStreamConfig, sessionEndpoint(xCloudStreamConfig.type,sessionPath,'ice'))
+    const response = await pollExchange<SDPResponse>(xStreamToken, xCloudStreamConfig, path)
+    const exchange = (response as SDPResponse)?.exchangeResponse
+    return {exchangeResponse: JSON.stringify(xboxIceAnswer(exchange, xCloudStreamConfig.type === 'home'))}
 }
 
 export const sendMsalToken = async (xStreamToken:xStreamToken, xCloudStreamConfig:xCloudStreamConfig, sessionPath:string, userRefreshToken:string) => {
@@ -155,7 +159,12 @@ async function pollExchange<T>(token: xStreamToken, config: xCloudStreamConfig, 
     const deadline = Date.now() + 45000
     do {
         const response = await httpGet<T>(token, config, url)
-        if ((response as StatusResponse)?.status !== 204) return response
+        const envelope = response as SDPResponse
+        if (envelope?.errorDetails?.code != null && envelope.errorDetails.code !== 0) {
+            throw Error('Xbox rejected the signaling exchange')
+        }
+        const waiting = [200,202,204].includes((response as StatusResponse)?.status) && envelope?.exchangeResponse === undefined
+        if (!waiting && envelope?.exchangeResponse !== null) return response
         await new Promise(resolve => setTimeout(resolve, 750))
     } while (Date.now() < deadline)
     throw new Error('Streaming handshake timed out')

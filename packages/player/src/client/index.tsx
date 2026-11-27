@@ -276,6 +276,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             let mediaWatchdog:ReturnType<typeof setInterval>;
             let terminal=false;
             let failures = 0;
+            let handshake: 'sdp-offer' | 'sdp-exchange' | 'sdp-answer' | 'ice-exchange' | 'ice-connect' | undefined;
             const current = handler.current;
             const active=()=>!disposed&&!terminal;
             const status=(value:string)=>{if(active())setPlayerState(value)};
@@ -284,13 +285,14 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             const fail=(reason:string)=>{
                 if(!active())return;
                 terminal=true;clearTimers();
-                failureCallback.current?.(reason);setPlayerState('Error');
+                failureCallback.current?.(reason==='transport'&&handshake?handshake:reason);setPlayerState('Error');
             };
             const watchdog=new StreamConnectionWatchdog(fail);
             watchdog.beginProvisioning();
             const heartbeat = new StreamHeartbeat(()=>current.sendKeepalive(),()=>fail('heartbeat'));
             const connect = async () => {
                 if(!active())return;
+                handshake='sdp-offer';
                 watchdog.beginHandshake();
                 instance = new xCloudPlayer('playerContainer', useWebGpu, videoBitrate, codecProfiles, consoleController,playback.current.volume,playback.current.muted,current.getStreamConfig().resolution===720?720:1080);
                 instance.init();
@@ -298,12 +300,15 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 status('Connecting');
                 const offer = await instance.createOffer();
                 if (!active()) return;
+                handshake='sdp-exchange';
                 const answer = await current.sendSDPOffer(offer);
                 if (!active()) return;
+                handshake='sdp-answer';
                 const remote = JSON.parse(answer.exchangeResponse);
                 if (typeof remote?.sdp !== 'string') throw new Error('Invalid SDP answer');
                 await instance.setRemoteSDP(remote.sdp);
                 if(!active())return;
+                handshake='ice-exchange';
                 const localIce = await instance.getICECandidates();
                 if (!active()) return;
                 const candidates = localIce.map(candidate => JSON.stringify({ candidate: candidate.candidate, sdpMid: candidate.sdpMid, sdpMLineIndex: candidate.sdpMLineIndex, usernameFragment: candidate.usernameFragment }));
@@ -313,12 +318,13 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 if (!Array.isArray(ice)) throw new Error('Invalid ICE response');
                 await instance.setRemoteIceCandidates(ice);
                 if (!active()) return;
+                handshake='ice-connect';
                 const peer = instance._peerConnection;
                 const onConnection = () => {
                     if (!active()) return;
                     watchdog.update(peer.connectionState);
                     if(!active())return;
-                    if (peer.connectionState === 'connected') { status('Connected'); instance?._channels.control.requestKeyframeRequest(true) }
+                    if (peer.connectionState === 'connected') { handshake=undefined; status('Connected'); instance?._channels.control.requestKeyframeRequest(true) }
                     else if (peer.connectionState === 'disconnected') status('Reconnecting');
                 };
                 peer.addEventListener('connectionstatechange', onConnection);
@@ -341,7 +347,7 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                     if (active()) timer = setTimeout(poll, 1000);
                 } catch {
                     if (!active()) return;
-                    if (instance || ++failures >= 5) { fail(instance?'transport':'server'); return }
+                    if (handshake || ++failures >= 5) { fail(handshake?'transport':'server'); return }
                     timer = setTimeout(poll, 1500);
                 }
             };

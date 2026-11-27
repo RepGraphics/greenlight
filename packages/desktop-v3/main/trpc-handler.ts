@@ -31,9 +31,17 @@ export function setupTrpcHandler(trusted: TrustedFrame, streamRefreshToken: (typ
       const data = await fn(input)
       return { result: { data } }
     } catch (cause: unknown) {
-      const error = cause as Error & { code?: string }
+      const error = cause as Error & { code?: string; cause?: {error?: {status?: unknown}} }
+      const signaling = op?.path === 'streaming_send_sdp_offer' ? 'SDP' : op?.path === 'streaming_send_ice_candidates' ? 'ICE' : undefined
       if (op?.path === 'streaming_start_stream') {
         console.warn('V3 Xbox stream startup rejected', error.code ?? 'UNCONFIRMED')
+      }
+      if (signaling) {
+        const status = error.cause?.error?.status
+        const suffix = typeof status === 'number' && Number.isInteger(status) && status >= 400 && status <= 599 ? ` (HTTP ${status})` : ''
+        const message = `Xbox ${signaling} exchange failed${suffix}.`
+        console.warn('V3', message)
+        return {error: {message, code: 'INTERNAL_SERVER_ERROR'}}
       }
       return {
         error: {
