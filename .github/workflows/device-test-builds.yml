@@ -104,3 +104,95 @@ jobs:
           name: greenlight-android-debug-${{ github.sha }}
           path: packages/android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+  verify:
+    name: Verify matching artifacts and local backend
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: greenlight-*-${{ github.sha }}
+          path: test-artifacts
+      - name: Verify expected files and generate checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd test-artifacts
+          test -n "$(find "greenlight-v2-windows-x64-$GITHUB_SHA" -type f -name '*.exe' -print -quit)"
+          test -n "$(find "greenlight-v2-windows-x64-$GITHUB_SHA" -type f -name '*.zip' -print -quit)"
+          test -n "$(find "greenlight-v3-windows-x64-$GITHUB_SHA" -type f -name '*.zip' -print -quit)"
+          test -n "$(find "greenlight-android-debug-$GITHUB_SHA" -type f -name '*.apk' -print -quit)"
+          test -f "greenlight-v3-web-$GITHUB_SHA/home/index.html"
+          find . -type f -print0 | sort -z | xargs -0 sha256sum > "$RUNNER_TEMP/SHA256SUMS.txt"
+          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/BUILD-COMMIT.txt"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install matching backend dependencies
+        run: |
+          npm install --global yarn@1.22.22
+          yarn install --frozen-lockfile
+          yarn build:depsv3
+      - name: Prepare exact downloaded web assets
+        run: |
+          node -e 'require("./packages/pages/scripts/copy-web.cjs").copyWebExport("test-artifacts/greenlight-v3-web-"+process.env.GITHUB_SHA,"packages/pages/public")'
+      - name: Smoke test local same-origin web and RPC
+        shell: bash
+        run: |
+          set -euo pipefail
+          setsid yarn pages dev --local --ip 127.0.0.1 --port 8787 > "$RUNNER_TEMP/greenlight-worker.log" 2>&1 &
+          worker=$!
+          trap 'kill -- -"$worker" 2>/dev/null || true' EXIT
+          ready=false
+          for attempt in $(seq 1 45); do
+            if curl --fail --silent --max-time 3 http://127.0.0.1:8787/home/ -o "$RUNNER_TEMP/greenlight-home.html"; then
+              ready=true
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" != true ]; then
+            tail -n 100 "$RUNNER_TEMP/greenlight-worker.log"
+            exit 1
+          fi
+          test -s "$RUNNER_TEMP/greenlight-home.html"
+          cmp "$RUNNER_TEMP/greenlight-home.html" "packages/pages/public/home/index.html"
+          headers="$RUNNER_TEMP/greenlight-rpc.headers"
+          status=$(curl --silent --show-error --max-time 10 -D "$headers" -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/trpc/test)
+          test "$status" = 405
+          grep -qi '^cache-control: no-store' "$headers"
+          grep -qi '^allow: POST' "$headers"
+          status=$(curl --silent --show-error --max-time 10 -X POST -D "$headers" -o /dev/null -w '%{http_code}' 'http://127.0.0.1:8787/trpc/test?input=invalid')
+          test "$status" = 400
+          grep -qi '^cache-control: no-store' "$headers"
+          # Unknown procedure must be handled locally, without Xbox credentials or upstream requests.
+          status=$(curl --silent --show-error --max-time 10 -X POST -H 'Content-Type: application/json' --data '{}' -D "$headers" -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/trpc/deviceBuildSmokeUnknown)
+          test "$status" = 404
+          grep -qi '^cache-control: no-store' "$headers"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: greenlight-verification-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/SHA256SUMS.txt
+            ${{ runner.temp }}/BUILD-COMMIT.txt
+          if-no-files-found: error
+      - name: Summarize verified test builds
+        shell: bash
+        run: |
+          {
+            echo '## PC and Android test artifacts'
+            echo
+            echo "Commit: `$GITHUB_SHA`"
+            echo
+            echo 'Windows V2 installer/ZIP, V3 ZIP, static web export and Android debug APK are present.'
+            echo 'The local web/RPC smoke checks passed; Xbox sign-in and physical playback were not tested.'
+            echo 'Download all four matching artifacts and the verification artifact from this run. Extract each into its artifact-named directory to verify SHA256SUMS.txt.'
+          } >> "$GITHUB_STEP_SUMMARY"
