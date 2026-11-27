@@ -11,7 +11,7 @@ export default class Overlay {
     private timer?:ReturnType<typeof setInterval>
 
     constructor(private _videoComponent:VideoComponent|WebGPUComponent,private _player:xCloudPlayer,
-        private schedule=setInterval,private cancel=clearInterval,private now=()=>performance.now()){}
+        private schedule=setInterval.bind(globalThis),private cancel=clearInterval.bind(globalThis),private now=()=>performance.now()){}
 
     toggleDebug(){
         if(this.debug)this.destroy()

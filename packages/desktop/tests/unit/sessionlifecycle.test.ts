@@ -14,6 +14,31 @@ function fixture(){
     const lifecycle=new SessionLifecycle(((fn:()=>void)=>{callbacks.set(++id,fn);return id}) as unknown as typeof setTimeout,((timer:number)=>callbacks.delete(timer)) as unknown as typeof clearTimeout)
     return {lifecycle,callbacks,expire(){const list=[...callbacks.values()];callbacks.clear();list.forEach(fn=>fn())}}
 }
+test('default session timers use the browser global receiver during start and teardown',async t=>{
+    let timer=0
+    const cleared:number[]=[]
+    t.mock.method(globalThis,'setTimeout',function(this:unknown){
+        assert.equal(this,globalThis)
+        return ++timer
+    })
+    t.mock.method(globalThis,'clearTimeout',function(this:unknown,id:number){
+        assert.equal(this,globalThis)
+        cleared.push(id)
+    })
+    const lifecycle=new SessionLifecycle()
+    const calls:string[]=[]
+    lifecycle.begin({
+        start:async()=>{calls.push('start');return 'session'},
+        stop:async id=>{calls.push('stop-'+id)},
+        onSession:id=>calls.push('ready-'+id),
+        onError:()=>assert.fail('unexpected session failure'),
+    })
+    await flush()
+    assert.deepEqual(calls,['start','ready-session'])
+    assert.equal(await lifecycle.end(),true)
+    assert.deepEqual(calls,['start','ready-session','stop-session'])
+    assert.deepEqual(cleared,[1,2])
+})
 test('replacement waits for slow cancelled provisioning and teardown',async()=>{
     const {lifecycle}=fixture(),pending=deferred<string>(),closing=deferred<void>()
     const calls:string[]=[]

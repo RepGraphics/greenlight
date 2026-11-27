@@ -6,7 +6,7 @@ type Cancel=(timer:ReturnType<typeof setInterval>)=>void
 // a late cleanup from an earlier renewal can revoke a newer active lease.
 export class AwakeLeaseQueue {
     private tails=new Map<string,Promise<void>>()
-    constructor(private schedule:Schedule=setInterval,private cancel:Cancel=clearInterval){}
+    constructor(private schedule:Schedule=setInterval.bind(globalThis),private cancel:Cancel=clearInterval.bind(globalThis)){}
     private enqueue(session:string,operation:()=>Promise<unknown>){
         const previous=this.tails.get(session)??Promise.resolve()
         const next=previous.then(operation).then(()=>{},()=>{})

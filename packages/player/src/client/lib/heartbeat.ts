@@ -9,7 +9,7 @@ export class StreamHeartbeat{
     private started=false
     private disposed=false
     private failures=0
-    constructor(private send:()=>Promise<unknown>,private fail:()=>void,private schedule=setTimeout,private cancel=clearTimeout){}
+    constructor(private send:()=>Promise<unknown>,private fail:()=>void,private schedule=setTimeout.bind(globalThis),private cancel=clearTimeout.bind(globalThis)){}
     start(){
         if(this.started||this.disposed)return
         this.started=true
