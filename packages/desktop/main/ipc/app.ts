@@ -71,9 +71,8 @@ export default class IpcApp extends IpcBase {
     }
     getUpdateDownloadStatus(){return this.updateDownload.status()}
     cancelUpdateDownload(){return this.updateDownload.cancel()}
-    revealUpdateDownload(){
-        const file=this.updateDownload.readyPath
-        if(!file)throw Error('No verified installer')
+    async revealUpdateDownload(){
+        const file=await this.updateDownload.verifyReady()
         electron.shell.showItemInFolder(file)
         return true
     }
