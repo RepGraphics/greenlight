@@ -39,6 +39,8 @@ During a connected stream, select Fullscreen to expand the shared playback surfa
 
 Connection history and diagnostics retains at most 300 samples or five minutes of measurements for the current stream. Expand the panel during playback or after a connection failure for latency, jitter, FPS and bitrate graphs, with stale data shown as gaps. Export the desktop-compatible JSON report explicitly; it excludes credentials, addresses and game/account identifiers. The report is local and is lost when leaving the session. Quality estimates use latency and jitter rather than guaranteeing gameplay performance.
 
+During a connected stream, select Keep screen awake in the playback toolbar to request a screen wake lock on compatible secure browsers. The opt-in lasts only for that connected session. Hiding the tab or disconnecting releases the lock; returning to a visible tab requests it again while enabled. Battery-saving or browser policies can revoke or deny it; use Retry wake lock or Allow screen sleep. The Android companion already requests native screen-awake behavior while connected. This does not keep the device awake in the background.
+
 ## Development
 
 From the repository root, use Node.js 24 and Yarn Classic 1.22.22:
@@ -50,7 +52,7 @@ yarn desktopv3 build:web
 yarn desktop test
 ```
 
-The static web export is in `packages/desktop-v3/web-out/`. On a POSIX shell, `yarn build:pages` also prepares the Pages workspace assets. Building does not provision a trusted deployment.
+The static web export is in `packages/desktop-v3/web-out/`. On Windows or POSIX shells, `yarn build:pages` also prepares the Pages workspace assets. Building does not provision a trusted deployment.
 
 ## Private testing only
 
