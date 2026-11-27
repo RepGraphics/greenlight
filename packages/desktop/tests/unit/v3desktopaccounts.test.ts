@@ -92,3 +92,33 @@ test('unavailable secure storage allows a temporary session without writing a pr
     assert.equal(accounts.streamRefreshToken('home','home-101'),'101:1')
     assert.deepEqual(await accounts.list(),{available:false,accounts:[]})
 })
+
+test('saved accounts must verify identity before activating or replacing a credential',async()=>{
+    const mock=fixture()
+    const manager=new DesktopAccounts(mock.services)
+    await manager.start()
+    const first=await manager.finish()
+    const before=mock.read()
+    for(const profile of [async()=>null,async()=>{throw Error('offline')},async()=>({id:'invalid',name:'unknown'})]){
+        const reopened=new DesktopAccounts({...mock.services,profile})
+        await assert.rejects(reopened.open(first.account!.id),/verify the saved Xbox account identity/)
+        assert.deepEqual(mock.read(),before)
+        assert.throws(()=>reopened.streamRefreshToken('home','home-101'))
+    }
+})
+test('native authorization prompt exposes only the validated public fields and expires before polling',async()=>{
+    const mock=fixture()
+    let now=0
+    const manager=new DesktopAccounts({...mock.services,start:async()=>({device_code:'private-code',user_code:'CODE-123',verification_uri:'https://evil.invalid',expires_in:3}),verify:async()=>assert.fail('expired code polled')},()=>now)
+    assert.deepEqual(await manager.start(),{user_code:'CODE-123',verification_uri:'https://microsoft.com/devicelogin',expires_in:3})
+    now=3000
+    await assert.rejects(manager.finish(),/expired/)
+    await assert.rejects(manager.finish(),/Start Xbox sign-in/)
+    assert.deepEqual(mock.read(),[])
+})
+test('invalid native device-code responses are never presented',async()=>{
+    const mock=fixture()
+    const manager=new DesktopAccounts({...mock.services,start:async()=>({device_code:'invalid code',user_code:'CODE-123',verification_uri:'https://www.microsoft.com/link'})})
+    await assert.rejects(manager.start(),/code unavailable/)
+    await assert.rejects(manager.finish(),/Start Xbox sign-in/)
+})

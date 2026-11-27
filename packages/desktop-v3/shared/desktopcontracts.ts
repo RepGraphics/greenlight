@@ -17,6 +17,7 @@ export interface DesktopSession {
 export interface DeviceCodePrompt {
     user_code: string
     verification_uri: string
+    expires_in?: number
 }
 
 export interface DesktopBridge {

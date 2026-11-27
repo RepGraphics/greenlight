@@ -43,3 +43,16 @@ test('web RPC requires POST with only the supported batch query marker',()=>{
     for(const query of ['?input=secret','?batch=1&input=secret','?token=secret'])assert.equal(rpcRequestAllowed('POST',query),false)
     assert.equal(rpcHeaders['Cache-Control'],'no-store')
 })
+
+import {deviceCodeDetails,deviceCodeRemaining} from '../../../desktop-v3/shared/devicesignin'
+test('device prompts validate public fields, secrets and bounded expiry independently',()=>{
+    const flow={user_code:'CODE-123',verification_uri:'https://www.microsoft.com/link',expires_in:30}
+    assert.deepEqual(deviceCodeDetails(flow,false),{...flow,device_code:undefined})
+    assert.equal(deviceCodeDetails(flow,true),null)
+    assert.equal(deviceCodeDetails({...flow,device_code:'private-code'},true)?.device_code,'private-code')
+    assert.equal(deviceCodeDetails({...flow,verification_uri:'https://evil.invalid'},false)?.verification_uri,'https://microsoft.com/devicelogin')
+    for(const expires_in of [0,-1,3601,NaN,'900'])assert.equal(deviceCodeDetails({...flow,expires_in},false),null)
+    assert.equal(deviceCodeDetails({...flow,user_code:'<script>'},false),null)
+    assert.equal(deviceCodeRemaining(10000,9500),1)
+    assert.equal(deviceCodeRemaining(10000,10000),0)
+})

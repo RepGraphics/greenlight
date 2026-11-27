@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
 import QRCode from 'react-qr-code'
-import {deviceSignInUrl} from '../../../shared/devicesignin'
+import {deviceCodeDetails,deviceCodeRemaining,deviceCodeSetupTimeoutMs} from '../../../shared/devicesignin'
 import AuthLayout from '../../components/authlayout'
 import {useAuth} from '../../contexts/AuthContext'
 
@@ -10,13 +10,16 @@ export default function AuthHome({onBack}: {onBack?: () => void}) {
     const {startAuth, verifyCode, logout, desktop, canSaveAccounts} = useAuth()
     const [state, setState] = useState<SignInState>({phase: 'idle'})
     const [copyStatus, setCopyStatus] = useState('')
+    const [remaining,setRemaining]=useState(0)
+    const timer=useRef<ReturnType<typeof setInterval>|undefined>(undefined)
+    const clearTimer=()=>{if(timer.current!==undefined){clearInterval(timer.current);timer.current=undefined}}
     const generation = useRef(0)
     const locked = useRef(false)
     const heading = useRef<HTMLHeadingElement>(null)
     const primaryButton = useRef<HTMLButtonElement>(null)
     const restoreFocus = useRef(false)
 
-    useEffect(() => () => {generation.current++; locked.current = false}, [])
+    useEffect(() => () => {generation.current++; locked.current = false;clearTimer()}, [])
     useEffect(() => {
         if (state.phase === 'code' || state.phase === 'failed') heading.current?.focus()
         if (state.phase === 'idle' && restoreFocus.current) {
@@ -25,29 +28,41 @@ export default function AuthHome({onBack}: {onBack?: () => void}) {
         }
     }, [state.phase])
 
+    const fail=()=>{
+        generation.current++;locked.current=false;clearTimer();logout();setRemaining(0)
+        setState({phase:'failed'});setCopyStatus('')
+    }
     const start = async () => {
         if (locked.current) return
         locked.current = true
         const epoch = ++generation.current
         setState({phase: 'requesting'})
-        setCopyStatus('')
+        setCopyStatus('');setRemaining(0)
+        const setupDeadline=performance.now()+deviceCodeSetupTimeoutMs
+        timer.current=setInterval(()=>{if(epoch===generation.current&&performance.now()>=setupDeadline)fail()},250)
         try {
             const flow = await startAuth()
             if (epoch !== generation.current) return
-            if (!flow?.user_code || (!desktop && !flow.device_code)) throw Error('Sign-in code unavailable')
-            setState({phase: 'code', code: flow.user_code, url: deviceSignInUrl(flow.verification_uri)})
-            const result = await verifyCode(flow.device_code)
+            clearTimer()
+            const details=deviceCodeDetails(flow,!desktop)
+            if(!details)throw Error('Sign-in code unavailable')
+            const deadline=performance.now()+details.expires_in*1000
+            setRemaining(details.expires_in)
+            setState({phase:'code',code:details.user_code,url:details.verification_uri})
+            timer.current=setInterval(()=>{if(epoch!==generation.current)return;const seconds=deviceCodeRemaining(deadline,performance.now());setRemaining(seconds);if(seconds===0)fail()},1000)
+            const result = await verifyCode(details.device_code)
             if (epoch === generation.current && !result) throw Error('Sign-in incomplete')
         } catch {
-            if (epoch === generation.current) setState({phase: 'failed'})
+            if (epoch === generation.current) fail()
         } finally {
-            if (epoch === generation.current) locked.current = false
+            if (epoch === generation.current) {locked.current = false;clearTimer()}
         }
     }
 
     const cancel = () => {
         generation.current++
         locked.current = false
+        clearTimer();setRemaining(0)
         restoreFocus.current = true
         logout()
         setState({phase: 'idle'})
@@ -69,11 +84,12 @@ export default function AuthHome({onBack}: {onBack?: () => void}) {
     return <AuthLayout>
         {state.phase === 'code' ? <>
             <h2 id="auth-heading" ref={heading} tabIndex={-1}>Enter your sign-in code</h2>
-            <p>Open Microsoft sign-in, enter this code, then return to Greenlight.</p>
+            <p>Open Microsoft sign-in, enter this code, then return to Greenlight. Never enter a code provided by someone else or share your sign-in code.</p>
             <div className="auth-code-row">
                 <code aria-label="Sign-in code">{state.code}</code>
                 <button type="button" className="v3-button v3-button-secondary" onClick={() => void copyCode(state.code)}>Copy code</button>
             </div>
+            <p>Code expires in {Math.floor(remaining/60)}:{String(remaining%60).padStart(2,'0')}</p>
             {copyStatus && <p className="auth-copy-status" role="status">{copyStatus}</p>}
             <a className="v3-button v3-button-primary auth-primary" href={state.url} target="_blank" rel="noopener noreferrer">Open Microsoft sign-in <span aria-hidden="true">↗</span></a>
             <details className="auth-phone">
