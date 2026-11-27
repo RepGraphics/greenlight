@@ -59,7 +59,7 @@ export default function HomePage(){
     const button='rounded border border-white/20 px-4 py-2 disabled:opacity-50'
     return <>
         <Head><title>Greenlight — Microsoft sign-in</title></Head>
-        <main className="min-h-[100dvh] bg-[#0d0d0d] text-white p-4 md:p-8">
+        <main className="h-[100dvh] overflow-y-auto bg-[#0d0d0d] text-white p-4 md:p-8">
             <div className="max-w-2xl mx-auto">
                 <h1 className="text-2xl font-bold">Sign in to Xbox</h1>
                 <p className="text-white/60 my-3">Use Microsoft device authorization. Enter your password only on Microsoft's official sign-in page. Never share your device code or enter a code provided by someone else.</p>
