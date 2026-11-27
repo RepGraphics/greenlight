@@ -33,7 +33,6 @@ export default class xCloudPlayer {
     private playback=normalizePlayback(1,false)
     private videoWatchdog: ReturnType<typeof setInterval> | undefined
     private lastVideoRecovery = 0
-    private videoReceivedAt = 0
     private videoStream: MediaStream | undefined
 
     constructor(elementId: string, useWebGpu = true, private videoBitrate = 0, profiles: string[] = [], public consoleController = false, volume=1, muted=false, public readonly requestedResolution:720|1080=1080) {
@@ -53,7 +52,6 @@ export default class xCloudPlayer {
                 this._videoComponent?.destroy()
                 const stream = event.streams[0] || new MediaStream([event.track])
                 this.videoStream = stream
-                this.videoReceivedAt = performance.now()
                 this.lastVideoRecovery = 0
                 const fallback = () => {
                     if (this._isDestoyed) return
