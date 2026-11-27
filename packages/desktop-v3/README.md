@@ -60,6 +60,8 @@ Use Remember setup for this sign-in to override the device defaults independentl
 
 Completed captures survive a connection interruption or ending a stream and returning to setup, in memory for the current game page. Active recordings are stopped for finalization, unsaved rolling replay is discarded, and explicitly requested replay saves may finish. Local trimming, sharing and saving remain available without a connection. A new capture requires discarding the previous one. Ending a stream with a capture returns to setup, where leaving requires explicit discard confirmation. Browser fullscreen includes expandable essential playback controls and keeps the touch overlay aligned with the video rather than the statistics HUD. No capture persistence beyond the current page or device testing is implied.
 
+The shared V3 watchdog now monitors video-specific report freshness and byte progress independently of audio. Hidden pages and reconnecting transports receive a fresh visible-connected recovery window; missing statistics or stalled video are reported separately. This improves recovery diagnostics but cannot prove decoded video or actual Xbox interoperability.
+
 ## Development
 
 From the repository root, use Node.js 24 and Yarn Classic 1.22.22:

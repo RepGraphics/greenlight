@@ -15,3 +15,25 @@ test('backgrounding or a gap in samples resets the stall history',()=>{
     assert.equal(monitor.sample(30000,[{id:'video',bytes:100}],true),false)
     assert.equal(monitor.sample(60000,[{id:'video',bytes:100}],true),false)
 })
+
+import {VisibleVideoWatchdog} from '../../../player/src/client/lib/statsfreshness'
+test('initial video with zero bytes cannot remain stalled indefinitely',()=>{
+    const monitor=new MediaStallMonitor()
+    for(let now=0;now<20000;now+=1000)assert.equal(monitor.sample(now,[{id:'video',bytes:0}],true),false)
+    assert.equal(monitor.sample(20000,[{id:'video',bytes:0}],true),true)
+})
+test('audio reports without fresh video fail as media rather than healthy playback',()=>{
+    const watchdog=new VisibleVideoWatchdog()
+    assert.equal(watchdog.sample(1000,true,true,1000,0,false),undefined)
+    assert.equal(watchdog.sample(15999,true,true,15999,0,false),undefined)
+    assert.equal(watchdog.sample(16000,true,true,16000,0,false),'media')
+})
+test('hidden and reconnecting sessions receive a fresh recovery grace period',()=>{
+    const watchdog=new VisibleVideoWatchdog()
+    assert.equal(watchdog.sample(1000,true,true,1000,1000,false),undefined)
+    assert.equal(watchdog.sample(17000,true,false,1000,1000,true),undefined)
+    assert.equal(watchdog.sample(50000,true,true,1000,1000,true),undefined)
+    assert.equal(watchdog.sample(64000,false,true,1000,1000,true),undefined)
+    assert.equal(watchdog.sample(80000,true,true,1000,1000,true),undefined)
+    assert.equal(watchdog.sample(95000,true,true,1000,1000,true),'stats')
+})

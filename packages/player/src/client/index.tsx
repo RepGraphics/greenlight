@@ -5,7 +5,7 @@ import type { xStreamToken, xCloudStreamConfig, startStreamResponse } from '../t
 export type { xStreamToken, startStreamResponse, xCloudStreamConfig };
 
 import xCloudPlayer from './lib/player';
-import { statsExpired } from './lib/statsfreshness';
+import { VisibleVideoWatchdog } from './lib/statsfreshness';
 import { StreamConnectionWatchdog } from './lib/connectionwatchdog';
 import { StreamHeartbeat } from './lib/heartbeat';
 
@@ -333,8 +333,14 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 status('Negotiated'); onConnection();
                 if(!active())return;
                 heartbeat.start();
-                let visibleConnectedAt=performance.now();
-                mediaWatchdog=setInterval(()=>{const now=performance.now();if(disposed||terminal)return;if(peer.connectionState==='new'||peer.connectionState==='connecting' && !instance?.getStats().lastStatsAt){visibleConnectedAt=now;return}if(instance?.serverDisconnected){fail('server');return}const stats=instance?.getStats();if(!stats)return;if(statsExpired(now,stats.lastStatsAt,visibleConnectedAt))fail('stats');else if(stats.mediaStalled)fail('media')},1000);
+                const videoWatchdog=new VisibleVideoWatchdog();
+                mediaWatchdog=setInterval(()=>{
+                    if(disposed||terminal)return;
+                    if(instance?.serverDisconnected){fail('server');return}
+                    const stats=instance?.getStats();if(!stats)return;
+                    const reason=videoWatchdog.sample(performance.now(),peer.connectionState==='connected',!document.hidden,stats.lastStatsAt,stats.lastVideoStatsAt,stats.mediaStalled);
+                    if(reason)fail(reason)
+                },1000);
             };
             const poll = async () => {
                 if (!active()) return;
