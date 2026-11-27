@@ -1,12 +1,15 @@
 import {canCapture,captureScreenshotBlob,screenshotFilename} from '../../../desktop/renderer/lib/streamcapture'
 import {startStreamRecording,recordingFilename} from '../../../desktop/renderer/lib/streamrecording'
 
+import {startInstantReplay,replayDuration,replayMaxBytes} from '../../../desktop/renderer/lib/instantreplay'
+
+export const webReplayDurations=[15,30,60] as const
 export const webRecordingDurations=[60,180,300] as const
 export const webRecordingBitrates=[1500000,3000000,6000000] as const
 export function webRecordingPreferences(seconds:unknown,videoBitsPerSecond:unknown){
     return {seconds:webRecordingDurations.find(value=>value===seconds)??60,videoBitsPerSecond:webRecordingBitrates.find(value=>value===videoBitsPerSecond)??3000000}
 }
-export type WebCaptureState={phase:'idle'|'capturing'|'recording'|'stopping'|'ready'|'failed';blob?:Blob;filename?:string}
+export type WebCaptureState={phase:'idle'|'capturing'|'recording'|'stopping'|'replay'|'savingReplay'|'ready'|'failed';blob?:Blob;filename?:string;replayReady?:boolean}
 export function webCaptureMedia(surface:HTMLElement|null){
     const video=surface?.querySelector<HTMLVideoElement>('#playerContainer video')??null
     const audio=surface?.querySelector<HTMLAudioElement>('#playerContainer audio')??null
@@ -19,7 +22,8 @@ export class WebCaptureSession{
     private generation=0
     private state:WebCaptureState={phase:'idle'}
     private recording?:{stop:()=>void}
-    constructor(private update:(state:WebCaptureState)=>void,private screenshot=captureScreenshotBlob,private record=startStreamRecording){}
+    private replay?:ReturnType<typeof startInstantReplay>
+    constructor(private update:(state:WebCaptureState)=>void,private screenshot=captureScreenshotBlob,private record=startStreamRecording,private beginReplay=startInstantReplay){}
     private publish(state:WebCaptureState){this.state=state;this.update(state)}
     private available(){return ['idle','ready','failed'].includes(this.state.phase)}
     async takeScreenshot(video:HTMLVideoElement|null){
@@ -45,6 +49,47 @@ export class WebCaptureSession{
             else recording.stop()
         }catch{if(generation===this.generation)this.publish({phase:'failed'})}
     }
+    startReplay(video:HTMLVideoElement|null,audio:HTMLAudioElement|null,seconds:unknown){
+        if(!this.available()||!canCapture(video))return
+        const generation=++this.generation
+        this.publish({phase:'replay',replayReady:false})
+        const fail=()=>{
+            if(generation!==this.generation)return
+            const replay=this.replay
+            this.replay=undefined
+            this.generation++
+            replay?.dispose()
+            this.publish({phase:'failed'})
+        }
+        try{
+            const replay=this.beginReplay(video,ready=>{
+                if(generation===this.generation&&this.state.phase==='replay')this.publish({phase:'replay',replayReady:ready})
+            },fail,replayDuration(seconds),audio)
+            if(generation===this.generation&&this.state.phase==='replay')this.replay=replay
+            else replay.dispose()
+        }catch{fail()}
+    }
+    async saveReplay(){
+        const replay=this.replay
+        if(!replay||this.state.phase!=='replay')return
+        const generation=this.generation
+        this.publish({phase:'savingReplay'})
+        let blob:Blob|null=null
+        try{blob=await replay.save()}catch{}
+        if(generation!==this.generation)return
+        this.generation++
+        this.replay=undefined
+        replay.dispose()
+        this.publish(blob&&blob.size>0&&blob.size<=replayMaxBytes&&blob.type.startsWith('video/webm')?{phase:'ready',blob,filename:recordingFilename()}:{phase:'failed'})
+    }
+    cancelReplay(){
+        if(this.state.phase!=='replay'&&this.state.phase!=='savingReplay')return
+        this.generation++
+        const replay=this.replay
+        this.replay=undefined
+        replay?.dispose()
+        this.publish({phase:'idle'})
+    }
     stop(){
         if(this.state.phase!=='recording'||!this.recording)return
         this.publish({phase:'stopping'})
@@ -59,9 +104,12 @@ export class WebCaptureSession{
     reset(){
         this.generation++
         const recording=this.recording
+        const replay=this.replay
         this.recording=undefined
+        this.replay=undefined
         this.state={phase:'idle'}
         recording?.stop()
+        replay?.dispose()
     }
 }
 export function downloadWebCapture(blob:Blob,filename:string){
