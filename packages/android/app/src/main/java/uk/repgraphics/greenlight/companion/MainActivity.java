@@ -62,6 +62,7 @@ public final class MainActivity extends Activity {
     private boolean challenged;
     private boolean resumed;
     private PermissionRequest pendingMicrophone;
+    private boolean systemMicrophonePrompt;
     private AlertDialog microphoneDialog;
     private static final int MICROPHONE_PERMISSION = 410;
     private String lastEndpoint = "";
@@ -385,11 +386,11 @@ public final class MainActivity extends Activity {
         pendingMicrophone = null;
         if (microphoneDialog != null) microphoneDialog.dismiss();
         microphoneDialog = null;
-        if (request != null) request.deny();
+        if (request != null) { try { request.deny(); } catch (RuntimeException ignored) { } }
     }
 
     private void requestMicrophone(WebView web, OriginPolicy selected, ConnectionMode selectedMode, PermissionRequest request) {
-        if (pendingMicrophone != null || !microphoneAllowed(web, selected, selectedMode, request)) {
+        if (systemMicrophonePrompt || pendingMicrophone != null || !microphoneAllowed(web, selected, selectedMode, request)) {
             request.deny();
             return;
         }
@@ -408,7 +409,9 @@ public final class MainActivity extends Activity {
                     pendingMicrophone = null;
                     request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
                 } else {
-                    requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, MICROPHONE_PERMISSION);
+                    systemMicrophonePrompt = true;
+                    try { requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, MICROPHONE_PERMISSION); }
+                    catch (RuntimeException error) { systemMicrophonePrompt = false; denyPendingMicrophone(); }
                 }
             }).setOnCancelListener(dialog -> denyPendingMicrophone()).create();
         microphoneDialog.show();
@@ -417,6 +420,7 @@ public final class MainActivity extends Activity {
     @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(code, permissions, results);
         if (code != MICROPHONE_PERMISSION) return;
+        systemMicrophonePrompt = false;
         // The OS permission prompt can pause the Activity. A paused/cancelled
         // WebView request is never revived; the user may enable voice chat again.
         PermissionRequest request = pendingMicrophone;
