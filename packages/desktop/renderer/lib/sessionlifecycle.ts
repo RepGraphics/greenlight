@@ -13,7 +13,7 @@ export class SessionLifecycle {
     private ending:Promise<boolean>|undefined
     private endOperation:Promise<boolean>|undefined
     private active:{id:string;owner:object;stop:SessionAttempt['stop']}|undefined
-    constructor(private schedule=setTimeout,private cancel=clearTimeout,private timeoutMs=60000,private endTimeoutMs=120000){}
+    constructor(private schedule=setTimeout.bind(globalThis),private cancel=clearTimeout.bind(globalThis),private timeoutMs=60000,private endTimeoutMs=120000){}
     private enqueue(operation:()=>Promise<void>){
         this.tail=this.tail.then(operation).catch(()=>{})
     }

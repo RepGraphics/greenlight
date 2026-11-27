@@ -35,7 +35,7 @@ export class RumblePlayback {
     private timer:ReturnType<typeof setTimeout>|undefined
     private actuator:RumbleActuator|undefined
     private effect:ReturnType<typeof resolveRumbleEffect>=null
-    constructor(private schedule:typeof setTimeout=setTimeout,private cancel:typeof clearTimeout=clearTimeout){}
+    constructor(private schedule:typeof setTimeout=setTimeout.bind(globalThis),private cancel:typeof clearTimeout=clearTimeout.bind(globalThis)){}
     private clearTimer(){
         this.generation++
         if(this.timer!==undefined)this.cancel(this.timer)

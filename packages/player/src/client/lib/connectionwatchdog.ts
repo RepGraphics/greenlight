@@ -7,7 +7,7 @@ export class StreamConnectionWatchdog{
     private timer:ReturnType<typeof setTimeout>|undefined
     private phase:'idle'|'provisioning'|'handshake'|'connected'|'disconnected'|'terminal'='idle'
     private generation=0
-    constructor(private fail:(reason:'server'|'transport')=>void,private schedule= setTimeout,private cancel=clearTimeout){}
+    constructor(private fail:(reason:'server'|'transport')=>void,private schedule=setTimeout.bind(globalThis),private cancel=clearTimeout.bind(globalThis)){}
     private clear(){
         this.generation++
         if(this.timer!==undefined)this.cancel(this.timer)
