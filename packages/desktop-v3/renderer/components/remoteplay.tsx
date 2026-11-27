@@ -1,4 +1,4 @@
-import {useEffect,useRef,useState,type CSSProperties} from 'react'
+import {useCallback,useEffect,useRef,useState,type CSSProperties} from 'react'
 import dynamic from 'next/dynamic'
 import Head from 'next/head'
 import {ArrowLeft, Play} from 'lucide-react'
@@ -57,7 +57,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     const [setupMessage,setSetupMessage]=useState('')
     const [captureRetained,setCaptureRetained]=useState(false)
     const captureRetainedRef=useRef(false)
-    const captureChanged=(retained:boolean)=>{captureRetainedRef.current=retained;setCaptureRetained(retained)}
+    const captureChanged=useCallback((retained:boolean)=>{captureRetainedRef.current=retained;setCaptureRetained(retained)},[])
     const [leaveRequested,setLeaveRequested]=useState(false)
     const pendingSetupBitrate=useRef<number|undefined>(undefined)
     const exitDestination=useRef<'browse'|'setup'>('browse')
