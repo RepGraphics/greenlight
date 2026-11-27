@@ -51,7 +51,7 @@ export class WebScreenWakeLock{
         this.publish('requesting')
         try{
             const lease=await this.request()
-            if(!this.eligible()){await this.release(lease);return}
+            if(!this.eligible()){void this.release(lease);return}
             if(lease.released){this.publish('paused');return}
             this.drop()
             this.lease=lease
@@ -62,7 +62,7 @@ export class WebScreenWakeLock{
             }
             lease.addEventListener('release',this.releaseListener)
             this.publish('active')
-        }catch{if(this.eligible())this.publish('failed')}
+        }catch{this.drop();if(this.eligible())this.publish('failed')}
         finally{this.pending=false}
     }
     dispose(){
