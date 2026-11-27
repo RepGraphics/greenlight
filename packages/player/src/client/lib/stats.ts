@@ -1,18 +1,15 @@
-import xCloudPlayer from './player'
+import type xCloudPlayer from './player'
+import {StatsPoller} from './statspoller'
 import { MediaStallMonitor } from './mediastall'
 
 export default class Stats {
     private _player: xCloudPlayer
     private _peerConnection:RTCPeerConnection
     private timer: ReturnType<typeof setInterval>
-    private disposed = false
-    private busy = false
+    private poller:StatsPoller<RTCStatsReport>
     private mediaMonitor = new MediaStallMonitor()
     mediaStalled = false
     lastStatsAt = 0
-    private requestGeneration=0
-    private requestStarted=0
-    private replacedPending=false
     private lastReportTimestamp=0
     private previous?: { id: string; bytes: number; time: number }
     _bitrate = 0
@@ -37,31 +34,31 @@ export default class Stats {
         this._player = player
         this._peerConnection = player._peerConnection
 
+        this.poller=new StatsPoller(()=>this._peerConnection.getStats(),(stats,now)=>this.consume(stats,now))
         this.timer = setInterval(this.loop.bind(this), 1000)
     }
 
-    destroy() { this.disposed = true; clearInterval(this.timer) }
+    destroy() { this.poller.dispose(); clearInterval(this.timer) }
 
-    loop(){
-        if (this.disposed) return
-        if(this.busy && performance.now()-this.requestStarted<5000)return
-        // At most one replacement request; a hung native getStats promise cannot be cancelled.
-        if(this.busy && this.replacedPending)return
-        if(this.busy)this.replacedPending=true
-        this.busy = true
-        this.requestStarted=performance.now()
-        const generation=++this.requestGeneration
-        this._peerConnection.getStats().then((stats) => {
-            if (this.disposed || generation!==this.requestGeneration) return
+    loop(){this.poller.tick()}
+
+    private consume(stats:RTCStatsReport,now:number){
             let latest=0
             stats.forEach(report=>{if(report.type==='inbound-rtp'&&Number.isFinite(report.timestamp))latest=Math.max(latest,report.timestamp)})
             if(latest<=this.lastReportTimestamp)return
             this.lastReportTimestamp=latest
-            this.lastStatsAt=performance.now()
+            this.lastStatsAt=now
             const inbound=Array.from(stats.values()).filter(r=>r.type==='inbound-rtp'&&(r.kind==='video'||r.kind==='audio')).map(r=>({id:r.id,bytes:r.bytesReceived}))
             this.mediaStalled=this.mediaMonitor.sample(this.lastStatsAt,inbound,this._peerConnection.connectionState==='connected'&&!document.hidden)
             const transport = Array.from(stats.values()).find(report=>report.type==='transport'&&report.selectedCandidatePairId)
-            const selectedPair = transport ? stats.get(transport.selectedCandidatePairId) : undefined
+            const selectedPair = transport ? stats.get(transport.selectedCandidatePairId) : Array.from(stats.values()).find(report=>report.type==='candidate-pair'&&report.nominated&&report.state==='succeeded')
+            this._rtt=0;this._activeRemoteCandidate='';this._remoteHost='';this._remotePort=0;this._remoteIsLocal=false;this._remoteIsIpv6=false
+            if(selectedPair?.type==='candidate-pair'){
+                this.readCandidatePair(selectedPair)
+                const remote=stats.get(selectedPair.remoteCandidateId)
+                if(remote?.type==='remote-candidate')this.readRemoteCandidate(remote)
+            }
+            this._bitrate=0;
             stats.forEach((report) => {
                 //  @TODO: Implement chat stats using type outbound-rtp
 
@@ -71,20 +68,15 @@ export default class Stats {
                         const codec = stats.get(report.codecId)
                         if (codec?.mimeType) this._videoCodec = codec.mimeType
                         const old = this.previous
-                        if (old && old.id === report.id && report.timestamp > old.time && report.bytesReceived >= old.bytes) this._bitrate = (report.bytesReceived - old.bytes) * 8 / (report.timestamp - old.time) / 1000
-                        if (typeof report.bytesReceived === 'number') this.previous = { id: report.id, bytes: report.bytesReceived, time: report.timestamp }
+                        if (old && old.id === report.id && Number.isFinite(report.timestamp) && Number.isFinite(report.bytesReceived) && report.timestamp > old.time && report.bytesReceived >= old.bytes) this._bitrate = (report.bytesReceived - old.bytes) * 8 / (report.timestamp - old.time) / 1000
+                        this.previous=Number.isFinite(report.bytesReceived)&&report.bytesReceived>=0&&Number.isFinite(report.timestamp)?{id:report.id,bytes:report.bytesReceived,time:report.timestamp}:undefined
                         this._jitter = (report.jitter || 0) * 1000
                         this._packetsLost = report.packetsLost || 0
                     }
 
-                } else if(report.type === 'candidate-pair' && (selectedPair ? report.id===selectedPair.id : report.nominated && report.state==='succeeded')){
-                    this.readCandidatePair(report)
-                    
-                } else if(report.type === 'remote-candidate'){
-                    this.readRemoteCandidate(report)
                 }
             })
-        }).catch(() => {}).finally(() => { if(generation===this.requestGeneration){this.busy=false;this.replacedPending=false} })
+
     }
 
     readInboundRtp(report:RTCInboundRtpStreamStats){
