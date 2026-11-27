@@ -16,7 +16,7 @@ test('backgrounding or a gap in samples resets the stall history',()=>{
     assert.equal(monitor.sample(60000,[{id:'video',bytes:100}],true),false)
 })
 
-import {VisibleVideoWatchdog} from '../../../player/src/client/lib/statsfreshness'
+import {VisibleVideoWatchdog,statsExpired} from '../../../player/src/client/lib/statsfreshness'
 test('initial video with zero bytes cannot remain stalled indefinitely',()=>{
     const monitor=new MediaStallMonitor()
     for(let now=0;now<20000;now+=1000)assert.equal(monitor.sample(now,[{id:'video',bytes:0}],true),false)
@@ -36,4 +36,18 @@ test('hidden and reconnecting sessions receive a fresh recovery grace period',()
     assert.equal(watchdog.sample(64000,false,true,1000,1000,true),undefined)
     assert.equal(watchdog.sample(80000,true,true,1000,1000,true),undefined)
     assert.equal(watchdog.sample(95000,true,true,1000,1000,true),'stats')
+})
+
+test('visibility events reset grace even when background interval callbacks were suspended',()=>{
+    const watchdog=new VisibleVideoWatchdog()
+    assert.equal(watchdog.sample(1000,true,true,1000,1000,false),undefined)
+    watchdog.reset()
+    assert.equal(watchdog.sample(120000,true,true,1000,1000,true),undefined)
+    assert.equal(watchdog.sample(134999,true,true,1000,1000,true),undefined)
+    assert.equal(watchdog.sample(135000,true,true,1000,1000,true),'stats')
+})
+test('invalid or future report timestamps cannot suppress the recovery deadline',()=>{
+    for(const timestamp of [NaN,Infinity,-1,50000])assert.equal(statsExpired(16000,timestamp,1000),true)
+    assert.equal(statsExpired(15999,0,1000),false)
+    assert.equal(statsExpired(NaN,0,1000),false)
 })

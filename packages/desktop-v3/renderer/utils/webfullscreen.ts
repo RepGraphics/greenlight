@@ -6,6 +6,7 @@ export class WebFullscreen {
     private pending=false
     private disposed=false
     private enabled=true
+    private releaseOnSettle=false
     constructor(private document:FullscreenDocument,private target:FullscreenTarget){}
     state(){
         const active=this.document.fullscreenElement===this.target
@@ -18,6 +19,7 @@ export class WebFullscreen {
         if(this.disposed||!this.enabled||this.pending)return false
         if(!this.state().available)throw Error('Fullscreen unavailable')
         this.pending=true
+        this.releaseOnSettle=false
         try{
             if(this.document.fullscreenElement===this.target){
                 await this.document.exitFullscreen()
@@ -26,10 +28,11 @@ export class WebFullscreen {
                 await this.target.requestFullscreen()
                 this.owned=this.document.fullscreenElement===this.target
             }
-            return !this.disposed&&this.enabled
+            return !this.disposed&&this.enabled&&!this.releaseOnSettle
         }finally{
-            this.pending=false
-            if(this.disposed||!this.enabled)await this.release()
+            // Keep the operation locked until any late entry has been exited.
+            try{if(this.disposed||!this.enabled||this.releaseOnSettle)await this.release()}
+            finally{this.pending=false}
         }
     }
     private async release(){
@@ -42,7 +45,7 @@ export class WebFullscreen {
     setEnabled(enabled:boolean){
         if(this.disposed)return
         this.enabled=enabled
-        if(!enabled&&!this.pending)void this.release()
+        if(!enabled){if(this.pending)this.releaseOnSettle=true;else void this.release()}
     }
     dispose(){
         this.disposed=true

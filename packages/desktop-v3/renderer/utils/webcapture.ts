@@ -29,7 +29,7 @@ export class WebCaptureSession{
     private trimController?:AbortController
     constructor(private update:(state:WebCaptureState)=>void,private screenshot=captureScreenshotBlob,private record=startStreamRecording,private beginReplay=startInstantReplay,private prepareTrim=trimClip){}
     private publish(state:WebCaptureState){this.state=state;this.update(state)}
-    private available(){return !this.trimController&&['idle','ready','failed'].includes(this.state.phase)}
+    private available(){return !this.trimController&&['idle','failed'].includes(this.state.phase)}
     async takeScreenshot(video:HTMLVideoElement|null){
         if(!this.available()||!canCapture(video))return
         const generation=++this.generation
@@ -87,7 +87,7 @@ export class WebCaptureSession{
         this.generation++
         this.replay=undefined
         replay.dispose()
-        this.publish(blob&&blob.size>0&&blob.size<=replayMaxBytes&&blob.type.startsWith('video/webm')?{phase:'ready',blob,filename:recordingFilename()}:{phase:'failed'})
+        this.publish(isWebCaptureClip(blob??undefined)&&blob!.size<=replayMaxBytes?{phase:'ready',blob:blob!,filename:recordingFilename()}:{phase:'failed'})
     }
     cancelReplay(){
         if(this.state.phase!=='replay'&&this.state.phase!=='savingReplay')return

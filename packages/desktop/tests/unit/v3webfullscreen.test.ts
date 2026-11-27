@@ -88,8 +88,9 @@ test('reconnection while a fullscreen request is pending does not create overlap
     const pending=f.controller.toggle()
     f.controller.setEnabled(false);f.controller.setEnabled(true)
     assert.equal(await f.controller.toggle(),false)
-    resolve();assert.equal(await pending,true)
-    assert.equal(f.controller.state().active,true)
+    resolve();assert.equal(await pending,false)
+    assert.equal(f.controller.state().active,false)
+    assert.equal(f.counts().exits,1)
     f.controller.dispose()
 })
 test('observed external fullscreen exit relinquishes prior ownership',async()=>{
@@ -98,4 +99,19 @@ test('observed external fullscreen exit relinquishes prior ownership',async()=>{
     f.setActive(f.surface);f.controller.dispose()
     assert.equal(f.doc.fullscreenElement,f.surface)
     assert.equal(f.counts().exits,0)
+})
+
+test('a late cancelled fullscreen entry remains locked until its exit settles',async()=>{
+    const f=fixture()
+    let enter!:()=>void,exit!:()=>void
+    f.target.requestFullscreen=()=>new Promise<void>(done=>{enter=()=>{f.setActive(f.surface);done()}})
+    f.doc.exitFullscreen=()=>new Promise<void>(done=>{exit=()=>{f.setActive(null);done()}})
+    const pending=f.controller.toggle()
+    f.controller.setEnabled(false);f.controller.setEnabled(true);enter()
+    await Promise.resolve()
+    assert.equal(f.controller.state().busy,true)
+    assert.equal(await f.controller.toggle(),false)
+    exit();assert.equal(await pending,false)
+    assert.equal(f.controller.state().active,false)
+    assert.equal(f.controller.state().busy,false)
 })

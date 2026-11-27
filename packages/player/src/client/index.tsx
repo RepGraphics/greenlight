@@ -282,7 +282,8 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             const active=()=>!disposed&&!terminal;
             const status=(value:string)=>{if(active())setPlayerState(value)};
             let removeConnectionListener:(()=>void)|undefined;
-            const clearTimers=()=>{clearTimeout(timer);heartbeat.dispose();clearInterval(mediaWatchdog);watchdog.dispose();removeConnectionListener?.();removeConnectionListener=undefined};
+            let removeVideoVisibilityListener:(()=>void)|undefined;
+            const clearTimers=()=>{clearTimeout(timer);heartbeat.dispose();clearInterval(mediaWatchdog);watchdog.dispose();removeConnectionListener?.();removeConnectionListener=undefined;removeVideoVisibilityListener?.();removeVideoVisibilityListener=undefined};
             const fail=(reason:string)=>{
                 if(!active())return;
                 terminal=true;clearTimers();
@@ -321,8 +322,14 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 if (!active()) return;
                 handshake='ice-connect';
                 const peer = instance._peerConnection;
+                const videoWatchdog=new VisibleVideoWatchdog();
+                const resetVideoGrace=()=>videoWatchdog.reset();
+                document.addEventListener('visibilitychange',resetVideoGrace);
+                window.addEventListener('pageshow',resetVideoGrace);
+                removeVideoVisibilityListener=()=>{document.removeEventListener('visibilitychange',resetVideoGrace);window.removeEventListener('pageshow',resetVideoGrace)};
                 const onConnection = () => {
                     if (!active()) return;
+                    if(peer.connectionState!=='connected')videoWatchdog.reset();
                     watchdog.update(peer.connectionState);
                     if(!active())return;
                     if (peer.connectionState === 'connected') { handshake=undefined; status('Connected'); instance?._channels.control.requestKeyframeRequest(true) }
@@ -333,7 +340,6 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 status('Negotiated'); onConnection();
                 if(!active())return;
                 heartbeat.start();
-                const videoWatchdog=new VisibleVideoWatchdog();
                 mediaWatchdog=setInterval(()=>{
                     if(disposed||terminal)return;
                     if(instance?.serverDisconnected){fail('server');return}

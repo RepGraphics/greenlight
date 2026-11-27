@@ -102,6 +102,7 @@ test('only the current WebM capture can be trimmed and failed output keeps the o
     const f=fixture(async()=>{attempts++;return new Blob(['invalid'],{type:'image/png'})})
     const screenshot=f.session.takeScreenshot(video);f.shot();await screenshot
     await f.session.trim(png,video,range)
+    assert.equal(f.session.discard(),true)
     f.session.startRecording(video,audio);f.finish()
     const initial=f.states.at(-1)
     await f.session.trim(trimmed,video,range)
@@ -194,4 +195,16 @@ test('invalid screenshot output is rejected',async()=>{
     const session=new WebCaptureSession(state=>states.push(state),async()=>new Blob(['x'],{type:'text/plain'}))
     await session.takeScreenshot(video)
     assert.deepEqual(states.at(-1),{phase:'failed'})
+})
+
+test('completed captures require explicit discard before another capture can begin',async()=>{
+    const f=fixture()
+    f.session.startRecording(video,audio);f.finish()
+    const ready=f.states.at(-1)
+    await f.session.takeScreenshot(video);f.session.startRecording(video,audio)
+    assert.equal(f.states.at(-1),ready)
+    assert.deepEqual(f.counts(),{shots:0,starts:1,stops:0})
+    assert.equal(f.session.discard(),true)
+    const next=f.session.takeScreenshot(video);f.shot();await next
+    assert.equal(f.states.at(-1)?.blob,png)
 })
