@@ -1,0 +1,8 @@
+const fs = require('node:fs')
+const path = require('node:path')
+const source = path.resolve(__dirname, '../../desktop-v3/web-out')
+const destination = path.resolve(__dirname, '../public')
+if (!fs.existsSync(path.join(source, 'home', 'index.html'))) throw new Error('Missing V3 web export')
+if (fs.existsSync(destination) && fs.lstatSync(destination).isSymbolicLink()) throw new Error('Refusing to copy into a symlinked asset directory')
+fs.mkdirSync(destination, {recursive:true})
+fs.cpSync(source, destination, {recursive:true})
