@@ -3,6 +3,7 @@
 /// <reference types="@types/dom-mediacapture-transform" />
 import xCloudPlayer from '../player'
 import Overlay from './overlay'
+import {GpuFrameWatchdog} from './gpuframewatchdog'
 
 export default class WebGpuComponent {
     private _player:xCloudPlayer
@@ -12,6 +13,7 @@ export default class WebGpuComponent {
     private _isActive: boolean = true
     private _failure: () => void = () => {}
     private _failureReported = false
+    private _watchdog=new GpuFrameWatchdog(performance.now())
 
     private fail() {
         if (!this._isActive || this._failureReported) return
@@ -44,6 +46,10 @@ export default class WebGpuComponent {
 
     create(stream:MediaStream, onFailure: () => void = () => {}) {
         this._failure = onFailure
+        if(!this._isActive)return
+        this._watchdog=new GpuFrameWatchdog(performance.now())
+        const element=document.getElementById(this._player.getElementId())
+        if(!element){this.fail();return}
         const videoElement = document.createElement('canvas')
         console.log('Creating WebGPU canvas element for stream:', stream);
 
@@ -61,7 +67,10 @@ export default class WebGpuComponent {
 
         const that:WebGpuComponent = this
 
-        navigator.gpu.requestAdapter().then((adapter:any) => {
+        Promise.resolve().then(()=>{
+            if(!this._isActive)return null
+            return navigator.gpu.requestAdapter()
+        }).then((adapter:any) => {
             if (!this._isActive) return
             if (!adapter) {
                 this.fail();
@@ -234,9 +243,6 @@ export default class WebGpuComponent {
 
         // Rest
 
-        const element = document.getElementById(this._player.getElementId())
-        if(element === null) {return}
-
         this._element = videoElement
         this._containerElement = element
         element.appendChild(this._element)
@@ -357,6 +363,7 @@ export default class WebGpuComponent {
             passEncoder.end();
 
             this._gpuDevice.queue.submit([commandEncoder.finish()]);
+            this._watchdog.rendered(performance.now())
 
             const renderEndTime = performance.now();
             const renderDelay = renderEndTime - renderStartTime;
@@ -458,6 +465,10 @@ export default class WebGpuComponent {
         this._overlay.toggleDebug()
     }
 
+    stalled(now:number,visible:boolean,connected:boolean){
+        return this._watchdog.stalled(now,visible,connected)
+    }
+
     getFrameStats() {
         return {
             droppedFrames: this._droppedFrames,
@@ -489,8 +500,12 @@ export default class WebGpuComponent {
             this._gpuVideoTexture = null;
         }
 
-        this._gpuContext?.unconfigure()
-        this._gpuDevice?.destroy()
+        try{this._gpuContext?.unconfigure()}catch{}
+        try{this._gpuDevice?.destroy()}catch{}
+        this._gpuContext=null
+        this._gpuBindGroup=null
+        this._gpuPipeline=null
+        this._gpuSampler=null
         this._gpuDevice = null
         if(this._overlay !== undefined){
             this._overlay.destroy()

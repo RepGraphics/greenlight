@@ -33,7 +33,6 @@ export default class xCloudPlayer {
     private playback=normalizePlayback(1,false)
     private videoWatchdog: ReturnType<typeof setInterval> | undefined
     private lastVideoRecovery = 0
-    private videoReceivedAt = 0
     private videoStream: MediaStream | undefined
 
     constructor(elementId: string, useWebGpu = true, private videoBitrate = 0, profiles: string[] = [], public consoleController = false, volume=1, muted=false, public readonly requestedResolution:720|1080=1080) {
@@ -53,7 +52,6 @@ export default class xCloudPlayer {
                 this._videoComponent?.destroy()
                 const stream = event.streams[0] || new MediaStream([event.track])
                 this.videoStream = stream
-                this.videoReceivedAt = performance.now()
                 this.lastVideoRecovery = 0
                 const fallback = () => {
                     if (this._isDestoyed) return
@@ -64,7 +62,8 @@ export default class xCloudPlayer {
                 if (useWebGpu && navigator.gpu && typeof MediaStreamTrackProcessor !== 'undefined') {
                     const gpu = new WebGpuComponent(this)
                     this._videoComponent = gpu
-                    gpu.create(stream, () => { if (this._videoComponent === gpu) fallback() })
+                    try{gpu.create(stream, () => { if (this._videoComponent === gpu) fallback() })}
+                    catch{if(this._videoComponent===gpu)fallback()}
                 } else fallback()
 
             } else if(event.track.kind === 'audio'){
@@ -78,12 +77,15 @@ export default class xCloudPlayer {
         }
 
         this.videoWatchdog = setInterval(()=>{
-            if(this._isDestoyed || this._peerConnection.connectionState!=='connected' || document.hidden) return
+            if(this._isDestoyed)return
             const video=this._videoComponent
+            const connected=this._peerConnection.connectionState==='connected',visible=!document.hidden
+            const gpuStalled=video instanceof WebGpuComponent&&video.stalled(performance.now(),visible,connected)
+            if(!connected||!visible)return
             const lastFrameAt=video instanceof VideoComponent?video.getLastFrameAt():undefined
             if(video instanceof VideoComponent && lastFrameAt!==undefined && performance.now()-lastFrameAt>5000 && performance.now()-this.lastVideoRecovery>5000){
                 this.lastVideoRecovery=performance.now();video.recover()
-            } else if(video instanceof WebGpuComponent && this.videoStream && performance.now()-this.videoReceivedAt>10000 && video.getFrameStats().renderingFps===0){
+            } else if(video instanceof WebGpuComponent && this.videoStream && gpuStalled){
                 video.destroy();this._videoComponent=new VideoComponent(this);this._videoComponent.create(this.videoStream);this._channels.control.requestKeyframeRequest(true)
             } else if(!video && performance.now()-this.lastVideoRecovery>5000){
                 this.lastVideoRecovery=performance.now();this._channels.control.requestKeyframeRequest(true)
