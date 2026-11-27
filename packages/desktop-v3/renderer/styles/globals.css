@@ -204,6 +204,11 @@ body {
   animation: hudSlideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
+.gl-gamepad-focus .gl-web-dashboard :focus {
+  outline: 3px solid #9bf00b;
+  outline-offset: 2px;
+}
+
 /* Shared player surface and touch controls in the experimental web client. */
 .web-remote-player { position:relative; width:100%; max-width:1280px; margin:12px auto; }
 .web-remote-player #playerContainer { aspect-ratio:16/9; width:100%; background:#000; overflow:hidden; }

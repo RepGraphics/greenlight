@@ -1,6 +1,6 @@
 import React, {useEffect,useRef,useState} from 'react'
 import Head from 'next/head'
-import Sidebar from '../components/sidebar'
+import DashboardLayout from '../components/dashboardlayout'
 import RemotePlay from '../components/remoteplay'
 import {useAuth} from '../contexts/AuthContext'
 import {useTRPCClient} from '../utils/trpc'
@@ -43,10 +43,8 @@ export default function ConsolesPage(){
     if(selected)return <RemotePlay target={{id:selected.id,name:selected.name,type:'home'}} onExit={()=>setSelected(null)}/>
     return <React.Fragment>
         <Head><title>Greenlight — My Consoles</title></Head>
-        <div className="flex min-h-screen flex-col md:h-screen md:flex-row bg-[#0d0d0d] text-white">
-            <Sidebar/>
-            <main className="flex-1 min-w-0 overflow-y-auto">
-                <div className="p-4 md:p-8 max-w-5xl mx-auto">
+        <DashboardLayout page="consoles">
+                <div className="max-w-5xl mx-auto">
                     <h1 className="text-2xl font-bold">My Consoles</h1>
                     <p className="text-white/60 mt-2">Discover Xbox consoles associated with your signed-in account.</p>
                     <p className="text-white/50 mt-2 text-sm">Experimental web client — Remote Play is unverified on hardware. Console power commands are not available here.</p>
@@ -72,7 +70,6 @@ export default function ConsolesPage(){
                         </div>
                     </section>
                 </div>
-            </main>
-        </div>
+        </DashboardLayout>
     </React.Fragment>
 }

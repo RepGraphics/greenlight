@@ -6,6 +6,7 @@ This separate V3 frontend supports Xbox Remote Play and Cloud Gaming through the
 
 - Microsoft device-code sign-in and in-memory session credentials.
 - Console discovery, cloud game browsing, entitlement filtering and session launch.
+- Gamepad navigation in My Consoles and the Cloud Gaming library.
 - 720p/1080p resolution preferences and requested bitrate caps.
 - Physical and on-screen controllers, keyboard controller emulation, experimental direct touchscreen input and multiple-controller support, plus Remote Play console-paired mode.
 - Physical controller presets, stick deadzone, Y-axis inversion, stick swapping and optional vibration.
@@ -30,6 +31,8 @@ During a connected session, Picture-in-picture opens the decoded game video in a
 Resolution and bitrate are negotiated when connecting, not guaranteed or adjusted live. Xbox services, browser support and individual games determine actual compatibility.
 
 The Cloud Gaming library also offers Favourites and Recently opened collections. These contain only title identifiers in memory for the current sign-in, are cleared on sign-out or reload, and never bypass the current catalog or entitlement checks. Recently opened records opening session setup, not confirmed gameplay. Clear both collections from the library at any time.
+
+With a standard-mapped controller and the browser tab focused, use the D-pad or left stick to move focus and A to activate a link or button. Use left and right to change a focused dropdown, and B to leave a form field or return from My Consoles to the Dashboard. Some browsers detect a controller only after a physical button press. After opening or refocusing a page, release any held controls before pressing again. Use the keyboard, mouse or touch to configure and start a session after opening it.
 
 Before connecting, open Controller test and stick drift calibration to inspect the four axes of a standard-mapped physical controller. Measure drift with both sticks untouched for three seconds, then explicitly apply the suggested deadzone. A lost controller, interrupted sampling, unfocused tab or large stick movement invalidates the measurement. The recommendation applies to all local controllers for this session only.
 

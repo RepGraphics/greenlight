@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from 'react'
 import Head from 'next/head'
-import Sidebar from '../components/sidebar'
+import DashboardLayout from '../components/dashboardlayout'
 import RemotePlay from '../components/remoteplay'
 import {useAuth} from '../contexts/AuthContext'
 import {useTRPCClient} from '../utils/trpc'
@@ -70,9 +70,7 @@ export default function HomePage(){
     if(selected)return <RemotePlay target={{id:selected.id,name:selected.name,type:'cloud',entitled:selected.entitled}} onExit={()=>setSelected(null)}/>
     return <>
         <Head><title>Greenlight — Cloud Gaming library</title></Head>
-        <div className="flex h-[100dvh] flex-col md:flex-row bg-[#0d0d0d] text-white overflow-hidden">
-            <Sidebar/>
-            <main className="flex-1 min-h-0 min-w-0 overflow-y-auto p-4 md:p-8">
+        <DashboardLayout page="home">
                 <h1 className="text-2xl font-bold">Cloud Gaming library</h1>
                 <p className="text-white/60 mt-2">Experimental web client — Cloud Gaming launch is unverified on hardware.</p>
                 {!token?<p className="mt-5" role="status">Cloud Gaming authorization is unavailable for this account.</p>:<>
@@ -104,7 +102,6 @@ export default function HomePage(){
                         <button type="button" className={button} disabled={currentPage===lastPage} onClick={()=>setPage(currentPage+1)}>Next</button>
                     </nav>}
                 </>}
-            </main>
-        </div>
+        </DashboardLayout>
     </>
 }
