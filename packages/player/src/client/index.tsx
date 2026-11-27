@@ -5,7 +5,7 @@ import type { xStreamToken, xCloudStreamConfig, startStreamResponse } from '../t
 export type { xStreamToken, startStreamResponse, xCloudStreamConfig };
 
 import xCloudPlayer from './lib/player';
-import { statsExpired } from './lib/statsfreshness';
+import { VisibleVideoWatchdog } from './lib/statsfreshness';
 import { StreamConnectionWatchdog } from './lib/connectionwatchdog';
 import { StreamHeartbeat } from './lib/heartbeat';
 
@@ -18,7 +18,7 @@ import Touch from './lib/input/touch';
 
 // export { Gamepad, MouseKeyboard, Touch };
 
-import type {StreamMetrics} from './metrics';
+import {networkStatsFresh,nonnegativeMetric,type StreamMetrics} from './metrics';
 export type {StreamMetrics} from './metrics';
 
 export interface StreamPlayerProps {
@@ -222,9 +222,10 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             const update = () => {
                 if (showStats || metricsCallback.current) {
                     const stats = player.getStats();
-                    const age=stats.lastStatsAt?performance.now()-stats.lastStatsAt:0;
-                    const fresh=stats.lastStatsAt>0&&age<5000;
-                    const next = { width: stats._videoWidth, height: stats._videoHeight, fps: fresh?stats._videoFps:0, bitrate: fresh?stats._bitrate:0, jitter: fresh?stats._jitter:0, loss: stats._packetsLost, rtt: fresh?stats._rtt * 1000:0, statsAgeMs:age, statsFresh:fresh, peerState:player._peerConnection.connectionState, iceState:player._peerConnection.iceConnectionState, signalingState:player._peerConnection.signalingState };
+                    const now=performance.now();
+                    const age=stats.lastVideoStatsAt?now-stats.lastVideoStatsAt:0;
+                    const fresh=networkStatsFresh(stats.lastVideoStatsAt,now);
+                    const next = { width: nonnegativeMetric(stats._videoWidth), height: nonnegativeMetric(stats._videoHeight), fps: fresh?nonnegativeMetric(stats._videoFps):0, bitrate: fresh?nonnegativeMetric(stats._bitrate):0, jitter: fresh?nonnegativeMetric(stats._jitter):0, loss: nonnegativeMetric(stats._packetsLost), rtt: fresh?nonnegativeMetric(stats._rtt * 1000):0, statsAgeMs:nonnegativeMetric(age), statsFresh:fresh, peerState:player._peerConnection.connectionState, iceState:player._peerConnection.iceConnectionState, signalingState:player._peerConnection.signalingState };
                     if (showStats) setMetrics(next);
                     metricsCallback.current?.(next);
                 }
@@ -281,7 +282,8 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
             const active=()=>!disposed&&!terminal;
             const status=(value:string)=>{if(active())setPlayerState(value)};
             let removeConnectionListener:(()=>void)|undefined;
-            const clearTimers=()=>{clearTimeout(timer);heartbeat.dispose();clearInterval(mediaWatchdog);watchdog.dispose();removeConnectionListener?.();removeConnectionListener=undefined};
+            let removeVideoVisibilityListener:(()=>void)|undefined;
+            const clearTimers=()=>{clearTimeout(timer);heartbeat.dispose();clearInterval(mediaWatchdog);watchdog.dispose();removeConnectionListener?.();removeConnectionListener=undefined;removeVideoVisibilityListener?.();removeVideoVisibilityListener=undefined};
             const fail=(reason:string)=>{
                 if(!active())return;
                 terminal=true;clearTimers();
@@ -320,8 +322,14 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 if (!active()) return;
                 handshake='ice-connect';
                 const peer = instance._peerConnection;
+                const videoWatchdog=new VisibleVideoWatchdog();
+                const resetVideoGrace=()=>videoWatchdog.reset();
+                document.addEventListener('visibilitychange',resetVideoGrace);
+                window.addEventListener('pageshow',resetVideoGrace);
+                removeVideoVisibilityListener=()=>{document.removeEventListener('visibilitychange',resetVideoGrace);window.removeEventListener('pageshow',resetVideoGrace)};
                 const onConnection = () => {
                     if (!active()) return;
+                    if(peer.connectionState!=='connected')videoWatchdog.reset();
                     watchdog.update(peer.connectionState);
                     if(!active())return;
                     if (peer.connectionState === 'connected') { handshake=undefined; status('Connected'); instance?._channels.control.requestKeyframeRequest(true) }
@@ -332,8 +340,13 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 status('Negotiated'); onConnection();
                 if(!active())return;
                 heartbeat.start();
-                let visibleConnectedAt=performance.now();
-                mediaWatchdog=setInterval(()=>{const now=performance.now();if(disposed||terminal)return;if(peer.connectionState==='new'||peer.connectionState==='connecting' && !instance?.getStats().lastStatsAt){visibleConnectedAt=now;return}if(instance?.serverDisconnected){fail('server');return}const stats=instance?.getStats();if(!stats)return;if(statsExpired(now,stats.lastStatsAt,visibleConnectedAt))fail('stats');else if(stats.mediaStalled)fail('media')},1000);
+                mediaWatchdog=setInterval(()=>{
+                    if(disposed||terminal)return;
+                    if(instance?.serverDisconnected){fail('server');return}
+                    const stats=instance?.getStats();if(!stats)return;
+                    const reason=videoWatchdog.sample(performance.now(),peer.connectionState==='connected',!document.hidden,stats.lastStatsAt,stats.lastVideoStatsAt,stats.mediaStalled);
+                    if(reason)fail(reason)
+                },1000);
             };
             const poll = async () => {
                 if (!active()) return;

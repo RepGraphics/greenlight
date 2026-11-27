@@ -102,6 +102,7 @@ test('only the current WebM capture can be trimmed and failed output keeps the o
     const f=fixture(async()=>{attempts++;return new Blob(['invalid'],{type:'image/png'})})
     const screenshot=f.session.takeScreenshot(video);f.shot();await screenshot
     await f.session.trim(png,video,range)
+    assert.equal(f.session.discard(),true)
     f.session.startRecording(video,audio);f.finish()
     const initial=f.states.at(-1)
     await f.session.trim(trimmed,video,range)
@@ -147,4 +148,63 @@ test('discarding a capture or ending playback aborts its pending trim',async()=>
         finish(trimmed);await pending
         assert.equal(f.states.length,count)
     }
+})
+
+test('suspending live playback finalizes an active recording once and retains its result',()=>{
+    const f=fixture()
+    f.session.startRecording(video,audio)
+    f.session.suspendLiveCapture();f.session.suspendLiveCapture()
+    assert.equal(f.counts().stops,1)
+    assert.equal(f.states.at(-1)?.phase,'stopping')
+    f.finish()
+    const ready=f.states.at(-1)
+    f.session.suspendLiveCapture()
+    assert.equal(f.states.at(-1),ready)
+    assert.equal(ready?.blob,clip)
+})
+test('suspending playback invalidates an unfinished screenshot but preserves a completed one',async()=>{
+    const f=fixture()
+    const pending=f.session.takeScreenshot(video)
+    f.session.suspendLiveCapture()
+    f.shot();await pending
+    assert.deepEqual(f.states.at(-1),{phase:'failed'})
+    const next=f.session.takeScreenshot(video);f.shot();await next
+    const ready=f.states.at(-1)
+    f.session.suspendLiveCapture()
+    assert.equal(f.states.at(-1),ready);assert.equal(ready?.blob,png)
+})
+test('local clip trimming can finish after the stream is disconnected',async()=>{
+    let finish!:(output:Blob)=>void
+    const f=fixture(()=>new Promise(resolve=>{finish=resolve}))
+    f.session.startRecording(video,audio);f.finish()
+    const pending=f.session.trim(clip,video,range)
+    f.session.suspendLiveCapture()
+    finish(trimmed);await pending
+    assert.equal(f.states.at(-1)?.blob,clip)
+    assert.equal(f.states.at(-1)?.trim?.phase,'ready')
+})
+
+test('invalid recorder output is not exposed as a completed clip',()=>{
+    for(const blob of [new Blob([],{type:'video/webm'}),new Blob(['x'],{type:'text/plain'})]){
+        const f=fixture();f.session.startRecording(video,audio);f.finish(blob)
+        assert.deepEqual(f.states.at(-1),{phase:'failed'})
+    }
+})
+test('invalid screenshot output is rejected',async()=>{
+    const states:WebCaptureState[]=[]
+    const session=new WebCaptureSession(state=>states.push(state),async()=>new Blob(['x'],{type:'text/plain'}))
+    await session.takeScreenshot(video)
+    assert.deepEqual(states.at(-1),{phase:'failed'})
+})
+
+test('completed captures require explicit discard before another capture can begin',async()=>{
+    const f=fixture()
+    f.session.startRecording(video,audio);f.finish()
+    const ready=f.states.at(-1)
+    await f.session.takeScreenshot(video);f.session.startRecording(video,audio)
+    assert.equal(f.states.at(-1),ready)
+    assert.deepEqual(f.counts(),{shots:0,starts:1,stops:0})
+    assert.equal(f.session.discard(),true)
+    const next=f.session.takeScreenshot(video);f.shot();await next
+    assert.equal(f.states.at(-1)?.blob,png)
 })

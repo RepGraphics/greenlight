@@ -11,6 +11,8 @@ export default class Stats {
     mediaStalled = false
     lastStatsAt = 0
     private lastReportTimestamp=0
+    private lastVideoTimestamp=0
+    lastVideoStatsAt=0
     private previous?: { id: string; bytes: number; time: number }
     _bitrate = 0
     _jitter = 0
@@ -48,7 +50,11 @@ export default class Stats {
             if(latest<=this.lastReportTimestamp)return
             this.lastReportTimestamp=latest
             this.lastStatsAt=now
-            const inbound=Array.from(stats.values()).filter(r=>r.type==='inbound-rtp'&&(r.kind==='video'||r.kind==='audio')).map(r=>({id:r.id,bytes:r.bytesReceived}))
+            const videoReports=Array.from(stats.values()).filter(r=>r.type==='inbound-rtp'&&r.kind==='video')
+            const inbound=videoReports.map(r=>({id:r.id,bytes:r.bytesReceived}))
+            const videoTimestamp=videoReports.reduce((latest,r)=>Number.isFinite(r.timestamp)?Math.max(latest,r.timestamp):latest,0)
+            const videoFresh=videoTimestamp>this.lastVideoTimestamp
+            if(videoFresh){this.lastVideoTimestamp=videoTimestamp;this.lastVideoStatsAt=now}
             this.mediaStalled=this.mediaMonitor.sample(this.lastStatsAt,inbound,this._peerConnection.connectionState==='connected'&&!document.hidden)
             const transport = Array.from(stats.values()).find(report=>report.type==='transport'&&report.selectedCandidatePairId)
             const selectedPair = transport ? stats.get(transport.selectedCandidatePairId) : Array.from(stats.values()).find(report=>report.type==='candidate-pair'&&report.nominated&&report.state==='succeeded')
@@ -59,6 +65,11 @@ export default class Stats {
                 if(remote?.type==='remote-candidate')this.readRemoteCandidate(remote)
             }
             this._bitrate=0;
+            if(!videoFresh){
+                this._videoWidth=0;this._videoHeight=0;this._videoFps=0;this._videoCodec='';this._jitter=0;this._packetsLost=0
+                return
+            }
+            this._videoWidth=0;this._videoHeight=0;this._videoFps=0;this._videoCodec='';this._jitter=0;this._packetsLost=0
             stats.forEach((report) => {
                 //  @TODO: Implement chat stats using type outbound-rtp
 

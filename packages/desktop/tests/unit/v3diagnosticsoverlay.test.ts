@@ -19,7 +19,7 @@ function fixture(){
     const holder=new Element()
     let available=true,now=1000,id=0
     const callbacks=new Map<number,()=>void>()
-    const stats={lastStatsAt:500,_remoteIsLocal:true,_remoteIsIpv6:false,_videoWidth:1920,_videoHeight:1080,_videoFps:60,_videoCodec:'video/H264',_rtt:.052,_bitrate:12.345,_jitter:4.567,_packetsLost:3}
+    const stats={lastVideoStatsAt:500,lastStatsAt:500,_remoteIsLocal:true,_remoteIsIpv6:false,_videoWidth:1920,_videoHeight:1080,_videoFps:60,_videoCodec:'video/H264',_rtt:.052,_bitrate:12.345,_jitter:4.567,_packetsLost:3}
     const renderer={getElement:()=>({style:{}}),getFrameStats:()=>({renderingFps:59,renderDelayMs:12,droppedFrames:2})}
     Object.defineProperty(globalThis,'document',{configurable:true,value:{getElementById:()=>available?holder:null,createElement:()=>new Element()}})
     const overlay=new Overlay(renderer as any,{getElementId:()=> 'stream',getStats:()=>stats} as any,
@@ -75,9 +75,9 @@ test('network diagnostics expose live values but hide stale and missing stats in
         assert.ok(f.labels().includes('Network stats: Stale'))
         assert.ok(!f.labels().some(label=>label.startsWith('Bitrate:')))
         assert.ok(f.labels().includes('Render FPS: 59'))
-        f.stats.lastStatsAt=0;f.tick()
+        f.stats.lastVideoStatsAt=0;f.tick()
         assert.ok(f.labels().includes('Network stats: Waiting'))
-        f.stats.lastStatsAt=5499;f.tick()
+        f.stats.lastVideoStatsAt=5499;f.tick()
         assert.ok(f.labels().includes('Network stats: Live'))
     }finally{f.restore()}
 })
@@ -91,5 +91,28 @@ test('codec labels use literal text and invalid metrics are not rendered as nume
         assert.ok(f.labels().includes('Bitrate: Unavailable'))
         assert.ok(f.labels().includes('RTT: Unavailable'))
         assert.ok(f.labels().includes('Jitter: Unavailable'))
+    }finally{f.restore()}
+})
+
+import {networkStatsFresh,nonnegativeMetric} from '../../../player/src/client/metrics'
+test('shared statistics freshness rejects future, expired and nonfinite timestamps',()=>{
+    assert.equal(networkStatsFresh(1000,5999),true)
+    for(const now of [999,6000,Infinity,NaN])assert.equal(networkStatsFresh(1000,now),false)
+    for(const last of [0,-1,NaN,Infinity])assert.equal(networkStatsFresh(last,1000),false)
+    for(const value of [NaN,Infinity,-1])assert.equal(nonnegativeMetric(value),0)
+    assert.equal(nonnegativeMetric(12.5),12.5)
+})
+test('unavailable network metrics are never shown with green healthy status',()=>{
+    const f=fixture()
+    try{
+        f.stats._videoWidth=NaN;f.stats._videoHeight=0
+        f.stats._rtt=NaN;f.stats._jitter=Infinity;f.stats._bitrate=Infinity;f.stats._packetsLost=-1
+        f.overlay.createDebugOverlay()
+        const labels=f.holder.children[0].children
+        for(const name of ['Resolution','RTT','Jitter','Bitrate','Packets lost (total)']){
+            const label=labels.find(child=>child.text().startsWith(name+':'))
+            assert.equal(label?.text(),name+': Unavailable')
+            assert.equal(label?.children[0].style.background,'rgb(255, 193, 7)')
+        }
     }finally{f.restore()}
 })

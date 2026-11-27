@@ -2,10 +2,10 @@ name: Client regression tests
 on:
   push:
     branches: [main-v2]
-    paths: ['packages/desktop/**','packages/player/**','package.json','yarn.lock','.github/workflows/client-tests.yml']
+    paths: ['packages/desktop/**','packages/desktop-v3/**','packages/player/**','packages/platform/**','packages/pages/**','package.json','yarn.lock','.github/workflows/client-tests.yml']
   pull_request:
     branches: [main-v2]
-    paths: ['packages/desktop/**','packages/player/**','package.json','yarn.lock','.github/workflows/client-tests.yml']
+    paths: ['packages/desktop/**','packages/desktop-v3/**','packages/player/**','packages/platform/**','packages/pages/**','package.json','yarn.lock','.github/workflows/client-tests.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -26,6 +26,10 @@ jobs:
           node-version: 24
       - run: npm install --global yarn@1.22.22
       - run: yarn install --frozen-lockfile --ignore-scripts
+      - name: V3 source syntax gate
+        run: |
+          node --test packages/desktop-v3/scripts/check-syntax.test.cjs
+          node packages/desktop-v3/scripts/check-syntax.cjs
       - name: Unit and integration tests with coverage
         shell: bash
         run: |

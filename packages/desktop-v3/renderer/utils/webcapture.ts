@@ -29,14 +29,14 @@ export class WebCaptureSession{
     private trimController?:AbortController
     constructor(private update:(state:WebCaptureState)=>void,private screenshot=captureScreenshotBlob,private record=startStreamRecording,private beginReplay=startInstantReplay,private prepareTrim=trimClip){}
     private publish(state:WebCaptureState){this.state=state;this.update(state)}
-    private available(){return !this.trimController&&['idle','ready','failed'].includes(this.state.phase)}
+    private available(){return !this.trimController&&['idle','failed'].includes(this.state.phase)}
     async takeScreenshot(video:HTMLVideoElement|null){
         if(!this.available()||!canCapture(video))return
         const generation=++this.generation
         this.publish({phase:'capturing'})
         try{
             const blob=await this.screenshot(video)
-            if(generation===this.generation)this.publish({phase:'ready',blob,filename:screenshotFilename()})
+            if(generation===this.generation)this.publish(blob.size>0&&blob.size<=recordingLimitBytes&&blob.type==='image/png'?{phase:'ready',blob,filename:screenshotFilename()}:{phase:'failed'})
         }catch{if(generation===this.generation)this.publish({phase:'failed'})}
     }
     startRecording(video:HTMLVideoElement|null,audio:HTMLAudioElement|null,preferences?:{seconds?:unknown;videoBitsPerSecond?:unknown;includeAudio?:boolean}){
@@ -47,7 +47,7 @@ export class WebCaptureSession{
             const recording=this.record(video,(blob,error)=>{
                 if(generation!==this.generation)return
                 this.recording=undefined
-                this.publish(blob&&!error?{phase:'ready',blob,filename:recordingFilename()}:{phase:'failed'})
+                this.publish(isWebCaptureClip(blob??undefined)&&!error?{phase:'ready',blob:blob!,filename:recordingFilename()}:{phase:'failed'})
             },audio,{
                 ...webRecordingPreferences(preferences?.seconds,preferences?.videoBitsPerSecond),
                 ...(preferences?.includeAudio===false?{includeAudio:false}:{}),
@@ -87,7 +87,7 @@ export class WebCaptureSession{
         this.generation++
         this.replay=undefined
         replay.dispose()
-        this.publish(blob&&blob.size>0&&blob.size<=replayMaxBytes&&blob.type.startsWith('video/webm')?{phase:'ready',blob,filename:recordingFilename()}:{phase:'failed'})
+        this.publish(isWebCaptureClip(blob??undefined)&&blob!.size<=replayMaxBytes?{phase:'ready',blob:blob!,filename:recordingFilename()}:{phase:'failed'})
     }
     cancelReplay(){
         if(this.state.phase!=='replay'&&this.state.phase!=='savingReplay')return
@@ -100,7 +100,21 @@ export class WebCaptureSession{
     stop(){
         if(this.state.phase!=='recording'||!this.recording)return
         this.publish({phase:'stopping'})
-        this.recording.stop()
+        try{this.recording.stop()}catch{
+            this.generation++;this.recording=undefined;this.publish({phase:'failed'})
+        }
+    }
+    // Stop live media work when the stream ceases to be connected. Completed
+    // captures and local clip edits belong to the current page, not the peer.
+    suspendLiveCapture(){
+        if(this.state.phase==='recording'){this.stop();return}
+        if(this.state.phase==='replay'){this.cancelReplay();return}
+        if(this.state.phase==='capturing'){
+            this.generation++
+            this.publish({phase:'failed'})
+        }
+        // An explicitly requested recording/replay finalization may finish.
+        // Local trim work is independent of the Xbox connection.
     }
     async trim(original:Blob,video:HTMLVideoElement,range:ClipTrimRange){
         const source=this.state

@@ -2,9 +2,12 @@ import type xCloudPlayer from '../player'
 import type VideoComponent from './video'
 import type WebGPUComponent from './webgpu'
 
+import {networkStatsFresh} from '../../metrics'
+
 type LabelTone='ok'|'warning'|'error'
 type FrameStats={renderingFps:number;renderDelayMs:number;droppedFrames:number}
-const metric=(value:number,suffix='')=>Number.isFinite(value)&&value>=0?Number(value.toFixed(2))+suffix:'Unavailable'
+const validMetric=(value:number)=>Number.isFinite(value)&&value>=0
+const metric=(value:number,suffix='')=>validMetric(value)?Number(value.toFixed(2))+suffix:'Unavailable'
 
 export default class Overlay {
     private debug?:HTMLElement
@@ -49,22 +52,22 @@ export default class Overlay {
         const debug=this.debug
         if(!debug)return
         const stats=this._player.getStats()
-        const age=this.now()-stats.lastStatsAt
-        const fresh=stats.lastStatsAt>0&&Number.isFinite(age)&&age>=0&&age<5000
+        const fresh=networkStatsFresh(stats.lastVideoStatsAt,this.now())
         const labels:HTMLElement[]=[]
         const add=(name:string,value:string,tone:LabelTone='ok')=>labels.push(this.createLabel(name,value,tone))
-        add('Network stats',fresh?'Live':stats.lastStatsAt>0?'Stale':'Waiting',fresh?'ok':'warning')
+        add('Network stats',fresh?'Live':stats.lastVideoStatsAt>0?'Stale':'Waiting',fresh?'ok':'warning')
         if(fresh){
             add('Local Play',stats._remoteIsLocal?'Local':'Remote')
-            add('Resolution',metric(stats._videoWidth)+'x'+metric(stats._videoHeight))
+            const resolution=validMetric(stats._videoWidth)&&stats._videoWidth>0&&validMetric(stats._videoHeight)&&stats._videoHeight>0
+            add('Resolution',resolution?metric(stats._videoWidth)+'x'+metric(stats._videoHeight):'Unavailable',resolution?'ok':'warning')
             add('Stream FPS',metric(stats._videoFps),stats._videoFps>=58?'ok':'warning')
             add('Connection',stats._remoteIsIpv6?'IPv6':'IPv4')
             add('Video',String(stats._videoCodec||'Unknown').slice(0,128))
             const rtt=stats._rtt*1000
-            add('RTT',rtt>0?metric(rtt,' ms'):'Unavailable',rtt>75?'error':rtt>40||rtt<=0?'warning':'ok')
-            add('Bitrate',stats._bitrate>0?metric(stats._bitrate,' Mbps'):'Unavailable',stats._bitrate>0?'ok':'warning')
-            add('Jitter',metric(stats._jitter,' ms'),stats._jitter>30?'error':stats._jitter>15?'warning':'ok')
-            add('Packets lost (total)',metric(stats._packetsLost),stats._packetsLost>0?'warning':'ok')
+            add('RTT',rtt>0?metric(rtt,' ms'):'Unavailable',!validMetric(rtt)||rtt<=0?'warning':rtt>75?'error':rtt>40?'warning':'ok')
+            add('Bitrate',stats._bitrate>0?metric(stats._bitrate,' Mbps'):'Unavailable',validMetric(stats._bitrate)&&stats._bitrate>0?'ok':'warning')
+            add('Jitter',metric(stats._jitter,' ms'),!validMetric(stats._jitter)?'warning':stats._jitter>30?'error':stats._jitter>15?'warning':'ok')
+            add('Packets lost (total)',metric(stats._packetsLost),!validMetric(stats._packetsLost)||stats._packetsLost>0?'warning':'ok')
         }
         // Renderer measurements are separate from incoming network statistics.
         const frameStats=(this._videoComponent as {getFrameStats?:()=>FrameStats}).getFrameStats?.()

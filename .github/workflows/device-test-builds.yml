@@ -8,7 +8,11 @@ on:
       - '.github/workflows/device-test-builds.yml'
       - 'packages/pages/scripts/**'
       - 'packages/pages/src/**'
-      - 'packages/desktop-v3/renderer/providers/trpc.tsx'
+      - 'packages/desktop-v3/renderer/**'
+      - 'packages/desktop-v3/main/**'
+      - 'packages/desktop-v3/shared/**'
+      - 'packages/player/src/**'
+      - 'packages/platform/src/**'
       - 'packages/desktop-v3/scripts/**'
       - 'packages/desktop/scripts/**'
       - 'packages/desktop/tests/smoke.cjs'
@@ -16,6 +20,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: device-test-builds-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   windows:
@@ -37,6 +45,8 @@ jobs:
         run: yarn install --frozen-lockfile
       - name: Regression and portable asset-copy tests
         run: |
+          node packages/desktop-v3/scripts/check-syntax.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           yarn desktop test
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node --test packages/pages/scripts/copy-web.test.cjs
