@@ -3,6 +3,8 @@ package uk.repgraphics.greenlight.companion;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.webkit.WebResourceError;
 import android.content.SharedPreferences;
 import android.content.ActivityNotFoundException;
 import android.net.Uri;
@@ -46,6 +48,9 @@ public final class MainActivity extends Activity {
     private WebView browser;
     private LinearLayout clientControls;
     private final PlaybackDisplay display = new PlaybackDisplay();
+    private final ConnectionHealth health = new ConnectionHealth();
+    private boolean clearingCookies;
+    private Button connectButton;
     private int previousSystemUi;
     private TextView status;
     private EditText endpoint, password;
@@ -73,6 +78,8 @@ public final class MainActivity extends Activity {
         } catch (ClassCastException error) {
             connectionPreferences.edit().clear().apply();
         }
+        // Clear session residue before opening a new WebView, including after process death.
+        clearSessionStorage();
         showConnect("Choose a connection mode and your trusted private HTTPS endpoint.");
     }
 
@@ -182,12 +189,19 @@ public final class MainActivity extends Activity {
             status.setText("Saved connection cleared.");
         });
         Button connect = new Button(this);
+        connectButton = connect;
         connect.setText("Connect");
+        connect.setEnabled(!clearingCookies);
         form.addView(connect);
+        Button diagnostics = new Button(this);
+        diagnostics.setText("Share connection diagnostics");
+        diagnostics.setOnClickListener(view -> shareDiagnostics());
+        form.addView(diagnostics);
         status = text(message, 14);
         status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         form.addView(status);
         connect.setOnClickListener(view -> {
+            if (clearingCookies || browser != null) return;
             OriginPolicy selected = OriginPolicy.parse(endpoint.getText().toString().trim());
             String credential = password.getText().toString();
             if (selected == null || !mode.acceptsCredential(credential)) {
@@ -207,6 +221,8 @@ public final class MainActivity extends Activity {
             origin = selected;
             token = mode == ConnectionMode.DESKTOP_COMPANION ? credential : null;
             challenged = false;
+            health.start(mode);
+            connectButton = null;
             openClient();
         });
     }
@@ -235,6 +251,10 @@ public final class MainActivity extends Activity {
             }
         });
         toolbar.addView(fullscreen);
+        Button diagnostics = new Button(this);
+        diagnostics.setText("Share diagnostics");
+        diagnostics.setOnClickListener(view -> shareDiagnostics());
+        toolbar.addView(diagnostics);
         final OriginPolicy selectedOrigin = origin;
         final ConnectionMode selectedMode = mode;
         if (selectedMode == ConnectionMode.PRIVATE_V3) {
@@ -285,9 +305,13 @@ public final class MainActivity extends Activity {
             @Override public void onReceivedHttpAuthRequest(WebView view, HttpAuthHandler handler, String host, String realm) {
                 if (view != browser || token == null || challenged || !selectedMode.allowsChallenge(selectedOrigin, host, realm)) {
                     handler.cancel();
-                    if (view == browser) status.setText(selectedMode == ConnectionMode.PRIVATE_V3
+                    if (view == browser) {
+                        health.fail(ConnectionHealth.State.AUTH);
+                        if (display.exit()) applyDisplay();
+                        status.setText(selectedMode == ConnectionMode.PRIVATE_V3
                         ? "Unexpected HTTP authentication challenge. Check the private V3 access configuration."
                         : "Authentication failed. Disconnect and check the endpoint and token.");
+                    }
                     return;
                 }
                 challenged = true;
@@ -296,24 +320,35 @@ public final class MainActivity extends Activity {
             }
             @Override public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
                 handler.cancel();
-                if (view == browser) status.setText("TLS certificate rejected. Use a trusted HTTPS certificate.");
+                if (view == browser) reportFailure(ConnectionHealth.State.TLS);
             }
             @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap icon) {
                 if (view != browser) return;
                 if (!selectedOrigin.allows(url)) {
                     view.stopLoading();
-                    status.setText("Blocked navigation outside the selected endpoint.");
+                    reportFailure(ConnectionHealth.State.NAVIGATION_BLOCKED);
                 }
             }
             @Override public void onPageFinished(WebView view, String url) {
-                if (view == browser && selectedOrigin.allows(url) && status.getText().toString().startsWith("Connecting")) {
+                if (view == browser && selectedOrigin.allows(url) && health.state() == ConnectionHealth.State.LOADING) {
+                    health.pageLoaded();
                     status.setText(selectedMode == ConnectionMode.PRIVATE_V3
                         ? "Start sign-in in the web client, then use the Microsoft device sign-in button."
                         : "Private companion · End the stream before disconnecting");
                 }
             }
+            @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                if (view == browser && request.isForMainFrame()) reportFailure(ConnectionHealth.networkError(error.getErrorCode()));
+            }
+            @Override public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
+                if (view == browser && request.isForMainFrame()) reportFailure(ConnectionHealth.httpError(response.getStatusCode()));
+            }
             @Override public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
-                if (view == browser) disconnect("WebView stopped. Check for an existing Xbox session before reconnecting.");
+                if (view == browser) {
+                    health.fail(ConnectionHealth.State.RENDERER_STOPPED);
+                    clearClient(true);
+                    showConnect(health.guidance());
+                }
                 return true;
             }
         });
@@ -354,7 +389,29 @@ public final class MainActivity extends Activity {
             .show();
     }
 
-    private void clearClient() {
+    private void reportFailure(ConnectionHealth.State failure) {
+        health.fail(failure);
+        if (display.exit()) applyDisplay();
+        status.setText(health.guidance());
+    }
+
+    private void shareDiagnostics() {
+        String appVersion = null;
+        try { appVersion = getPackageManager().getPackageInfo(getPackageName(), 0).versionName; }
+        catch (android.content.pm.PackageManager.NameNotFoundException ignored) { }
+        PackageInfo webView = WebView.getCurrentWebViewPackage();
+        String report = health.report(Build.VERSION.SDK_INT, appVersion, webView == null ? null : webView.versionName, display.isImmersive());
+        new AlertDialog.Builder(this).setTitle("Share connection diagnostics?")
+            .setMessage(report + "No endpoint, token, account or game identifiers are included.")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Share", (dialog, which) -> {
+                Intent send = new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, report);
+                try { startActivity(Intent.createChooser(send, "Share diagnostics")); }
+                catch (ActivityNotFoundException error) { status.setText("No sharing app available."); }
+            }).show();
+    }
+
+    private void clearClient(boolean rendererGone) {
         WebView web = browser;
         if (display.disconnected()) applyDisplay();
         clientControls = null;
@@ -364,19 +421,31 @@ public final class MainActivity extends Activity {
         challenged = false;
         if (web != null) {
             root.removeView(web);
-            web.stopLoading();
-            web.clearHistory();
-            web.clearCache(true);
+            if (!rendererGone) {
+                web.stopLoading();
+                web.clearHistory();
+                web.clearCache(true);
+            }
             web.destroy();
         }
+        clearSessionStorage();
+    }
+
+    private void clearSessionStorage() {
+        clearingCookies = true;
+        if (connectButton != null) connectButton.setEnabled(false);
         WebViewDatabase.getInstance(this).clearHttpAuthUsernamePassword();
         WebStorage.getInstance().deleteAllData();
-        CookieManager.getInstance().removeAllCookies(null);
-        CookieManager.getInstance().flush();
+        CookieManager.getInstance().removeAllCookies(removed -> {
+            CookieManager.getInstance().flush();
+            clearingCookies = false;
+            if (!isFinishing() && !isDestroyed() && connectButton != null) connectButton.setEnabled(true);
+        });
     }
 
     private void disconnect(String message) {
-        clearClient();
+        health.disconnected();
+        clearClient(false);
         showConnect(message);
     }
 
@@ -397,7 +466,8 @@ public final class MainActivity extends Activity {
         }
     }
     @Override protected void onDestroy() {
-        clearClient();
+        connectButton = null;
+        clearClient(false);
         super.onDestroy();
     }
 }

@@ -1,6 +1,8 @@
 import {useEffect,useRef,useState} from 'react'
 import {calibrationPads,calibratable,WebDeadzoneCalibration,type CalibrationPad,type CalibrationResult} from '../utils/webcontrollercalibration'
 
+import {controllerConfirmationValid,type ControllerIdentity} from '../utils/controllerconfirmation'
+
 const readPads=()=>{
     try{return calibrationPads(Array.from(navigator.getGamepads?.()??[]))}catch{return []}
 }
@@ -19,20 +21,29 @@ export default function ControllerCalibration({deadzone,onApply}:{deadzone:numbe
     const [selected,setSelected]=useState('')
     const [result,setResult]=useState<CalibrationResult|null>(null)
     const job=useRef<WebDeadzoneCalibration|null>(null)
-    const cancel=()=>{job.current=null;setResult(null)}
+    const source=useRef<ControllerIdentity|null>(null)
+    const selectedRef=useRef(selected)
+    selectedRef.current=selected
+    const cancel=()=>{job.current=null;source.current=null;setResult(null)}
     useEffect(()=>{
         if(!open)return
         const tick=()=>{
             const current=readPads()
             setPads(current)
+            const focused=!document.hidden&&document.hasFocus()
+            const selectedPad=current.find(item=>String(item.index)===selectedRef.current)??current[0]
+            if(source.current&&!controllerConfirmationValid(source.current,selectedPad,current,focused)){
+                cancel();setResult({kind:'failed'});return
+            }
             if(!job.current)return
-            const next=job.current.sample(current,performance.now(),!document.hidden&&document.hasFocus())
+            const next=job.current.sample(current,performance.now(),focused)
             if(next.kind!=='running')job.current=null
+            if(next.kind==='failed')source.current=null
             setResult(next)
         }
         tick()
         const timer=setInterval(tick,50)
-        return()=>{clearInterval(timer);job.current=null}
+        return()=>{clearInterval(timer);job.current=null;source.current=null}
     },[open])
     useEffect(()=>{cancel()},[deadzone])
     const pad=pads.find(item=>String(item.index)===selected)??pads[0]
@@ -40,6 +51,8 @@ export default function ControllerCalibration({deadzone,onApply}:{deadzone:numbe
     const start=()=>{
         const current=readPads().find(item=>item.index===pad?.index&&item.id===pad?.id)
         if(!calibratable(current)||document.hidden||!document.hasFocus()){setResult({kind:'failed'});return}
+        source.current={index:current.index,id:current.id}
+        setSelected(String(current.index))
         job.current=new WebDeadzoneCalibration(current,performance.now())
         setResult({kind:'running',remaining:3})
     }
@@ -57,7 +70,7 @@ export default function ControllerCalibration({deadzone,onApply}:{deadzone:numbe
             <div className="flex flex-wrap gap-2">
                 <button type="button" className={button} disabled={!calibratable(pad)||running} onClick={start}>{running?'Measuring… '+result.remaining+'s':'Measure stick drift'}</button>
                 <button type="button" className={button} disabled={!result} onClick={cancel}>Cancel</button>
-                {result?.kind==='ready'&&<button type="button" className={button} onClick={()=>{onApply(result.deadzone);cancel()}}>Apply {Math.round(result.deadzone*100)}% deadzone</button>}
+                {result?.kind==='ready'&&<button type="button" className={button} onClick={()=>{const current=readPads();const selectedPad=current.find(item=>String(item.index)===selected)??current[0];if(source.current&&controllerConfirmationValid(source.current,selectedPad,current,!document.hidden&&document.hasFocus())){onApply(result.deadzone);cancel()}else{cancel();setResult({kind:'failed'})}}}>Apply {Math.round(result.deadzone*100)}% deadzone</button>}
             </div>
             {result?.kind==='ready'&&<p role="status">Recommended deadzone: {Math.round(result.deadzone*100)}%. Current: {Math.round(deadzone*100)}%.</p>}
             {result?.kind==='failed'&&<p role="alert">Measurement failed. Keep the controller connected, leave the sticks untouched, and keep this tab focused.</p>}

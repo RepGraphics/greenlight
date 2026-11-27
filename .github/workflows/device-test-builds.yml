@@ -7,6 +7,8 @@ on:
     paths:
       - '.github/workflows/device-test-builds.yml'
       - 'packages/pages/scripts/**'
+      - 'packages/pages/src/**'
+      - 'packages/desktop-v3/renderer/providers/trpc.tsx'
       - 'packages/desktop-v3/scripts/**'
       - 'packages/desktop/scripts/**'
 
@@ -94,7 +96,7 @@ jobs:
         working-directory: packages/android
         run: |
           mkdir -p /tmp/android-policy-test
-          javac -d /tmp/android-policy-test app/src/main/java/uk/repgraphics/greenlight/companion/OriginPolicy.java app/src/main/java/uk/repgraphics/greenlight/companion/ConnectionMode.java app/src/main/java/uk/repgraphics/greenlight/companion/PlaybackDisplay.java app/src/main/java/uk/repgraphics/greenlight/companion/SavedConnection.java tests/OriginPolicyTest.java
+          javac -d /tmp/android-policy-test app/src/main/java/uk/repgraphics/greenlight/companion/OriginPolicy.java app/src/main/java/uk/repgraphics/greenlight/companion/ConnectionMode.java app/src/main/java/uk/repgraphics/greenlight/companion/PlaybackDisplay.java app/src/main/java/uk/repgraphics/greenlight/companion/SavedConnection.java app/src/main/java/uk/repgraphics/greenlight/companion/ConnectionHealth.java tests/OriginPolicyTest.java
           java -cp /tmp/android-policy-test uk.repgraphics.greenlight.companion.OriginPolicyTest
       - name: Build and lint debug APK
         working-directory: packages/android
@@ -172,6 +174,16 @@ jobs:
           grep -qi '^allow: POST' "$headers"
           status=$(curl --silent --show-error --max-time 10 -X POST -D "$headers" -o /dev/null -w '%{http_code}' 'http://127.0.0.1:8787/trpc/test?input=invalid')
           test "$status" = 400
+          grep -qi '^cache-control: no-store' "$headers"
+          status=$(curl --silent --show-error --max-time 10 -X POST -H 'Content-Type: application/json' -H 'Sec-Fetch-Site: cross-site' --data '{}' -D "$headers" -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/trpc/test)
+          test "$status" = 403
+          grep -qi '^cache-control: no-store' "$headers"
+          status=$(curl --silent --show-error --max-time 10 -X POST -H 'Content-Type: text/plain' --data '{}' -D "$headers" -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/trpc/test)
+          test "$status" = 415
+          grep -qi '^cache-control: no-store' "$headers"
+          python3 -c 'import sys; sys.stdout.write("x" * (2 * 1024 * 1024 + 1))' > "$RUNNER_TEMP/oversized-rpc-body"
+          status=$(curl --silent --show-error --max-time 10 -X POST -H 'Content-Type: application/json' --data-binary @"$RUNNER_TEMP/oversized-rpc-body" -D "$headers" -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/trpc/test)
+          test "$status" = 413
           grep -qi '^cache-control: no-store' "$headers"
           # Unknown procedure must be handled locally, without Xbox credentials or upstream requests.
           status=$(curl --silent --show-error --max-time 10 -X POST -H 'Content-Type: application/json' --data '{}' -D "$headers" -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/trpc/deviceBuildSmokeUnknown)

@@ -45,6 +45,12 @@ Device verification checklist (not yet executed):
 
 In either connected mode, tap **Fullscreen (Back to exit)** to hide the native controls and system bars without recreating the WebView. Swipe from the screen edge to temporarily reveal the system bars; use Android Back to restore the controls before disconnecting. The connected WebView requests that the screen stay awake while visible; this does not keep the device awake in the background. Disconnecting resets fullscreen. Real device, gesture navigation and rotation testing remain necessary.
 
+## Connection troubleshooting and diagnostics
+
+Main-frame failures show a local error category and private-network troubleshooting guidance. A failed page load does not become successful just because WebView calls its page-finished callback. A renderer crash destroys the unusable WebView and returns to setup; this does not confirm Xbox stream termination. The app never retries or creates a new session automatically.
+
+Use Share connection diagnostics from the connection screen or connected toolbar to preview and explicitly share a plain-text report containing Android API level, application and WebView versions, connection mode, native page state and fullscreen state. It excludes the endpoint, credentials, account/game identifiers and raw WebView error descriptions. Do not interpret PAGE_LOADED as successful Xbox playback. On launch and disconnect, the app clears site storage and waits for the asynchronous cookie removal callback before allowing a new connection. Real-device cleanup and authentication behavior remain to be tested.
+
 ## Standalone roadmap
 
 A truly backend-independent Android client still needs native authentication/token storage, Xbox signaling, media and input integration. Private V3 mode is an intermediate architecture, not a native standalone client or a production release.

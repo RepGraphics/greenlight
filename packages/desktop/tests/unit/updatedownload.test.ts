@@ -1,11 +1,11 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import {createHash} from 'node:crypto'
-import {mkdtemp,readFile,readdir,rm,writeFile,stat} from 'node:fs/promises'
+import {mkdtemp,readFile,readdir,rm,writeFile,stat,symlink} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {selectForkInstaller,selectForkRelease} from '../../main/helpers/updaterelease'
-import {downloadVerifiedInstaller,validInstallerRedirect,UpdateDownloadTask} from '../../main/helpers/updatedownload'
+import {downloadVerifiedInstaller,validInstallerRedirect,UpdateDownloadTask,verifySavedInstaller} from '../../main/helpers/updatedownload'
 import {isAllowedIpc,isAllowedWebIpc} from '../../main/ipc/policy'
 const bytes=Buffer.from('test installer')
 const sha=createHash('sha256').update(bytes).digest('hex')
@@ -103,4 +103,51 @@ test('verified Linux AppImages are executable by the owner only',{skip:process.p
         assert.deepEqual(await readFile(path),bytes)
         assert.deepEqual(await readdir(dir),[linuxAsset.name])
     }finally{await rm(dir,{recursive:true,force:true})}
+})
+
+test('saved installer verification detects same-size tampering and deletion',async()=>{
+    const dir=await mkdtemp(join(tmpdir(),'streamcloud-reverify-'))
+    try{
+        const file=join(dir,asset.name)
+        await writeFile(file,bytes)
+        assert.equal(await verifySavedInstaller(file,asset),file)
+        await writeFile(file,Buffer.alloc(bytes.length,65))
+        await assert.rejects(verifySavedInstaller(file,asset),/changed/)
+        await rm(file)
+        await assert.rejects(verifySavedInstaller(file,asset))
+    }finally{await rm(dir,{recursive:true,force:true})}
+})
+test('saved installer verification rejects invalid names, lengths and non-files',async()=>{
+    const dir=await mkdtemp(join(tmpdir(),'streamcloud-reverify-'))
+    try{
+        const file=join(dir,asset.name)
+        await writeFile(file,bytes)
+        await assert.rejects(verifySavedInstaller(file,{...asset,name:'other.exe'}),/metadata/)
+        await assert.rejects(verifySavedInstaller(file,{...asset,size:asset.size+1}),/changed/)
+        await rm(file)
+        const {mkdir}=await import('node:fs/promises');await mkdir(file)
+        await assert.rejects(verifySavedInstaller(file,asset),/changed/)
+    }finally{await rm(dir,{recursive:true,force:true})}
+})
+test('saved installer verification rejects symbolic links even to matching bytes',{skip:process.platform==='win32'},async()=>{
+    const dir=await mkdtemp(join(tmpdir(),'streamcloud-reverify-'))
+    try{
+        const actual=join(dir,'actual.exe'),file=join(dir,asset.name)
+        await writeFile(actual,bytes);await symlink(actual,file)
+        await assert.rejects(verifySavedInstaller(file,asset),/changed/)
+    }finally{await rm(dir,{recursive:true,force:true})}
+})
+test('installer handoff shares verification and blocks a new download until it settles',async()=>{
+    const task=new UpdateDownloadTask()
+    const file=join(tmpdir(),asset.name)
+    task.start(async()=>asset,async()=>tmpdir(),async()=>file)
+    await flush()
+    let complete!:(value:string)=>void,calls=0
+    const verifying=task.verifyReady(()=>{calls++;return new Promise(resolve=>{complete=resolve})})
+    assert.equal(task.verifyReady(),verifying)
+    task.start(async()=>assert.fail('download during verification'),async()=>tmpdir())
+    await flush();assert.equal(calls,1);complete(file)
+    assert.equal(await verifying,file);assert.equal(task.readyPath,file)
+    await assert.rejects(task.verifyReady(async()=>{throw Error('changed')}),/changed/)
+    assert.equal(task.readyPath,undefined);assert.equal(task.status().phase,'failed')
 })
