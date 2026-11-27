@@ -223,8 +223,8 @@ export const StreamPlayer = forwardRef<StreamPlayerHandle, StreamPlayerProps>(
                 if (showStats || metricsCallback.current) {
                     const stats = player.getStats();
                     const now=performance.now();
-                    const age=stats.lastStatsAt?now-stats.lastStatsAt:0;
-                    const fresh=networkStatsFresh(stats.lastStatsAt,now);
+                    const age=stats.lastVideoStatsAt?now-stats.lastVideoStatsAt:0;
+                    const fresh=networkStatsFresh(stats.lastVideoStatsAt,now);
                     const next = { width: nonnegativeMetric(stats._videoWidth), height: nonnegativeMetric(stats._videoHeight), fps: fresh?nonnegativeMetric(stats._videoFps):0, bitrate: fresh?nonnegativeMetric(stats._bitrate):0, jitter: fresh?nonnegativeMetric(stats._jitter):0, loss: nonnegativeMetric(stats._packetsLost), rtt: fresh?nonnegativeMetric(stats._rtt * 1000):0, statsAgeMs:nonnegativeMetric(age), statsFresh:fresh, peerState:player._peerConnection.connectionState, iceState:player._peerConnection.iceConnectionState, signalingState:player._peerConnection.signalingState };
                     if (showStats) setMetrics(next);
                     metricsCallback.current?.(next);

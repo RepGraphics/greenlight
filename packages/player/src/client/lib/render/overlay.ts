@@ -52,10 +52,10 @@ export default class Overlay {
         const debug=this.debug
         if(!debug)return
         const stats=this._player.getStats()
-        const fresh=networkStatsFresh(stats.lastStatsAt,this.now())
+        const fresh=networkStatsFresh(stats.lastVideoStatsAt,this.now())
         const labels:HTMLElement[]=[]
         const add=(name:string,value:string,tone:LabelTone='ok')=>labels.push(this.createLabel(name,value,tone))
-        add('Network stats',fresh?'Live':stats.lastStatsAt>0?'Stale':'Waiting',fresh?'ok':'warning')
+        add('Network stats',fresh?'Live':stats.lastVideoStatsAt>0?'Stale':'Waiting',fresh?'ok':'warning')
         if(fresh){
             add('Local Play',stats._remoteIsLocal?'Local':'Remote')
             const resolution=validMetric(stats._videoWidth)&&stats._videoWidth>0&&validMetric(stats._videoHeight)&&stats._videoHeight>0

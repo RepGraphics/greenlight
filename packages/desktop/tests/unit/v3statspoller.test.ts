@@ -85,3 +85,19 @@ test('bitrate baseline resets across video stream replacement and counter regres
         assert.equal(f.stats._bitrate,0)
     }finally{f.restore()}
 })
+
+test('audio-only statistics cannot refresh stale video readings',async()=>{
+    const f=statsFixture()
+    try{
+        await f.sample(videoReport('video',100,100))
+        const videoAt=f.stats.lastVideoStatsAt
+        assert.equal(f.stats._videoWidth,1920)
+        await f.sample(videoReport('video',100,100),{id:'audio',type:'inbound-rtp',kind:'audio',timestamp:200,bytesReceived:1000})
+        assert.equal(f.stats.lastVideoStatsAt,videoAt)
+        assert.equal(f.stats._videoWidth,0)
+        assert.equal(f.stats._videoFps,0)
+        assert.equal(f.stats._bitrate,0)
+        await f.sample(videoReport('video',300,300))
+        assert.equal(f.stats._videoWidth,1920)
+    }finally{f.restore()}
+})
