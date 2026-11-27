@@ -20,7 +20,7 @@ During playback, choose either the on-screen controller or experimental direct t
 
 Local captures contain decoded game video, not the desktop or web UI. WebM clips use available remote audio and are limited to the selected 1, 3 or 5 minute duration or the shared 128 MiB recorder size limit. Choose 1.5, 3 or 6 Mbps recording video bitrate; higher quality may hit the size limit earlier. Preview screenshots and clips locally before saving, or discard the current capture. Preview media URLs are released when hidden or removed. Save the capture explicitly before leaving, reconnecting or starting another capture. Nothing is uploaded. Android WebView does not currently support saving these downloads.
 
-Before starting a session, expand Advanced physical controller options to select Standard, Southpaw, Inverted or Alternate face buttons and adjust the deadzone and axes. Settings apply to the selected session only; they are not stored across reloads. Console-paired mode bypasses local controller input. During playback, adjust volume independently of mute or toggle streaming statistics. Browser and hardware support determine vibration availability. Expand Custom button mappings to assign any supported Xbox button to a physical button index (0–63), or listen for a press on a selected connected controller. Listening requires focus and ends after ten seconds; held or simultaneous presses require release before capture. Confirm with Apply mapping. Mappings apply to all local physical controllers for the session and are not persisted.
+Before starting a session, expand Advanced physical controller options to select Standard, Southpaw, Inverted or Alternate face buttons and adjust the deadzone and axes. Changes in stream setup apply to the selected session; use Settings to save reusable defaults. Console-paired mode bypasses local controller input. During playback, adjust volume independently of mute or toggle streaming statistics. Browser and hardware support determine vibration availability. Expand Custom button mappings to assign any supported Xbox button to a physical button index (0–63), or listen for a press on a selected connected controller. Listening requires focus and ends after ten seconds; held or simultaneous presses require release before capture. Confirm with Apply mapping. Mappings apply to all local physical controllers for the session; defaults saved in Settings can be reused.
 
 During playback, expand Video appearance to choose a desktop-compatible preset or adjust the individual SDR filters. Neutral restores the default appearance. These adjustments affect only the displayed video and do not change the remote stream, touch coordinates or saved captures. Sharpening requires browser SVG filter support and may increase rendering cost. Appearance is session-local, not HDR processing.
 
@@ -46,6 +46,10 @@ During a connected stream, select Fullscreen to expand the shared playback surfa
 
 Connection history and diagnostics retains at most 300 samples or five minutes of measurements for the current stream. Expand the panel during playback or after a connection failure for latency, jitter, FPS and bitrate graphs, with stale data shown as gaps. Export the desktop-compatible JSON report explicitly; it excludes credentials, addresses and game/account identifiers. The report is local and is lost when leaving the session. Quality estimates use latency and jitter rather than guaranteeing gameplay performance.
 
+During a connected stream, select Keep screen awake in the playback toolbar to request a screen wake lock on compatible secure browsers. The opt-in lasts only for that connected session. Hiding the tab or disconnecting releases the lock; returning to a visible tab requests it again while enabled. Battery-saving or browser policies can revoke or deny it; use Retry wake lock or Allow screen sleep. The Android companion already requests native screen-awake behavior while connected. This does not keep the device awake in the background.
+
+Connection diagnostics can suggest a lower requested bitrate after sustained recent latency or jitter. Choose End and use suggested cap to stop the stream and return to the current title's setup with that cap, only after confirmed teardown. You can also end and return to setup without changing quality, including after a failed connection. Save captures first. Starting another session is always explicit, may rejoin a cloud queue, and does not provide live bitrate adaptation. A failed stop retains ownership and requires a retry; the suggested cap is not applied when teardown fails.
+
 ## Development
 
 From the repository root, use Node.js 24 and Yarn Classic 1.22.22:
@@ -57,7 +61,7 @@ yarn desktopv3 build:web
 yarn desktop test
 ```
 
-The static web export is in `packages/desktop-v3/web-out/`. On a POSIX shell, `yarn build:pages` also prepares the Pages workspace assets. Building does not provision a trusted deployment.
+The static web export is in `packages/desktop-v3/web-out/`. On Windows or POSIX shells, `yarn build:pages` also prepares the Pages workspace assets. Building does not provision a trusted deployment.
 
 ## Private testing only
 

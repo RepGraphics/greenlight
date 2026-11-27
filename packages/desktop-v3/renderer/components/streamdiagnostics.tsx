@@ -1,6 +1,7 @@
 import {useState} from 'react'
 import {graphData,type GraphMetric} from '../../../desktop/renderer/lib/networkgraph'
 import {summarizeDiagnostics,streamFailureReasons,type DiagnosticSample} from '../../../desktop/renderer/lib/streamdiagnostics'
+import {sessionBitrateLabel} from '../../../desktop/renderer/lib/sessionquality'
 import {webDiagnosticReport} from '../utils/webdiagnostics'
 import {downloadWebCapture} from '../utils/webcapture'
 
@@ -16,7 +17,7 @@ function Graph({samples,metric,label,unit,seconds}:{samples:DiagnosticSample[];m
     </div>
 }
 const display=(value:number|null,unit:string)=>value===null?'Unavailable':value.toFixed(1)+' '+unit
-export default function StreamDiagnostics({samples,type,status,reason}:{samples:DiagnosticSample[];type:'home'|'cloud';status:string;reason:string}){
+export default function StreamDiagnostics({samples,type,status,reason,recommendedCap,onApplyRecommendation}:{samples:DiagnosticSample[];type:'home'|'cloud';status:string;reason:string;recommendedCap:number|null;onApplyRecommendation:()=>void}){
     const [open,setOpen]=useState(false)
     const [seconds,setSeconds]=useState(60)
     const [error,setError]=useState(false)
@@ -40,6 +41,11 @@ export default function StreamDiagnostics({samples,type,status,reason}:{samples:
                 <p>95th percentile latency: {display(summary.rtt95,'ms')}</p>
                 <p>95th percentile jitter: {display(summary.jitter95,'ms')}</p>
             </div>
+            {recommendedCap!==null&&<div className="rounded border border-white/20 p-3">
+                <p>Sustained latency or jitter detected. Consider a lower requested bitrate of {sessionBitrateLabel(recommendedCap,'Automatic')} on your next connection.</p>
+                <p className="text-sm text-white/60 my-2">Save any captures first. This ends the current session and returns to setup only after Xbox acknowledges termination. Cloud Gaming may rejoin a queue. It does not change the current stream.</p>
+                <button type="button" className="rounded border border-white/20 px-4 py-2" onClick={onApplyRecommendation}>End and use suggested cap</button>
+            </div>}
             <label>Graph window <select className="bg-[#202020] rounded p-2" value={seconds} onChange={event=>setSeconds(Number(event.target.value))}>{[30,60,120,300].map(value=><option key={value} value={value}>{value} seconds</option>)}</select></label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <Graph samples={samples} metric="rtt" label="Latency" unit="ms" seconds={seconds}/>

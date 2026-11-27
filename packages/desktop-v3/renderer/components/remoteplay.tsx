@@ -6,6 +6,7 @@ import DashboardInput from '../../../desktop/renderer/components/ui/dashboardinp
 import CaptureControls from './capturecontrols'
 import FullscreenSurface from './fullscreensurface'
 import StreamDiagnostics from './streamdiagnostics'
+import {webQualityAdvice} from '../utils/webqualityadvice'
 import {appendWebDiagnostic} from '../utils/webdiagnostics'
 import type {DiagnosticSample} from '../../../desktop/renderer/lib/streamdiagnostics'
 import ControllerCalibration from './controllercalibration'
@@ -140,7 +141,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
             })
         }catch(cause){failStart(cause)}
     }
-    const end=async(destination:'browse'|'setup'='browse')=>{
+    const end=async(destination:'browse'|'setup'='browse',nextBitrate?:number)=>{
         if(phaseRef.current==='stopping')return
         if(phaseRef.current==='idle'){onExit();return}
         exitDestination.current=destination
@@ -148,10 +149,17 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         const stopped=await lifecycle.current.end()
         if(!mounted.current)return
         if(stopped){
-            transition('idle')
+            transition('idle');setStatus('Initializing');setGuideMissing(false)
             if(destination==='browse')onExit()
+            else if(nextBitrate!==undefined)setBitrate(nextBitrate)
         }
         else transition('stopFailed')
+    }
+    const advice=phase==='playing'&&status==='Connected'?webQualityAdvice(samples,bitrate,Math.max(0,(typeof performance==='undefined'?0:performance.now())-diagnosticStart.current)/1000,status):null
+    const applyAdvice=()=>{
+        if(phaseRef.current!=='playing'||status!=='Connected')return
+        const cap=webQualityAdvice(samples,bitrate,(performance.now()-diagnosticStart.current)/1000,status)
+        if(cap!==null)void end('setup',cap)
     }
     const saveSetupDefaults=()=>{
         savePreferences(cloud?{...preferences,resolution,bitrate}:{...preferences,remoteResolution:resolution,remoteBitrate:bitrate,consolePaired})
@@ -256,11 +264,11 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         {phase==='playing'&&status==='Connected'&&<VideoAppearance value={filters} onChange={setFilters}/>}
         {phase==='playing'&&status==='Connected'&&<PictureInPictureControl surface={()=>playerSurface.current}/>}
         {phase==='playing'&&status==='Connected'&&<CaptureControls surface={()=>playerSurface.current}/>}
-        {phase!=='idle'&&<StreamDiagnostics samples={samples} type={target.type} status={status} reason={failureReason}/>}
+        {phase!=='idle'&&<StreamDiagnostics samples={samples} type={target.type} status={status} reason={failureReason} recommendedCap={advice} onApplyRecommendation={applyAdvice}/>}
         {guideMissing&&<p role='status'>Connect a controller or enable the on-screen or keyboard controller to open the guide.</p>}
         {phase!=='idle'&&phase!=='startFailed'&&<div className="v3-actions">
             <button type="button" className={button} disabled={phase==='stopping'} onClick={()=>void end(phase==='stopFailed'?exitDestination.current:'browse')}>{phase==='stopFailed'?'Retry ending session':phase==='starting'?'Cancel and end session':'End session'}</button>
-            {phase==='playing'&&status==='Error'&&<button type="button" className={button} onClick={()=>void end('setup')}>Back to stream setup</button>}
+            {phase==='playing'&&<button type="button" className={button} onClick={()=>void end('setup')}>End stream and return to setup</button>}
         </div>}
     </main>
 }

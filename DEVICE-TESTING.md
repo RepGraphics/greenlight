@@ -2,6 +2,12 @@
 
 Use the same commit for all components. The PC and Android test builds workflow can be run manually against main-v2 after it is merged, and uploads Windows x64 V2 installers, an experimental V3 Electron ZIP, V3 static web assets and a debug Android APK. No releases are published. PR artifacts are built from the PR merge revision. Download only artifacts from a trusted successful run and note the commit SHA in bug reports.
 
+## Download and verify matching CI builds
+
+Open [PC and Android test builds](https://github.com/RepGraphics/greenlight/actions/workflows/device-test-builds.yml), select Run workflow on main-v2, and use a successful run. The verification job checks that all four component artifacts are present, starts the same-revision local backend using the downloaded web assets, and checks the local home route, POST-only RPC boundary and no-store headers without signing in or contacting Xbox.
+
+Download the four component artifacts and the verification artifact. Extract each component ZIP into a directory named exactly as its artifact (including the commit suffix), alongside SHA256SUMS.txt and BUILD-COMMIT.txt from the verification artifact. On a POSIX shell, run `sha256sum -c SHA256SUMS.txt` from that directory. On Windows, use `Get-FileHash -Algorithm SHA256` on individual extracted files and compare with the corresponding checksum entry. Checksums verify matching bytes, not publisher identity or code signing. The APK and development installers may be unsigned or debug-signed; the local smoke test is not a real Xbox or Android device test.
+
 ## Windows (PowerShell)
 
 Install Git, Node.js 24 and Yarn Classic 1.22.22. From the repository root:

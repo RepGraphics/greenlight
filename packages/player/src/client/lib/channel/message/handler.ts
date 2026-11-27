@@ -1,74 +1,39 @@
-import Channel from '../channel'
+import type Channel from '../channel'
+import {decodeMessageDialog,type StreamMessage} from './protocol'
+
+type TransactionMessage=Exclude<StreamMessage,{type:'HandshakeAck'}>
 
 export default class MessageHandler {
-    private _channel:Channel
-    private _data:object
-
-    constructor(channel:Channel, data:object) {
-        this._channel = channel
-        this._data = data
-
-        this.handle(this._data)
+    constructor(private channel:Pick<Channel,'send'|'getPlayer'>, data:TransactionMessage, private ask:(message:string)=>boolean=message=>confirm(message)) {
+        this.handle(data)
     }
 
-    handle(data) {
-        console.log('[MessageHandler] Handling:', data)
+    private handle(data:TransactionMessage) {
         switch(data.target){
             case '/streaming/sessionLifetimeManagement/serverInitiatedDisconnect':
-                this.completeTransaction(data.id, '')
-                // Preserve the reason so the owning session can perform orderly recovery.
-                this._channel.getPlayer().serverDisconnected = true
+                this.channel.getPlayer().serverDisconnected=true
+                this.completeTransaction(data.id,'')
                 break
-            
-            case '/streaming/properties/titleinfo':
-                console.log('Title update:', data)
-                break
-            
-            case '/streaming/touchcontrols/showlayoutv2':
-                // console.log('Showing touch layout:', data)
-                break
-
             case '/streaming/systemUi/messages/ShowMessageDialog':
                 this.handleMessage(data)
                 break
-
-            default:
-                console.log('[MessageChannel] Unhandled transaction:', data)
+            // Title updates, touch layout hints and unrecognized transactions
+            // require no action. Do not log raw remote message content.
         }
-
     }
 
-    completeTransaction(id, data) {
-        const transaction = JSON.stringify({
-            'type': 'TransactionComplete',
-            'content': JSON.stringify(data),
-            // 'content':'{\'Result\':0}',
-            'id': id,
-            'cv': '',
-        })
-
-        this._channel.send(transaction)
+    private completeTransaction(id:string,content:unknown){
+        this.channel.send(JSON.stringify({type:'TransactionComplete',content:JSON.stringify(content),id,cv:''}))
     }
 
-    cancelTransaction(id, data) {
-        const transaction = JSON.stringify({
-            'type': 'ReceiverCancel',
-            'content': JSON.stringify(data),
-            'id': id,
-            'cv': '',
-        })
-
-        this._channel.send(transaction)
-    }
-
-    handleMessage(data) {
-        const jsonData = JSON.parse(data.content)
-        console.log(jsonData)
-        if(confirm(jsonData.TitleText+'\n\n'+jsonData.ContentText)){
-            this.completeTransaction(data.id, { Result: 0 })
-        } else {
-            this.completeTransaction(data.id, { Result: 1 })
-            // this.cancelTransaction(data.id, '')
+    private handleMessage(data:TransactionMessage){
+        const dialog=decodeMessageDialog(data.content)
+        let accepted=false
+        if(dialog){
+            try{accepted=this.ask(dialog.title+'\n\n'+dialog.body)}catch{/* Unavailable browser dialog: decline. */}
         }
+        // Malformed or unavailable dialogs are declined rather than throwing
+        // or leaving the remote transaction awaiting an answer.
+        this.completeTransaction(data.id,{Result:accepted?0:1})
     }
 }

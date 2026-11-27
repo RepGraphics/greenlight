@@ -192,3 +192,41 @@ test('late successful cleanup needs no additional stop after the UI timed out',a
     assert.equal(await lifecycle.end(),true);assert.equal(stops,1)
     assert.equal(callbacks.size,0)
 })
+
+test('a replacement queued behind a stalled stop times out without starting another session',async()=>{
+    const {lifecycle,expire,callbacks}=fixture(),closing=deferred<void>()
+    const calls:string[]=[]
+    const first=lifecycle.begin({start:async()=> 'old',stop:()=>{calls.push('stop-old');return closing.promise},onSession:()=>{},onError:()=>assert.fail('unexpected error')})
+    await flush();first();await flush()
+    const second=lifecycle.begin({start:async()=>{calls.push('start-new');return 'new'},stop:async()=>{},onSession:()=>assert.fail('expired replacement'),onError:reason=>calls.push(reason)})
+    await flush();assert.deepEqual(calls,['stop-old'])
+    expire();assert.deepEqual(calls,['stop-old','stop'])
+    closing.resolve();await flush()
+    assert.deepEqual(calls,['stop-old','stop'])
+    assert.equal(callbacks.size,0)
+    second()
+    assert.equal(await lifecycle.end(),true)
+})
+test('a queued replacement cannot overtake timed-out provisioning, even after its own deadline',async()=>{
+    const {lifecycle,expire}=fixture(),pending=deferred<string>()
+    const calls:string[]=[]
+    const first=lifecycle.begin({start:()=>pending.promise,stop:async id=>{calls.push('stop-'+id)},onSession:()=>assert.fail('late old session'),onError:reason=>calls.push(reason)})
+    await flush();first()
+    lifecycle.begin({start:async()=>{calls.push('start-new');return 'new'},stop:async()=>{},onSession:()=>assert.fail('expired new session'),onError:reason=>calls.push(reason)})
+    expire();assert.deepEqual(calls,['stop'])
+    pending.resolve('old');await flush()
+    assert.deepEqual(calls,['stop','stop-old'])
+    assert.equal(await lifecycle.end(),true)
+})
+test('failed previous teardown clears the replacement deadline and preserves ownership',async()=>{
+    const {lifecycle,callbacks,expire}=fixture()
+    const errors:string[]=[]
+    let stops=0
+    lifecycle.begin({start:async()=> 'old',stop:async()=>{if(++stops===1)throw Error('offline')},onSession:()=>{},onError:()=>assert.fail('unexpected error')})
+    await flush()
+    const second=lifecycle.begin({start:async()=>assert.fail('unsafe start'),stop:async()=>{},onSession:()=>assert.fail('unsafe session'),onError:reason=>errors.push(reason)})
+    await flush()
+    assert.deepEqual(errors,['stop']);assert.equal(callbacks.size,0)
+    expire();assert.deepEqual(errors,['stop'])
+    second();assert.equal(await lifecycle.end(),true);assert.equal(stops,2)
+})

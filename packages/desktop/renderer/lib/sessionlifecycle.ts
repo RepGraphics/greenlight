@@ -48,6 +48,7 @@ export class SessionLifecycle {
     begin(attempt:SessionAttempt){
         const owner={}
         let disposed=false
+        let stage:'stop'|'start'='stop'
         let timer:ReturnType<typeof setTimeout>|undefined
         const clear=()=>{if(timer!==undefined){this.cancel(timer);timer=undefined}}
         const cancelAttempt=(cleanup:boolean)=>{
@@ -58,12 +59,16 @@ export class SessionLifecycle {
         }
         this.cancelCurrent=cancelAttempt
         const dispose=()=>cancelAttempt(true)
+        // Bound the complete caller-visible attempt, including time spent
+        // queued behind a previous provisioning or teardown operation.
+        // Expiry never releases the serialization barrier or remote ownership.
+        timer=this.schedule(()=>{if(!disposed){dispose();attempt.onError(stage)}},this.timeoutMs)
         this.enqueue(async()=>{
             if(disposed)return
             try{await this.closeActive()}
-            catch(cause){if(!disposed)attempt.onError('stop',cause);return}
+            catch(cause){clear();if(!disposed)attempt.onError('stop',cause);return}
             if(disposed)return
-            timer=this.schedule(()=>{if(!disposed){dispose();attempt.onError('start')}},this.timeoutMs)
+            stage='start'
             let result:unknown
             try{
                 result=await attempt.start()

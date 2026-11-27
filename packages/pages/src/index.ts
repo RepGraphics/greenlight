@@ -12,7 +12,7 @@
  */
 
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
-import {isRpcPath,rpcRequestAllowed,rpcHeaders} from './rpcpolicy';
+import {isRpcPath,rpcRequestAllowed,rpcHeaders,rpcHeaderFailure,rpcPathAllowed,boundedRpcBody,RpcBodyError} from './rpcpolicy';
 import { appRouter } from '@greenlight/platform';
 
 export default {
@@ -21,9 +21,18 @@ export default {
 
 		if(isRpcPath(url.pathname)) {
 			if(!rpcRequestAllowed(request.method,url.search))return new Response('POST RPC requests required',{status:request.method==='POST'?400:405,headers:{...rpcHeaders,Allow:'POST'}});
+			const failure=rpcHeaderFailure(request.headers);
+			if(failure)return new Response('RPC request rejected',{status:failure,headers:rpcHeaders});
+			if(!rpcPathAllowed(url.pathname))return new Response('Invalid RPC path',{status:400,headers:rpcHeaders});
+			let body:ArrayBuffer;
+			try{body=await boundedRpcBody(request.body)}
+			catch(error){return new Response('RPC request rejected',{status:error instanceof RpcBodyError?error.status:400,headers:rpcHeaders})}
+			const headers=new Headers(request.headers);
+			headers.delete('content-length');
+			const boundedRequest=new Request(request.url,{method:'POST',headers,body,signal:request.signal});
 			return fetchRequestHandler({
 				endpoint: '/trpc',
-				req: request,
+				req: boundedRequest,
 				router: appRouter,
 				createContext: () => ({}),
 				allowMethodOverride: true,
