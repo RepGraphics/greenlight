@@ -35,6 +35,8 @@ Before connecting, open Controller test and stick drift calibration to inspect t
 
 Instant replay is opt-in during a connected session. Choose 15, 30 or 60 second rolling segments, then enable the replay buffer. Save replay and stop finalizes the current or recent completed segment using the existing bounded desktop recorder; it is not an exact continuous history. Save the resulting capture explicitly, preview it, or discard it. Only one capture mode runs at a time. Disabling replay or ending playback releases the buffered media. Nothing is uploaded, and microphone audio is not included.
 
+During a connected stream, select Fullscreen to expand the shared playback surface, including its on-screen controller and performance HUD. The video keeps its existing aspect ratio and direct-touch coordinate handling. Use Exit fullscreen or the browser's exit gesture to return to the rest of the controls. Fullscreen opened by this control is released when the stream ends or disconnects. Browser support varies; the Android companion retains its separate native fullscreen control. This does not renegotiate the video stream or implement native Android fullscreen APIs in the web client.
+
 ## Development
 
 From the repository root, use Node.js 24 and Yarn Classic 1.22.22:
