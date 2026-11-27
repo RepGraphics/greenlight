@@ -7,7 +7,12 @@ import type {DesktopSession, DeviceCodePrompt, XboxAccount} from '../../shared/d
 
 import {emptyLibraryCollections,toggleFavorite,openLibraryTitle,type LibraryCollections} from '../utils/librarycollections';
 
+import {emptyWebSetupPresets,rememberWebSetup,forgetWebSetup,type WebSetupMode,type WebSetupPresets,type WebSetupPreferences} from '../utils/websetuppresets';
+
 interface AuthContextType {
+  setupPresets:WebSetupPresets;
+  rememberSetup:(mode:WebSetupMode,value:WebSetupPreferences)=>void;
+  forgetSetup:(mode:WebSetupMode)=>void;
   libraryCollections: LibraryCollections;
   toggleLibraryFavorite: (id:string)=>void;
   rememberLibraryTitle: (id:string)=>void;
@@ -59,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [activeAccount,setActiveAccount]=useState<XboxAccount|null>(null);
   const [accountSaved,setAccountSaved]=useState(false);
   const [libraryCollections,setLibraryCollections]=useState(emptyLibraryCollections);
+  const [setupPresets,setSetupPresets]=useState(emptyWebSetupPresets);
   const attempts = useRef(new AuthAttempt());
   const active = useRef<ReturnType<AuthAttempt['begin']>|null>(null);
   const verifying = useRef(false);
@@ -88,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const acceptDesktopSession=(session:DesktopSession, isCurrent:()=>boolean)=>{
     if(!isCurrent())return false;
     setLibraryCollections(emptyLibraryCollections());
+    setSetupPresets(emptyWebSetupPresets());
     setAuthState({userToken:null,webToken:session.webToken,streamingTokens:session.streamingTokens});
     setActiveAccount(session.account);
     setAccountSaved(session.saved);
@@ -126,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ]);
       if(!attempt.current())return false;
       setLibraryCollections(emptyLibraryCollections());
+    setSetupPresets(emptyWebSetupPresets());
       setAuthState({userToken,webToken,streamingTokens});
       setIsAuthenticated(true);
       return true;
@@ -157,6 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     verifying.current=false;
     if(window.greenlightDesktop)void window.greenlightDesktop.accounts.cancel().catch(()=>{});
     setLibraryCollections(emptyLibraryCollections());
+    setSetupPresets(emptyWebSetupPresets());
     setAuthState({userToken:null,webToken:null,streamingTokens:null});
     setIsAuthenticated(false);
     setActiveAccount(null);
@@ -206,6 +215,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider
       value={{
+        setupPresets,
+        rememberSetup:(mode,value)=>{if(isAuthenticated)setSetupPresets(previous=>rememberWebSetup(previous,mode,value))},
+        forgetSetup:mode=>setSetupPresets(previous=>forgetWebSetup(previous,mode)),
         libraryCollections,
         toggleLibraryFavorite:id=>{if(isAuthenticated)setLibraryCollections(previous=>toggleFavorite(previous,id))},
         rememberLibraryTitle:id=>{if(isAuthenticated)setLibraryCollections(previous=>openLibraryTitle(previous,id))},

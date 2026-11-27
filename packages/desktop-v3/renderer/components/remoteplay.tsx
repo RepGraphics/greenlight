@@ -15,7 +15,7 @@ import VideoAppearance from './videoappearance'
 import {webVideoPresentation} from '../utils/videoappearance'
 import {useAuth} from '../contexts/AuthContext'
 import {useStreamPreferences} from '../contexts/StreamPreferencesContext'
-import {preferredControllerProfile, preferredStreamQuality} from '../../shared/streampreferences'
+import {deviceWebSetup,resolveWebSetup} from '../utils/websetuppresets'
 import {useTRPCClient} from '../utils/trpc'
 import {createRemoteSession,selectStreamCredentials,type WebStreamTarget} from '../utils/remotesession'
 import {startFailureDetails,startFailureReason,type StartFailureReason} from '../utils/startfailure'
@@ -37,10 +37,10 @@ const handshakeFailureMessage: Record<string,string> = {
     'ice-connect': 'Greenlight and Xbox couldn’t establish a working network route.',
 }
 export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExit:()=>void}){
-    const {getxHomeToken,getxCloudToken,getUserRefreshToken,authState,desktop}=useAuth()
+    const {getxHomeToken,getxCloudToken,getUserRefreshToken,authState,desktop,setupPresets,rememberSetup,forgetSetup}=useAuth()
     const {preferences,savePreferences,storageAvailable}=useStreamPreferences()
     const cloud=target.type==='cloud'
-    const quality=preferredStreamQuality(preferences,target.type)
+    const [initial]=useState(()=>resolveWebSetup(target.type,preferences,setupPresets))
     const mode=cloud?'Cloud Gaming':'Remote Play'
     const client=useTRPCClient()
     const lifecycle=useRef(new SessionLifecycle())
@@ -54,30 +54,32 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     const [failureReason,setFailureReason]=useState('')
     const [startupFailure,setStartupFailure]=useState<StartFailureReason>('start-unconfirmed')
     const [defaultsUpdated,setDefaultsUpdated]=useState(false)
+    const [setupMessage,setSetupMessage]=useState('')
+    const pendingSetupBitrate=useRef<number|undefined>(undefined)
     const exitDestination=useRef<'browse'|'setup'>('browse')
     const diagnosticStart=useRef(0)
     const [adapter,setAdapter]=useState<communicationHandler|null>(null)
-    const [resolution,setResolution]=useState(quality.resolution)
-    const [bitrate,setBitrate]=useState(quality.bitrate)
-    const [consolePaired,setConsolePaired]=useState(preferences.consolePaired)
-    const [multipleControllers,setMultipleControllers]=useState(preferences.multipleControllers)
+    const [resolution,setResolution]=useState(initial.resolution)
+    const [bitrate,setBitrate]=useState(initial.bitrate)
+    const [consolePaired,setConsolePaired]=useState(initial.consolePaired)
+    const [multipleControllers,setMultipleControllers]=useState(initial.multipleControllers)
     const [keyframe,setKeyframe]=useState(0)
     const [muted,setMuted]=useState(preferences.muted)
     const [micAvailable,setMicAvailable]=useState(false)
     const [mic,setMic]=useState<WebMicrophoneState>('off')
-    const [volume,setVolume]=useState(preferences.volume)
-    const [showStats,setShowStats]=useState(preferences.showStats)
-    const [filters,setFilters]=useState(preferences.videoFilters)
+    const [volume,setVolume]=useState(initial.volume)
+    const [showStats,setShowStats]=useState(initial.showStats)
+    const [filters,setFilters]=useState(initial.filters)
     const presentation=webVideoPresentation(filters)
-    const [profile,setProfile]=useState(()=>preferredControllerProfile(preferences))
+    const [profile,setProfile]=useState(initial.profile)
     const [preset,setPreset]=useState<string>(
-        preferences.deadzone!==null||preferences.invertY!==null||preferences.swapSticks!==null||preferences.buttonMapping!==null
+        setupPresets[target.type]!==null||preferences.deadzone!==null||preferences.invertY!==null||preferences.swapSticks!==null||preferences.buttonMapping!==null
             ?'custom':preferences.preset
     )
     const [advancedOpen,setAdvancedOpen]=useState(false)
-    const [vibration,setVibration]=useState(preferences.vibration)
-    const [touch,setTouch]=useState<WebTouchMode>(preferences.touch)
-    const [keyboard,setKeyboard]=useState(preferences.keyboard)
+    const [vibration,setVibration]=useState(initial.vibration)
+    const [touch,setTouch]=useState<WebTouchMode>(initial.touch)
+    const [keyboard,setKeyboard]=useState(initial.keyboard)
     const inputOptions=webSessionInputOptions(target.type,consolePaired,multipleControllers,touch,keyboard)
     const controllerOptions=webControllerOptions(profile,vibration,inputOptions.consoleController)
     const [guide,setGuide]=useState(0)
@@ -97,10 +99,13 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
             if(phaseRef.current==='idle')return
             event.preventDefault();event.returnValue=''
         }
+        const hide=()=>{if(document.hidden)setMic('off')}
         window.addEventListener('beforeunload',warn)
+        document.addEventListener('visibilitychange',hide)
         return()=>{
             mounted.current=false
             window.removeEventListener('beforeunload',warn)
+            document.removeEventListener('visibilitychange',hide)
             if(phaseRef.current!=='idle')void lifecycle.current.end()
         }
     },[])
@@ -144,6 +149,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     const end=async(destination:'browse'|'setup'='browse',nextBitrate?:number)=>{
         if(phaseRef.current==='stopping')return
         if(phaseRef.current==='idle'){onExit();return}
+        if(phaseRef.current!=='stopFailed'||destination!==exitDestination.current||nextBitrate!==undefined)pendingSetupBitrate.current=destination==='setup'?nextBitrate:undefined
         exitDestination.current=destination
         transition('stopping');setMic('off');setAdapter(null)
         const stopped=await lifecycle.current.end()
@@ -151,7 +157,8 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         if(stopped){
             transition('idle');setStatus('Initializing');setGuideMissing(false)
             if(destination==='browse')onExit()
-            else if(nextBitrate!==undefined)setBitrate(nextBitrate)
+            else if(pendingSetupBitrate.current!==undefined)setBitrate(pendingSetupBitrate.current)
+            pendingSetupBitrate.current=undefined
         }
         else transition('stopFailed')
     }
@@ -164,6 +171,17 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     const saveSetupDefaults=()=>{
         savePreferences(cloud?{...preferences,resolution,bitrate}:{...preferences,remoteResolution:resolution,remoteBitrate:bitrate,consolePaired})
         setDefaultsUpdated(true)
+    }
+    const rememberCurrentSetup=()=>{
+        rememberSetup(target.type,{resolution,bitrate,profile,vibration,touch,keyboard,multipleControllers,consolePaired,volume,showStats,filters})
+        setSetupMessage('Setup remembered for this sign-in only.')
+    }
+    const restoreDeviceDefaults=()=>{
+        const next=deviceWebSetup(target.type,preferences)
+        setResolution(next.resolution);setBitrate(next.bitrate);setConsolePaired(next.consolePaired);setMultipleControllers(next.multipleControllers)
+        setVolume(next.volume);setShowStats(next.showStats);setFilters(next.filters);setProfile(next.profile);setVibration(next.vibration);setTouch(next.touch);setKeyboard(next.keyboard)
+        setPreset(preferences.deadzone!==null||preferences.invertY!==null||preferences.swapSticks!==null||preferences.buttonMapping!==null?'custom':preferences.preset)
+        setMuted(preferences.muted);setAdvancedOpen(false);setDefaultsUpdated(false);forgetSetup(target.type);setSetupMessage('Device defaults restored for this mode.')
     }
     const button='v3-button v3-button-secondary'
     return <main className="v3-session" ref={setupScope}>
@@ -199,6 +217,12 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
                 <button type="button" className="v3-button v3-button-primary" onClick={start}><Play size={17} aria-hidden="true"/> Start {mode}</button>
                 <button type="button" className={button} onClick={saveSetupDefaults}>Save stream defaults</button>
             </div>
+            <div className="v3-actions">
+                <button type="button" className={button} onClick={rememberCurrentSetup}>Remember setup for this sign-in</button>
+                <button type="button" className={button} onClick={restoreDeviceDefaults}>Restore device defaults</button>
+            </div>
+            <p className="v3-muted">Remembered setups override device defaults for this mode until sign-out, account switch or reload. Microphone and mute are not saved here.</p>
+            {setupMessage&&<p role="status">{setupMessage}</p>}
             {defaultsUpdated&&<p className="v3-muted" role="status">{storageAvailable?'Defaults updated for '+mode+'.':'Defaults updated for this window. Storage is unavailable.'}</p>}
         </div>}
         {cloud&&phase!=='idle'&&<p className="text-sm text-white/60">Cloud queues may take several minutes. Cancelling will request termination of the current session; starting again may rejoin the queue.</p>}
@@ -254,7 +278,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
             <button type="button" className={button} onClick={()=>setKeyframe(value=>value+1)}>Request video refresh</button>
         </div>}
         {phase==='playing'&&status==='Connected'&&<div className="text-sm text-white/60 my-2">
-            {micAvailable?<p>Microphone chat is opt-in and requires browser permission and Xbox support. Playback mute does not mute your microphone. Android Private V3 companion requires a compatible app build and explicit native microphone permission.</p>:<p>Microphone capture is unavailable in this browser or insecure context.</p>}
+            {micAvailable?<p>Microphone chat is opt-in and requires browser permission and Xbox support. Playback mute does not mute your microphone. Hiding the page disables voice chat; enable it again when you return. Android Private V3 companion requires a compatible app build and explicit native microphone permission.</p>:<p>Microphone capture is unavailable in this browser or insecure context.</p>}
             {mic==='requesting'&&<p role="status">Requesting microphone permission and negotiating voice chat…</p>}
             {mic==='active'&&<p role="status" className="font-semibold text-white">Microphone active — your voice may be transmitted to Xbox.</p>}
             {mic==='failed'&&<p role="alert">Microphone unavailable or disconnected. Check permissions, device and Xbox chat support before retrying.</p>}
@@ -263,6 +287,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         {phase==='playing'&&status==='Connected'&&inputOptions.keyboardMapping&&<p className="text-sm text-white/60">Click the video to move focus away from controls. Arrow keys: D-pad · Enter/Backspace: A/B · X/Y: X/Y · M/V/N: Menu/View/Guide · [ / ]: shoulders · L/R: stick buttons · - / =: triggers.</p>}
         {phase==='playing'&&status==='Connected'&&<VideoAppearance value={filters} onChange={setFilters}/>}
         {phase==='playing'&&status==='Connected'&&<PictureInPictureControl surface={()=>playerSurface.current}/>}
+        {phase==='playing'&&status==='Connected'&&<div className="my-2"><button type="button" className={button} onClick={rememberCurrentSetup}>Remember current setup for this sign-in</button>{setupMessage&&<p role="status">{setupMessage}</p>}</div>}
         {phase==='playing'&&status==='Connected'&&<CaptureControls surface={()=>playerSurface.current}/>}
         {phase!=='idle'&&<StreamDiagnostics samples={samples} type={target.type} status={status} reason={failureReason} recommendedCap={advice} onApplyRecommendation={applyAdvice}/>}
         {guideMissing&&<p role='status'>Connect a controller or enable the on-screen or keyboard controller to open the guide.</p>}

@@ -56,6 +56,8 @@ With a standard-mapped controller and the browser tab focused, use the D-pad or 
 
 Settings includes a Compatibility category with local API and H.264 receiver capability checks and a shareable credential-free report. Where the browser supports file sharing, Share capture and Share trimmed copy use the native chooser; no application upload service is used. Android WebView support varies.
 
+Use Remember setup for this sign-in to override the device defaults independently for Remote Play and Cloud Gaming, including controller mappings, touch, volume, stats and appearance. Restore device defaults clears that mode’s override. Sign-out, account switches and reload discard both overrides. Mute remains a separate playback/device preference and microphone permission is never remembered. Hiding the page disables requested voice chat without automatically reenabling it.
+
 ## Development
 
 From the repository root, use Node.js 24 and Yarn Classic 1.22.22:
