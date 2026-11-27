@@ -41,6 +41,8 @@ Connection history and diagnostics retains at most 300 samples or five minutes o
 
 During a connected stream, select Keep screen awake in the playback toolbar to request a screen wake lock on compatible secure browsers. The opt-in lasts only for that connected session. Hiding the tab or disconnecting releases the lock; returning to a visible tab requests it again while enabled. Battery-saving or browser policies can revoke or deny it; use Retry wake lock or Allow screen sleep. The Android companion already requests native screen-awake behavior while connected. This does not keep the device awake in the background.
 
+The Settings navigation now opens a device compatibility page with local checks for secure context, WebRTC, advertised H.264 receive capability, gamepad, touch, microphone, recording, fullscreen, picture-in-picture, wake lock and clipboard APIs. Refresh after changing browsers or devices. The allowlisted text report can be copied or selected manually; it excludes device identifiers, endpoints, tokens and user agents. Checks do not request permissions, contact Xbox or prove actual media playback. The Android companion's separate permission and download restrictions still apply.
+
 ## Development
 
 From the repository root, use Node.js 24 and Yarn Classic 1.22.22:
