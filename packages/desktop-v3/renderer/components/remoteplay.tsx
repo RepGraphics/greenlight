@@ -9,7 +9,8 @@ import type {DiagnosticSample} from '../../../desktop/renderer/lib/streamdiagnos
 import ControllerCalibration from './controllercalibration'
 import PictureInPictureControl from './pictureinpicturecontrol'
 import VideoAppearance from './videoappearance'
-import {selectWebVideoPreset,webVideoPresentation} from '../utils/videoappearance'
+import {webVideoPresentation} from '../utils/videoappearance'
+import {snapshotWebSetup} from '../utils/websetuppresets'
 import {useAuth} from '../contexts/AuthContext'
 import {useTRPCClient} from '../utils/trpc'
 import {createRemoteSession,selectStreamCredentials,type WebStreamTarget} from '../utils/remotesession'
@@ -24,7 +25,9 @@ import type {communicationHandler} from '@greenlight/player/client'
 const SharedPlayer=dynamic(()=>import('@greenlight/player/client').then(module=>module.StreamPlayer),{ssr:false})
 type Phase='idle'|'starting'|'playing'|'startFailed'|'stopping'|'stopFailed'
 export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExit:()=>void}){
-    const {getxHomeToken,getxCloudToken,getUserRefreshToken,authState}=useAuth()
+    const {getxHomeToken,getxCloudToken,getUserRefreshToken,authState,setupPresets,rememberSetup,forgetSetup}=useAuth()
+    const saved=setupPresets[target.type]
+    const [initial]=useState(()=>snapshotWebSetup(target.type,saved))
     const cloud=target.type==='cloud'
     const mode=cloud?'Cloud Gaming':'Remote Play'
     const client=useTRPCClient()
@@ -38,28 +41,29 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     const [failureReason,setFailureReason]=useState('')
     const diagnosticStart=useRef(0)
     const [adapter,setAdapter]=useState<communicationHandler|null>(null)
-    const [resolution,setResolution]=useState<720|1080>(1080)
-    const [bitrate,setBitrate]=useState(0)
-    const [consolePaired,setConsolePaired]=useState(false)
-    const [multipleControllers,setMultipleControllers]=useState(true)
+    const [resolution,setResolution]=useState<720|1080>(initial.resolution)
+    const [bitrate,setBitrate]=useState(initial.bitrate)
+    const [consolePaired,setConsolePaired]=useState(initial.consolePaired)
+    const [multipleControllers,setMultipleControllers]=useState(initial.multipleControllers)
     const [keyframe,setKeyframe]=useState(0)
     const [muted,setMuted]=useState(false)
     const [micAvailable,setMicAvailable]=useState(false)
     const [mic,setMic]=useState<WebMicrophoneState>('off')
-    const [volume,setVolume]=useState(1)
-    const [showStats,setShowStats]=useState(true)
-    const [filters,setFilters]=useState(()=>selectWebVideoPreset('neutral'))
+    const [volume,setVolume]=useState(initial.volume)
+    const [showStats,setShowStats]=useState(initial.showStats)
+    const [filters,setFilters]=useState(initial.filters)
     const presentation=webVideoPresentation(filters)
-    const [profile,setProfile]=useState(()=>selectWebControllerPreset('standard'))
-    const [preset,setPreset]=useState('standard')
+    const [profile,setProfile]=useState(()=>saved?initial.profile:selectWebControllerPreset('standard'))
+    const [preset,setPreset]=useState(saved?'custom':'standard')
     const [advancedOpen,setAdvancedOpen]=useState(false)
-    const [vibration,setVibration]=useState(true)
-    const [touch,setTouch]=useState<WebTouchMode>('off')
-    const [keyboard,setKeyboard]=useState(false)
+    const [vibration,setVibration]=useState(initial.vibration)
+    const [touch,setTouch]=useState<WebTouchMode>(initial.touch)
+    const [keyboard,setKeyboard]=useState(initial.keyboard)
     const inputOptions=webSessionInputOptions(target.type,consolePaired,multipleControllers,touch,keyboard)
     const controllerOptions=webControllerOptions(profile,vibration,inputOptions.consoleController)
     const [guide,setGuide]=useState(0)
     const [guideMissing,setGuideMissing]=useState(false)
+    const [setupMessage,setSetupMessage]=useState('')
     const transition=(value:Phase)=>{phaseRef.current=value;if(mounted.current)setPhase(value)}
     useEffect(()=>{
         mounted.current=true
@@ -126,6 +130,17 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         const cap=webQualityAdvice(samples,bitrate,(performance.now()-diagnosticStart.current)/1000,status)
         if(cap!==null)void end(true,cap)
     }
+    const remember=()=>{
+        rememberSetup(target.type,{resolution,bitrate,profile,vibration,touch,keyboard,multipleControllers,consolePaired,volume,showStats,filters})
+        setSetupMessage('Setup remembered for this sign-in.')
+    }
+    const resetSetup=()=>{
+        const next=snapshotWebSetup(target.type,null)
+        setResolution(next.resolution);setBitrate(next.bitrate);setProfile(selectWebControllerPreset('standard'));setPreset('standard')
+        setVibration(next.vibration);setTouch(next.touch);setKeyboard(next.keyboard);setMultipleControllers(next.multipleControllers)
+        setConsolePaired(next.consolePaired);setVolume(next.volume);setShowStats(next.showStats);setFilters(next.filters);setMuted(false)
+        forgetSetup(target.type);setSetupMessage('Setup defaults restored and remembered preset cleared.')
+    }
     const button='rounded border border-white/20 px-4 py-2 disabled:opacity-50'
     return <section className="h-screen overflow-y-auto bg-[#0d0d0d] text-white p-4">
         <h1 className="text-2xl font-bold break-words">{target.name} — Experimental {mode}</h1>
@@ -135,6 +150,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
             <label>Requested bitrate <select className="bg-[#202020] rounded p-2" value={bitrate} onChange={event=>{const value=parseSessionBitrate(event.target.value);if(value!==null)setBitrate(value)}}>{sessionBitrates.map(cap=><option key={cap} value={cap}>{sessionBitrateLabel(cap,'Automatic')}</option>)}</select></label>
             {!cloud&&<label className="flex items-center gap-2"><input type="checkbox" checked={consolePaired} onChange={event=>{setConsolePaired(event.target.checked);if(event.target.checked){setTouch('off');setKeyboard(false);setAdvancedOpen(false)}}}/> Controller connected directly to Xbox</label>}
             {!inputOptions.consoleController&&<label className="flex items-center gap-2"><input type="checkbox" checked={multipleControllers} onChange={event=>setMultipleControllers(event.target.checked)}/> Multiple local controllers (experimental)</label>}
+            {!inputOptions.consoleController&&<label>Touch input <select className="bg-[#202020] rounded p-2" value={touch} onChange={event=>{const value=event.target.value;setTouch(value==='controller'||value==='direct'?value:'off')}}><option value="off">Off</option><option value="controller">On-screen controller</option><option value="direct">Direct touch (experimental)</option></select></label>}
             {!inputOptions.consoleController&&<label className="flex items-center gap-2"><input type="checkbox" checked={keyboard} onChange={event=>setKeyboard(event.target.checked)}/> Keyboard controller emulation</label>}
             {!inputOptions.consoleController&&<details className="w-full rounded border border-white/10 p-3" onToggle={event=>{if(event.target===event.currentTarget)setAdvancedOpen(event.currentTarget.open)}}><summary className="cursor-pointer">Advanced physical controller options</summary><div className="flex flex-wrap gap-3 mt-3 items-center">
                 <label>Preset <select className="bg-[#202020] rounded p-2" value={preset} onChange={event=>{if(event.target.value==='custom')return;setProfile(selectWebControllerPreset(event.target.value));setPreset(event.target.value)}}>{Object.entries(webControllerPresets).map(([id,item])=><option key={id} value={id}>{item.name}</option>)}{preset==='custom'&&<option value="custom">Custom</option>}</select></label>
@@ -148,6 +164,12 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
             </div></details>}
             <p className="w-full text-sm text-white/60">Resolution and bitrate are requested at connection time, not guaranteed or adjusted live. Local multiplayer depends on Xbox service and game support.</p>
             {!inputOptions.consoleController&&<ControllerCalibration deadzone={profile.v3_deadzone} onApply={value=>{setProfile(previous=>({...previous,v3_deadzone:value}));setPreset('custom')}}/>}
+            <div className="w-full rounded border border-white/10 p-3 flex flex-wrap gap-2 items-center">
+                <p className="w-full text-sm text-white/60">Remember quality, controller, touch and display settings separately for Remote Play and Cloud Gaming until sign-out or reload. Microphone permission, playback mute and captures are never remembered.</p>
+                <button type="button" className={button} onClick={remember}>Remember setup for this sign-in</button>
+                <button type="button" className={button} onClick={resetSetup}>Restore defaults and forget setup</button>
+                {setupMessage&&<p role="status">{setupMessage}</p>}
+            </div>
             <button type="button" className={button} onClick={start}>Start {mode}</button>
             <button type="button" className={button} onClick={()=>void end()}>Back to {cloud?'library':'consoles'}</button>
         </div>}
@@ -207,6 +229,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         {phase==='playing'&&status==='Connected'&&inputOptions.keyboardMapping&&<p className="text-sm text-white/60">Click the video to move focus away from controls. Arrow keys: D-pad · Enter/Backspace: A/B · X/Y: X/Y · M/V/N: Menu/View/Guide · [ / ]: shoulders · L/R: stick buttons · - / =: triggers.</p>}
         {phase==='playing'&&status==='Connected'&&<VideoAppearance value={filters} onChange={setFilters}/>}
         {phase==='playing'&&status==='Connected'&&<PictureInPictureControl surface={()=>playerSurface.current}/>}
+        {phase==='playing'&&status==='Connected'&&<div className="my-2"><button type="button" className={button} onClick={remember}>Remember current setup for this sign-in</button>{setupMessage&&<p role="status">{setupMessage}</p>}</div>}
         {phase==='playing'&&status==='Connected'&&<CaptureControls surface={()=>playerSurface.current}/>}
         {phase!=='idle'&&<StreamDiagnostics samples={samples} type={target.type} status={status} reason={failureReason} recommendedCap={advice} onApplyRecommendation={applyAdvice}/>}
         {guideMissing&&<p role='status'>Connect a controller or enable the on-screen or keyboard controller to open the guide.</p>}
