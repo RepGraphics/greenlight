@@ -41,3 +41,47 @@ test('invalid or backwards clocks cannot publish fresh stats',async()=>{
     f.clock(1000);f.poller.tick();f.clock(999);f.resolve(1);await flush();assert.deepEqual(f.samples,[])
     f.clock(1000);f.poller.tick();f.clock(Infinity);f.resolve(1);await flush();assert.deepEqual(f.samples,[])
 })
+
+import Stats from '../../../player/src/client/lib/stats'
+
+function statsFixture(){
+    const original=Object.getOwnPropertyDescriptor(globalThis,'document')
+    Object.defineProperty(globalThis,'document',{configurable:true,value:{hidden:false}})
+    let reports=new Map<string,any>()
+    const peer={connectionState:'connected',getStats:async()=>reports}
+    const stats=new Stats({_peerConnection:peer} as unknown as ConstructorParameters<typeof Stats>[0])
+    return {stats,async sample(...values:Array<{id:string;type:string;[key:string]:unknown}>){
+        reports=new Map(values.map(value=>[value.id,value]));stats.loop();await flush()
+    },restore(){stats.destroy();if(original)Object.defineProperty(globalThis,'document',original);else Reflect.deleteProperty(globalThis,'document')}}
+}
+const videoReport=(id:string,timestamp:number,bytesReceived:number)=>({id,type:'inbound-rtp',kind:'video',timestamp,bytesReceived,codecId:'codec',packetsReceived:10,frameWidth:1920,frameHeight:1080,framesPerSecond:60})
+test('selected remote candidate is resolved independently of report iteration order',async()=>{
+    const f=statsFixture()
+    try{
+        await f.sample({id:'remote',type:'remote-candidate',address:'192.168.1.20',port:9000},
+            {id:'pair',type:'candidate-pair',remoteCandidateId:'remote',currentRoundTripTime:.025,nominated:true,state:'succeeded'},
+            {id:'transport',type:'transport',selectedCandidatePairId:'pair'},videoReport('video',100,100))
+        assert.equal(f.stats._remoteHost,'192.168.1.20')
+        assert.equal(f.stats._remoteIsLocal,true)
+        assert.equal(f.stats._rtt,.025)
+        await f.sample(videoReport('video',1100,200))
+        assert.equal(f.stats._remoteHost,'')
+        assert.equal(f.stats._remotePort,0)
+        assert.equal(f.stats._rtt,0)
+    }finally{f.restore()}
+})
+test('bitrate baseline resets across video stream replacement and counter regression',async()=>{
+    const f=statsFixture()
+    try{
+        await f.sample(videoReport('first',100,0))
+        assert.equal(f.stats._bitrate,0)
+        await f.sample(videoReport('first',1100,1000000))
+        assert.equal(f.stats._bitrate,8)
+        await f.sample(videoReport('second',2100,2000000))
+        assert.equal(f.stats._bitrate,0)
+        await f.sample(videoReport('second',3100,3000000))
+        assert.equal(f.stats._bitrate,8)
+        await f.sample(videoReport('second',4100,0))
+        assert.equal(f.stats._bitrate,0)
+    }finally{f.restore()}
+})
