@@ -37,6 +37,8 @@ Instant replay is opt-in during a connected session. Choose 15, 30 or 60 second 
 
 During a connected stream, select Fullscreen to expand the shared playback surface, including its on-screen controller and performance HUD. The video keeps its existing aspect ratio and direct-touch coordinate handling. Use Exit fullscreen or the browser's exit gesture to return to the rest of the controls. Fullscreen opened by this control is released when the stream ends or disconnects. Browser support varies; the Android companion retains its separate native fullscreen control. This does not renegotiate the video stream or implement native Android fullscreen APIs in the web client.
 
+Connection history and diagnostics retains at most 300 samples or five minutes of measurements for the current stream. Expand the panel during playback or after a connection failure for latency, jitter, FPS and bitrate graphs, with stale data shown as gaps. Export the desktop-compatible JSON report explicitly; it excludes credentials, addresses and game/account identifiers. The report is local and is lost when leaving the session. Quality estimates use latency and jitter rather than guaranteeing gameplay performance.
+
 ## Development
 
 From the repository root, use Node.js 24 and Yarn Classic 1.22.22:

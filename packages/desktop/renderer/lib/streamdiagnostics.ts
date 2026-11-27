@@ -1,4 +1,4 @@
-import type { StreamMetrics } from '../../../player/src/client/index'
+import type { StreamMetrics } from '../../../player/src/client/metrics'
 
 export type DiagnosticSample = StreamMetrics & { elapsedSeconds: number }
 export function sanitizeSample(metrics: StreamMetrics, elapsedSeconds: number): DiagnosticSample {

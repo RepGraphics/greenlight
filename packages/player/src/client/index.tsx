@@ -18,7 +18,8 @@ import Touch from './lib/input/touch';
 
 // export { Gamepad, MouseKeyboard, Touch };
 
-export interface StreamMetrics { width: number; height: number; fps: number; bitrate: number; jitter: number; loss: number; rtt: number; statsAgeMs?:number; statsFresh?:boolean; peerState?:string; iceState?:string; signalingState?:string }
+import type {StreamMetrics} from './metrics';
+export type {StreamMetrics} from './metrics';
 
 export interface StreamPlayerProps {
     onStatusChanged: (newStatus: string) => void;

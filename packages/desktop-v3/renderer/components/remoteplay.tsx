@@ -2,6 +2,9 @@ import {useEffect,useRef,useState,type CSSProperties} from 'react'
 import dynamic from 'next/dynamic'
 import CaptureControls from './capturecontrols'
 import FullscreenSurface from './fullscreensurface'
+import StreamDiagnostics from './streamdiagnostics'
+import {appendWebDiagnostic} from '../utils/webdiagnostics'
+import type {DiagnosticSample} from '../../../desktop/renderer/lib/streamdiagnostics'
 import ControllerCalibration from './controllercalibration'
 import PictureInPictureControl from './pictureinpicturecontrol'
 import VideoAppearance from './videoappearance'
@@ -30,6 +33,9 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     const phaseRef=useRef<Phase>('idle')
     const [phase,setPhase]=useState<Phase>('idle')
     const [status,setStatus]=useState('Initializing')
+    const [samples,setSamples]=useState<DiagnosticSample[]>([])
+    const [failureReason,setFailureReason]=useState('')
+    const diagnosticStart=useRef(0)
     const [adapter,setAdapter]=useState<communicationHandler|null>(null)
     const [resolution,setResolution]=useState<720|1080>(1080)
     const [bitrate,setBitrate]=useState(0)
@@ -70,6 +76,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     },[])
     const start=()=>{
         if(phaseRef.current!=='idle')return
+        diagnosticStart.current=performance.now();setSamples([]);setFailureReason('')
         try{
             const {token,host}=selectStreamCredentials(target,getxHomeToken(),getxCloudToken(),{
                 home:authState?.streamingTokens?.xHomeToken?.data.offeringSettings?.regions,
@@ -140,7 +147,37 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         {phase==='startFailed'&&<p role="alert">Unable to start. If the provisioning response was lost, check for an existing Xbox session before retrying.</p>}
         {phase==='stopping'&&<p role="status">Waiting for Xbox to acknowledge session termination…</p>}
         {phase==='stopFailed'&&<p role="alert">Xbox termination is not confirmed. A previous request may still be pending. Retry before leaving.</p>}
-        {phase==='playing'&&adapter&&status!=='Error'&&<FullscreenSurface enabled={status==='Connected'}><div ref={playerSurface} className="web-remote-player" style={{'--gl-web-video-filter':presentation.filter} as CSSProperties}>{presentation.kernel&&<svg width="0" height="0" aria-hidden="true" style={{position:'absolute',pointerEvents:'none'}}><defs><filter id="gl-stream-sharpen" colorInterpolationFilters="sRGB"><feConvolveMatrix order={3} kernelMatrix={presentation.kernel} divisor={1} edgeMode="duplicate" preserveAlpha={true}/></filter></defs></svg>}<SharedPlayer communicationHandler={adapter} onStatusChanged={value=>{if(phaseRef.current!=='playing')return;setStatus(value);if(value!=='Connected')setMic('off')}} useWebGpu={false} {...inputOptions} {...controllerOptions} videoBitrate={bitrate} volume={volume} muted={muted} microphone={micAvailable&&status==='Connected'&&microphoneRequested(mic)} onMicrophoneStatus={(active,error)=>{if(phaseRef.current==='playing')setMic(previous=>webMicrophoneResult(previous,active,error))}} showStats={showStats} keyframeRequest={keyframe} guideRequest={guide} onGuideUnavailable={()=>setGuideMissing(true)}/></div></FullscreenSurface>}
+        {phase==='playing'&&adapter&&status!=='Error'&&<FullscreenSurface enabled={status==='Connected'}>
+            <div ref={playerSurface} className="web-remote-player" style={{'--gl-web-video-filter':presentation.filter} as CSSProperties}>
+                {presentation.kernel&&<svg width="0" height="0" aria-hidden="true" style={{position:'absolute',pointerEvents:'none'}}><defs><filter id="gl-stream-sharpen" colorInterpolationFilters="sRGB"><feConvolveMatrix order={3} kernelMatrix={presentation.kernel} divisor={1} edgeMode="duplicate" preserveAlpha={true}/></filter></defs></svg>}
+                <SharedPlayer
+                    communicationHandler={adapter}
+                    onStatusChanged={value=>{
+                        if(phaseRef.current!=='playing')return
+                        setStatus(value)
+                        if(value!=='Connected')setMic('off')
+                    }}
+                    useWebGpu={false}
+                    {...inputOptions}
+                    {...controllerOptions}
+                    videoBitrate={bitrate}
+                    volume={volume}
+                    muted={muted}
+                    microphone={micAvailable&&status==='Connected'&&microphoneRequested(mic)}
+                    onMicrophoneStatus={(active,error)=>{if(phaseRef.current==='playing')setMic(previous=>webMicrophoneResult(previous,active,error))}}
+                    showStats={showStats}
+                    onMetrics={metrics=>{
+                        if(!mounted.current||phaseRef.current!=='playing')return
+                        const elapsed=(performance.now()-diagnosticStart.current)/1000
+                        setSamples(previous=>appendWebDiagnostic(previous,metrics,elapsed))
+                    }}
+                    onFailureReason={reason=>{if(mounted.current&&phaseRef.current==='playing')setFailureReason(reason)}}
+                    keyframeRequest={keyframe}
+                    guideRequest={guide}
+                    onGuideUnavailable={()=>setGuideMissing(true)}
+                />
+            </div>
+        </FullscreenSurface>}
         {phase==='playing'&&status==='Connected'&&<div className="flex flex-wrap gap-3 my-3">
             {!inputOptions.consoleController&&<><label>Touch input <select className="bg-[#202020] rounded p-2" value={touch} onChange={event=>{const value=event.target.value;setTouch(value==='direct'||value==='controller'?value:'off');setGuideMissing(false)}}><option value="off">Off</option><option value="controller">On-screen controller</option><option value="direct">Direct touch (experimental)</option></select></label><button type="button" className={button} aria-pressed={keyboard} onClick={()=>{setKeyboard(value=>!value);setGuideMissing(false)}}>Keyboard controller</button></>}
             <button type="button" className={button} aria-pressed={muted} onClick={()=>setMuted(value=>!value)}>Mute</button>
@@ -161,6 +198,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         {phase==='playing'&&status==='Connected'&&<VideoAppearance value={filters} onChange={setFilters}/>}
         {phase==='playing'&&status==='Connected'&&<PictureInPictureControl surface={()=>playerSurface.current}/>}
         {phase==='playing'&&status==='Connected'&&<CaptureControls surface={()=>playerSurface.current}/>}
+        {phase!=='idle'&&<StreamDiagnostics samples={samples} type={target.type} status={status} reason={failureReason}/>}
         {guideMissing&&<p role='status'>Connect a controller or enable the on-screen or keyboard controller to open the guide.</p>}
         {phase!=='idle'&&<button type="button" className={button} disabled={phase==='stopping'} onClick={()=>void end()}>{phase==='stopFailed'?'Retry ending session':phase==='starting'?'Cancel and end session':'End session'}</button>}
     </section>

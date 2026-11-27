@@ -20,7 +20,7 @@
     "build:client": "vite build",
     "build:server": "tsup",
     "build": "yarn clean && yarn build:client && yarn build:server",
-    "clean": "rm -rf dist/",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "test": "mocha",
     "dev": "concurrently \"yarn dev:server\" \"yarn dev:client\"",
     "dev:client": "vite build --watch",
