@@ -10,7 +10,7 @@
     "url": "git+https://github.com/RepGraphics/greenlight.git"
   },
   "scripts": {
-    "dev": "DEBUG=greenlight:* nextron",
+    "dev": "node scripts/dev.cjs",
     "build": "node scripts/build.cjs",
     "lint": "eslint . --ext .ts && eslint renderer/ --ext .tsx",
     "lint:fix": "eslint . --ext .ts --fix && eslint renderer/ --ext .tsx --fix",

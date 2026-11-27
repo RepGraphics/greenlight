@@ -14,8 +14,9 @@
     "dev": "nextron",
     "dev:web": "cd renderer && BUILD_TARGET=web next build && cd ../ && npx wrangler pages dev",
     "build": "nextron build",
-    "build:web": "cd renderer && BUILD_TARGET=web next build",
-    "postinstall": "electron-builder install-app-deps"
+    "build:web": "node scripts/build-web.cjs",
+    "postinstall": "electron-builder install-app-deps",
+    "package:local": "electron-builder --publish never"
   },
   "dependencies": {
     "@trpc/client": "^11.17.0",
