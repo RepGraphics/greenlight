@@ -32,6 +32,9 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.HorizontalScrollView;
+import android.view.inputmethod.EditorInfo;
 import android.widget.RadioGroup;
 import android.widget.RadioButton;
 import android.widget.TextView;
@@ -80,7 +83,9 @@ public final class MainActivity extends Activity {
         root.setOnApplyWindowInsetsListener((view, insets) -> {
             if (Build.VERSION.SDK_INT >= 30) {
                 android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
-                view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                android.graphics.Insets keyboard = insets.getInsets(WindowInsets.Type.ime());
+                view.setPadding(Math.max(bars.left, keyboard.left), Math.max(bars.top, keyboard.top),
+                    Math.max(bars.right, keyboard.right), Math.max(bars.bottom, keyboard.bottom));
             } else {
                 view.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
                     insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
@@ -91,18 +96,29 @@ public final class MainActivity extends Activity {
         root.requestApplyInsets();
     }
 
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
     private TextView text(String value, int size) {
         TextView view = new TextView(this);
         view.setText(value);
         view.setTextSize(size);
         view.setTextColor(Color.WHITE);
-        view.setPadding(20, 12, 20, 12);
+        view.setPadding(dp(12), dp(6), dp(12), dp(6));
         return view;
     }
 
     private void showConnect(String message) {
         layout();
-        root.addView(text("Greenlight Android (experimental)", 23));
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(12), dp(8), dp(12), dp(12));
+        scroll.addView(form, new ScrollView.LayoutParams(-1, -2));
+        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        form.addView(text("Greenlight Android (experimental)", 23));
         RadioGroup modes = new RadioGroup(this);
         RadioButton desktop = new RadioButton(this);
         desktop.setId(View.generateViewId());
@@ -112,23 +128,27 @@ public final class MainActivity extends Activity {
         privateV3.setText("Private V3 backend (no desktop required)");
         modes.addView(desktop);
         modes.addView(privateV3);
-        root.addView(modes);
+        form.addView(modes);
         modes.check(mode == ConnectionMode.PRIVATE_V3 ? privateV3.getId() : desktop.getId());
         TextView modeHint = text("", 14);
-        root.addView(modeHint);
+        form.addView(modeHint);
         endpoint = new EditText(this);
         endpoint.setSingleLine(true);
         endpoint.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         endpoint.setHint("https://your-private-host");
         endpoint.setText(lastEndpoint);
         endpoint.setSaveEnabled(false);
-        root.addView(endpoint);
+        endpoint.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+        endpoint.setImeOptions(EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING | EditorInfo.IME_ACTION_NEXT);
+        form.addView(endpoint);
         password = new EditText(this);
         password.setSingleLine(true);
         password.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         password.setHint("Desktop WebUI access token");
         password.setSaveEnabled(false);
-        root.addView(password);
+        password.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+        password.setImeOptions(EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING | EditorInfo.IME_ACTION_DONE);
+        form.addView(password);
         Runnable updateMode = () -> {
             mode = modes.getCheckedRadioButtonId() == privateV3.getId()
                 ? ConnectionMode.PRIVATE_V3 : ConnectionMode.DESKTOP_COMPANION;
@@ -143,14 +163,14 @@ public final class MainActivity extends Activity {
         CheckBox remember = new CheckBox(this);
         remember.setText("Remember endpoint and connection mode (not credentials)");
         remember.setChecked(rememberEndpoint);
-        root.addView(remember);
+        form.addView(remember);
         remember.setOnCheckedChangeListener((button, checked) -> {
             rememberEndpoint = checked;
             if (!checked) connectionPreferences.edit().clear().apply();
         });
         Button forget = new Button(this);
         forget.setText("Forget saved connection");
-        root.addView(forget);
+        form.addView(forget);
         forget.setOnClickListener(view -> {
             remember.setChecked(false);
             rememberEndpoint = false;
@@ -163,9 +183,10 @@ public final class MainActivity extends Activity {
         });
         Button connect = new Button(this);
         connect.setText("Connect");
-        root.addView(connect);
+        form.addView(connect);
         status = text(message, 14);
-        root.addView(status);
+        status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        form.addView(status);
         connect.setOnClickListener(view -> {
             OriginPolicy selected = OriginPolicy.parse(endpoint.getText().toString().trim());
             String credential = password.getText().toString();
@@ -173,6 +194,8 @@ public final class MainActivity extends Activity {
                 status.setText(mode == ConnectionMode.PRIVATE_V3
                     ? "Enter a trusted private HTTPS V3 origin on port 443."
                     : "Enter an HTTPS origin on port 443 and the 64-character desktop WebUI token.");
+                status.announceForAccessibility(status.getText());
+                scroll.post(() -> scroll.smoothScrollTo(0, status.getBottom()));
                 return;
             }
             password.setText("");
@@ -193,10 +216,16 @@ public final class MainActivity extends Activity {
         clientControls = new LinearLayout(this);
         clientControls.setOrientation(LinearLayout.VERTICAL);
         root.addView(clientControls);
+        HorizontalScrollView toolbarScroll = new HorizontalScrollView(this);
+        toolbarScroll.setFillViewport(true);
+        LinearLayout toolbar = new LinearLayout(this);
+        toolbar.setOrientation(LinearLayout.HORIZONTAL);
+        toolbarScroll.addView(toolbar, new HorizontalScrollView.LayoutParams(-2, -2));
+        clientControls.addView(toolbarScroll);
         Button leave = new Button(this);
         leave.setText("Disconnect");
         leave.setOnClickListener(view -> confirmDisconnect());
-        clientControls.addView(leave);
+        toolbar.addView(leave);
         Button fullscreen = new Button(this);
         fullscreen.setText("Fullscreen (Back to exit)");
         fullscreen.setOnClickListener(view -> {
@@ -205,7 +234,7 @@ public final class MainActivity extends Activity {
                 applyDisplay();
             }
         });
-        clientControls.addView(fullscreen);
+        toolbar.addView(fullscreen);
         final OriginPolicy selectedOrigin = origin;
         final ConnectionMode selectedMode = mode;
         if (selectedMode == ConnectionMode.PRIVATE_V3) {
@@ -220,9 +249,10 @@ public final class MainActivity extends Activity {
                     status.setText("No browser available. Visit microsoft.com/devicelogin on another device.");
                 }
             });
-            clientControls.addView(signIn);
+            toolbar.addView(signIn);
         }
         status = text("Connecting to " + selectedOrigin.home(), 13);
+        status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         clientControls.addView(status);
         WebView web = new WebView(this);
         browser = web;

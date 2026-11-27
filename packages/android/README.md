@@ -30,6 +30,17 @@ Session credentials remain in the experimental web client's memory; disconnect o
 
 Optionally select **Remember endpoint and connection mode (not credentials)** before connecting. The app stores only the canonical HTTPS origin and the selected mode in private app preferences. Next launch pre-fills these fields but never automatically connects or signs in. Desktop tokens and Microsoft credentials are not saved by this feature. Uncheck the option or tap **Forget saved connection** on the connection screen to clear the saved preference; the latter also clears the current input fields. Android app backup remains disabled. Remembering an origin does not verify its trustworthiness or bypass TLS checks.
 
+## Small-screen and keyboard testing
+
+The connection form scrolls when space is limited, including landscape and when the keyboard is visible. The connected native toolbar scrolls horizontally, leaving more vertical space for playback. Endpoint and token inputs opt out of Android autofill and request no personalised keyboard learning; this is a platform hint, not a guarantee about third-party keyboards. The existing no-persistence and private-origin policies are unchanged.
+
+Device verification checklist (not yet executed):
+
+- Rotate the connection screen to landscape with the keyboard open; verify Connect, Remember and Forget remain reachable by scrolling.
+- Submit an invalid endpoint/token and verify the validation message is brought into view and announced by accessibility services.
+- Connect in both modes on a narrow display; scroll the native toolbar to reach Disconnect, Fullscreen and (V3 only) Microsoft device sign-in.
+- Enter fullscreen, rotate, exit using Back and verify the same WebView remains active. Confirm that the keyboard and system bars do not cover required controls.
+
 ## Fullscreen playback
 
 In either connected mode, tap **Fullscreen (Back to exit)** to hide the native controls and system bars without recreating the WebView. Swipe from the screen edge to temporarily reveal the system bars; use Android Back to restore the controls before disconnecting. The connected WebView requests that the screen stay awake while visible; this does not keep the device awake in the background. Disconnecting resets fullscreen. Real device, gesture navigation and rotation testing remain necessary.
