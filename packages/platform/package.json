@@ -7,7 +7,7 @@
   "scripts": {
     "start": "yarn build && node dist/index.js",
     "build": "yarn clean && tsc --build",
-    "clean": "rm -rf dist/",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "test": "yarn build && mocha tests/**.ts tests/**/*.ts",
     "dev": "wrangler dev --local",
     "dev:test": "start-server-and-test 'wrangler dev --local' http://127.0.0.1:8787 'tsx src/client.ts'"
