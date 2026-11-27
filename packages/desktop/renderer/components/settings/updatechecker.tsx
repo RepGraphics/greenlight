@@ -11,6 +11,8 @@ export default function UpdateChecker(){
     const [busy,setBusy]=React.useState(false)
     const [error,setError]=React.useState(false)
     const [result,setResult]=React.useState<UpdateResult|null>(null)
+    const [verifying,setVerifying]=React.useState(false)
+    const revealLocked=React.useRef(false)
     const [desktop,setDesktop]=React.useState(false)
     const [download,setDownload]=React.useState<UpdateDownloadStatus>({phase:'idle',received:0,total:0})
     const downloading=download.phase==='choosing'||download.phase==='downloading'
@@ -30,13 +32,19 @@ export default function UpdateChecker(){
         return()=>{active=false;clearInterval(timer)}
     },[desktop])
     const start=async()=>{
-        if(downloading||!result?.release?.installer||result.status!=='available')return
+        if(downloading||verifying||!result?.release?.installer||result.status!=='available')return
         setDownload({phase:'choosing',received:0,total:0})
         try{const status=await Ipc.send('app','startUpdateDownload',{tag:result.release.tag,includePrereleases:prereleases});if(mounted.current)setDownload(status)}
         catch{if(mounted.current)setDownload({phase:'failed',received:0,total:0})}
     }
     const cancel=async()=>{try{const status=await Ipc.send('app','cancelUpdateDownload');if(mounted.current)setDownload(status)}catch{}}
-    const reveal=async()=>{try{await Ipc.send('app','revealUpdateDownload')}catch{if(mounted.current)setError(true)}}
+    const reveal=async()=>{
+        if(revealLocked.current)return
+        revealLocked.current=true;setVerifying(true);setError(false)
+        try{await Ipc.send('app','revealUpdateDownload')}
+        catch{if(mounted.current){setError(true);try{setDownload(await Ipc.send('app','getUpdateDownloadStatus'))}catch{}}}
+        finally{revealLocked.current=false;if(mounted.current)setVerifying(false)}
+    }
     const check=async()=>{
         if(locked.current)return
         locked.current=true;setBusy(true);setError(false);setResult(null)
@@ -51,9 +59,9 @@ export default function UpdateChecker(){
         {error&&<p role='alert'>{t('updater.unableToCheckForUpdates')}</p>}
         {result&&<div role='status'><p>{t('updater.installedVersion')} {result.installed}</p><p>{t(result.status==='available'?'updater.newReleaseAvailable':result.status==='none'?'updater.noReleases':'updater.alreadyOnLatestVersion')}</p>
             {result.release&&<><p>{t('updater.latestVersion')} {result.release.tag}</p><button type='button' className='btn' onClick={()=>window.Greenlight.openExternal(result.release!.url)}>{t('updater.downloadBtn')}</button>
-                {result.status==='available'&&result.release.installer&&<button type='button' className='btn' disabled={downloading} onClick={()=>void start()}>{t('updater.downloadVerified')}</button>}
+                {result.status==='available'&&result.release.installer&&<button type='button' className='btn' disabled={downloading||verifying} onClick={()=>void start()}>{t('updater.downloadVerified')}</button>}
                 {result.release.notes&&<details><summary>{t('updater.releaseNotes')}</summary><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{result.release.notes}</pre></details>}</>}
         </div>}
-        {download.phase!=='idle'&&<div role='status'><p>{t('updater.download_'+download.phase)}</p>{download.name&&<p>{download.name}</p>}{download.phase==='downloading'&&<progress max={download.total||1} value={download.received}/>} {downloading&&<button className='btn' type='button' onClick={()=>void cancel()}>{t('dashboard.cancelBackup')}</button>}{download.phase==='ready'&&<button className='btn' type='button' onClick={()=>void reveal()}>{t('updater.revealInstaller')}</button>}</div>}
+        {download.phase!=='idle'&&<div role='status'><p>{t('updater.download_'+download.phase)}</p>{download.name&&<p>{download.name}</p>}{download.phase==='downloading'&&<progress max={download.total||1} value={download.received}/>} {downloading&&<button className='btn' type='button' onClick={()=>void cancel()}>{t('dashboard.cancelBackup')}</button>}{download.phase==='ready'&&<button className='btn' type='button' disabled={verifying} onClick={()=>void reveal()}>{verifying?t('updater.reverifyingInstaller',{defaultValue:'Verifying installer…'}):t('updater.revealInstaller')}</button>}</div>}
     </Card>
 }
