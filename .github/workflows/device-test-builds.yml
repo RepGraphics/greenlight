@@ -94,7 +94,7 @@ jobs:
         working-directory: packages/android
         run: |
           mkdir -p /tmp/android-policy-test
-          javac -d /tmp/android-policy-test app/src/main/java/uk/repgraphics/greenlight/companion/OriginPolicy.java app/src/main/java/uk/repgraphics/greenlight/companion/ConnectionMode.java app/src/main/java/uk/repgraphics/greenlight/companion/PlaybackDisplay.java app/src/main/java/uk/repgraphics/greenlight/companion/SavedConnection.java tests/OriginPolicyTest.java
+          javac -d /tmp/android-policy-test app/src/main/java/uk/repgraphics/greenlight/companion/OriginPolicy.java app/src/main/java/uk/repgraphics/greenlight/companion/ConnectionMode.java app/src/main/java/uk/repgraphics/greenlight/companion/PlaybackDisplay.java app/src/main/java/uk/repgraphics/greenlight/companion/SavedConnection.java app/src/main/java/uk/repgraphics/greenlight/companion/ConnectionHealth.java tests/OriginPolicyTest.java
           java -cp /tmp/android-policy-test uk.repgraphics.greenlight.companion.OriginPolicyTest
       - name: Build and lint debug APK
         working-directory: packages/android
