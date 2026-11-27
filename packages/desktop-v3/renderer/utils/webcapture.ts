@@ -1,27 +1,35 @@
 import {canCapture,captureScreenshotBlob,screenshotFilename} from '../../../desktop/renderer/lib/streamcapture'
-import {startStreamRecording,recordingFilename} from '../../../desktop/renderer/lib/streamrecording'
+import {startStreamRecording,recordingFilename,recordingLimitBytes} from '../../../desktop/renderer/lib/streamrecording'
+import {trimClip,type ClipTrimRange} from '../../../desktop/renderer/lib/cliptrim'
 
 import {startInstantReplay,replayDuration,replayMaxBytes} from '../../../desktop/renderer/lib/instantreplay'
 
 import {webRecordingPreferences} from '../../shared/recordingpreferences'
 export {webReplayDurations, webRecordingDurations, webRecordingBitrates, webRecordingPreferences} from '../../shared/recordingpreferences'
-export type WebCaptureState={phase:'idle'|'capturing'|'recording'|'stopping'|'replay'|'savingReplay'|'ready'|'failed';blob?:Blob;filename?:string;replayReady?:boolean}
+export type WebClipTrimState={phase:'running';progress:number}|{phase:'ready';blob:Blob;filename:string}|{phase:'failed'}
+export type WebCaptureState={phase:'idle'|'capturing'|'recording'|'stopping'|'replay'|'savingReplay'|'ready'|'failed';blob?:Blob;filename?:string;replayReady?:boolean;trim?:WebClipTrimState}
+
+export function isWebCaptureClip(blob?:Blob):blob is Blob{
+    return Boolean(blob&&blob.size>0&&blob.size<=recordingLimitBytes&&blob.type.split(';',1)[0]==='video/webm')
+}
+
 export function webCaptureMedia(surface:HTMLElement|null){
     const video=surface?.querySelector<HTMLVideoElement>('#playerContainer video')??null
     const audio=surface?.querySelector<HTMLAudioElement>('#playerContainer audio')??null
     return {video:canCapture(video)?video:null,audio}
 }
 
-// At most one capture, scoped to the mounted connected player. Never trigger
-// a download from an asynchronous completion or keep media after disposal.
+// Run one capture or trim at a time within the mounted connected player.
+// The user downloads completed media explicitly.
 export class WebCaptureSession{
     private generation=0
     private state:WebCaptureState={phase:'idle'}
     private recording?:{stop:()=>void}
     private replay?:ReturnType<typeof startInstantReplay>
-    constructor(private update:(state:WebCaptureState)=>void,private screenshot=captureScreenshotBlob,private record=startStreamRecording,private beginReplay=startInstantReplay){}
+    private trimController?:AbortController
+    constructor(private update:(state:WebCaptureState)=>void,private screenshot=captureScreenshotBlob,private record=startStreamRecording,private beginReplay=startInstantReplay,private prepareTrim=trimClip){}
     private publish(state:WebCaptureState){this.state=state;this.update(state)}
-    private available(){return ['idle','ready','failed'].includes(this.state.phase)}
+    private available(){return !this.trimController&&['idle','ready','failed'].includes(this.state.phase)}
     async takeScreenshot(video:HTMLVideoElement|null){
         if(!this.available()||!canCapture(video))return
         const generation=++this.generation
@@ -94,14 +102,48 @@ export class WebCaptureSession{
         this.publish({phase:'stopping'})
         this.recording.stop()
     }
+    async trim(original:Blob,video:HTMLVideoElement,range:ClipTrimRange){
+        const source=this.state
+        if(this.trimController||source.phase!=='ready'||source.blob!==original||!isWebCaptureClip(original)||!source.filename)return
+        const filename=source.filename.replace(/\.webm$/i,'-trimmed.webm')
+        const controller=new AbortController()
+        this.trimController=controller
+        this.publish({...source,trim:{phase:'running',progress:0}})
+        let result:WebClipTrimState={phase:'failed'}
+        try{
+            const blob=await this.prepareTrim(video,range,controller.signal,progress=>{
+                if(this.trimController===controller&&this.state.trim?.phase==='running'&&this.state.trim.progress!==progress){
+                    this.publish({...source,trim:{phase:'running',progress}})
+                }
+            })
+            if(isWebCaptureClip(blob))result={phase:'ready',blob,filename}
+        }catch{
+            // A failure leaves the source available for retry or download.
+        }
+        if(this.trimController!==controller)return
+        this.trimController=undefined
+        this.publish({...source,trim:result})
+    }
+    private abortTrim(){
+        const controller=this.trimController
+        this.trimController=undefined
+        controller?.abort()
+    }
+    cancelTrim(){
+        if(!this.trimController)return
+        this.abortTrim()
+        this.publish({...this.state,trim:undefined})
+    }
     discard(){
         if(this.state.phase!=='ready'&&this.state.phase!=='failed')return false
         this.generation++
+        this.abortTrim()
         this.publish({phase:'idle'})
         return true
     }
     reset(){
         this.generation++
+        this.abortTrim()
         const recording=this.recording
         const replay=this.replay
         this.recording=undefined

@@ -21,7 +21,8 @@
     "publish": "electron-builder -p onTag",
     "flatpak-build": "nextron build --no-pack && electron-builder --dir",
     "package:local": "electron-builder --publish never",
-    "test:coverage": "tsx --test --experimental-test-coverage tests/unit/*.test.ts"
+    "test:coverage": "tsx --test --experimental-test-coverage tests/unit/*.test.ts",
+    "test:smoke": "yarn build --no-pack && node tests/smoke.cjs v2"
   },
   "dependencies": {
     "@types/i18next": "^13.0.0",

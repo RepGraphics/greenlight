@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useSettings } from './userContext';
-import { initI18nWithLanguage } from '../lib/i18n';
+import { setI18nLanguage } from '../lib/i18n';
 
 // Language context for instant switching
 export const LanguageContext = createContext({
@@ -23,8 +23,7 @@ export const LanguageProvider = ({ children }) => {
     if (settings.language && settings.language !== language) {
       setLanguageState(settings.language);
     }
-    // Always re-init i18n when settings.language changes
-    initI18nWithLanguage(settings);
+    setI18nLanguage(settings.language);
   }, [settings.language]);
 
   return (

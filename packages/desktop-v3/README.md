@@ -11,7 +11,7 @@ This separate V3 frontend supports Xbox Remote Play and Cloud Gaming through the
 - Physical and on-screen controllers, keyboard controller emulation, experimental direct touchscreen input and multiple-controller support, plus Remote Play console-paired mode.
 - Physical controller presets, stick deadzone, Y-axis inversion, stick swapping and optional vibration.
 - Audio mute and volume, Xbox guide, toggleable streaming statistics, video refresh requests and acknowledged session termination.
-- Experimental local PNG screenshots and bounded WebM clips in compatible browsers.
+- Experimental local PNG screenshots, bounded WebM clips and non-destructive clip trimming in compatible browsers.
 - Live video appearance presets, brightness, contrast, saturation and experimental sharpening.
 - Experimental opt-in microphone voice chat in secure, compatible browsers.
 - Browser-native picture-in-picture playback where supported.
@@ -50,6 +50,10 @@ During a connected stream, select Keep screen awake in the playback toolbar to r
 
 Connection diagnostics can suggest a lower requested bitrate after sustained recent latency or jitter. Choose End and use suggested cap to stop the stream and return to the current title's setup with that cap, only after confirmed teardown. You can also end and return to setup without changing quality, including after a failed connection. Save captures first. Starting another session is always explicit, may rejoin a cloud queue, and does not provide live bitrate adaptation. A failed stop retains ownership and requires a retry; the suggested cap is not applied when teardown fails.
 
+In a compatible browser, open a WebM recording or replay preview, choose the start and end in seconds, and select **Prepare trimmed copy**. The browser re-encodes the selection at normal playback speed. Output timing can vary slightly with browser seeking and recording. Save the original or the trimmed copy separately. Cancel the trim or hide the preview to stop processing. Both copies stay in memory until discarded, replaced by a new capture, or released when the stream ends.
+
+With a standard-mapped controller and the browser tab focused, use the D-pad or left stick to move focus and A to activate a link or button. Use left and right to change a focused dropdown, and B to leave a form field or return from My Consoles to the Dashboard. Some browsers detect a controller only after a physical button press. After opening or refocusing a page, release any held controls before pressing again. Use the keyboard, mouse or touch to configure and start a session after opening it.
+
 ## Development
 
 From the repository root, use Node.js 24 and Yarn Classic 1.22.22:
@@ -59,6 +63,8 @@ yarn install --frozen-lockfile
 yarn build:depsv3
 yarn desktopv3 build:web
 yarn desktop test
+# Optional desktop boot check after building dependencies:
+yarn desktopv3 test:smoke
 ```
 
 The static web export is in `packages/desktop-v3/web-out/`. On Windows or POSIX shells, `yarn build:pages` also prepares the Pages workspace assets. Building does not provision a trusted deployment.

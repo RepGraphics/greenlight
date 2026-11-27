@@ -6,7 +6,7 @@ export function trimRange(start:unknown,end:unknown,duration:unknown){
     if(typeof start!=='number'||typeof end!=='number'||!Number.isFinite(start)||!Number.isFinite(end)||start<0||end>maximum||end-start<.5)return null
     return {start,end}
 }
-type Range={start:number;end:number}
+export type ClipTrimRange={start:number;end:number}
 type CapturableVideo=HTMLVideoElement&{captureStream?:()=>MediaStream;mozCaptureStream?:()=>MediaStream}
 export function supportsClipTrim(video:CapturableVideo){
     return Boolean((video.captureStream||video.mozCaptureStream)&&recordingMimeType())
@@ -32,7 +32,7 @@ function seek(video:HTMLVideoElement,time:number,signal:AbortSignal){
         try{video.currentTime=time}catch{fail()}
     })
 }
-export async function trimClip(video:CapturableVideo,range:Range,signal:AbortSignal,onProgress:(percent:number)=>void=()=>{}){
+export async function trimClip(video:CapturableVideo,range:ClipTrimRange,signal:AbortSignal,onProgress:(percent:number)=>void=()=>{}){
     const valid=trimRange(range.start,range.end,video.duration),mime=recordingMimeType()
     if(!valid||!mime||!(video.captureStream||video.mozCaptureStream))throw Error('Unsupported clip or range')
     video.pause()

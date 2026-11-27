@@ -8,32 +8,32 @@
       "name": "Nextron: Main",
       "type": "node",
       "request": "attach",
-      "protocol": "inspector",
+      "address": "127.0.0.1",
       "port": 9292,
+      "restart": true,
+      "timeout": 30000,
       "skipFiles": ["<node_internals>/**"],
       "sourceMapPathOverrides": {
-        "webpack:///./~/*": "${workspaceFolder}/node_modules/*",
-        "webpack:///./*": "${workspaceFolder}/*",
-        "webpack:///*": "*"
+        "webpack://greenlight-desktop/./*": "${workspaceFolder}/packages/desktop/*",
+        "webpack:///./*": "${workspaceFolder}/packages/desktop/*"
       }
     },
     {
       "name": "Nextron: Renderer",
       "type": "chrome",
       "request": "attach",
+      "address": "127.0.0.1",
       "port": 5858,
-      "timeout": 10000,
-      "urlFilter": "http://localhost:*",
-      "webRoot": "${workspaceFolder}/app",
-      "sourceMapPathOverrides": {
-        "webpack:///./src/*": "${webRoot}/*"
-      }
+      "timeout": 30000,
+      "urlFilter": "http://localhost:8888/home*",
+      "webRoot": "${workspaceFolder}/packages/desktop/renderer"
     }
   ],
   "compounds": [
     {
       "name": "Nextron: All",
-      "preLaunchTask": "dev",
+      "preLaunchTask": "Greenlight: Start desktop debugger",
+      "stopAll": true,
       "configurations": ["Nextron: Main", "Nextron: Renderer"]
     }
   ]

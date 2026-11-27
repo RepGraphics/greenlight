@@ -16,7 +16,8 @@
     "build": "nextron build",
     "build:web": "node scripts/build-web.cjs",
     "postinstall": "electron-builder install-app-deps",
-    "package:local": "electron-builder --publish never"
+    "package:local": "electron-builder --publish never",
+    "test:smoke": "yarn build --no-pack && node ../desktop/tests/smoke.cjs v3"
   },
   "dependencies": {
     "@trpc/client": "^11.17.0",
