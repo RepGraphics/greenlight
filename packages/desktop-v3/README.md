@@ -35,6 +35,8 @@ Before connecting, open Controller test and stick drift calibration to inspect t
 
 Instant replay is opt-in during a connected session. Choose 15, 30 or 60 second rolling segments, then enable the replay buffer. Save replay and stop finalizes the current or recent completed segment using the existing bounded desktop recorder; it is not an exact continuous history. Save the resulting capture explicitly, preview it, or discard it. Only one capture mode runs at a time. Disabling replay or ending playback releases the buffered media. Nothing is uploaded, and microphone audio is not included.
 
+Connection history and diagnostics retains at most 300 samples or five minutes of measurements for the current stream. Expand the panel during playback or after a connection failure for latency, jitter, FPS and bitrate graphs, with stale data shown as gaps. Export the desktop-compatible JSON report explicitly; it excludes credentials, addresses and game/account identifiers. The report is local and is lost when leaving the session. Quality estimates use latency and jitter rather than guaranteeing gameplay performance.
+
 ## Development
 
 From the repository root, use Node.js 24 and Yarn Classic 1.22.22:
