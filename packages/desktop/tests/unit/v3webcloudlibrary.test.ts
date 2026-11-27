@@ -21,6 +21,20 @@ test('metadata hydration preserves entitlement and never introduces undiscovered
     assert.equal(titles[0].name,'one')
     assert.throws(()=>hydrateCloudTitles(titles,{data:{Products:[]}}))
 })
+test('only known Xbox artwork hosts are rendered and rejected art leaves the title playable',()=>{
+    const titles=normalizeCloudTitles({data:{results:[row('one','A',true)]}})
+    const [game]=hydrateCloudTitles(titles,{data:{Products:{A:{
+        ProductTitle:'Adventure',
+        ProductDescriptionShort:'A short description',
+        Image_Tile:{URL:'https://store-images.s-microsoft.com.example.test/tile'},
+        Image_Poster:{URL:'//store-images.s-microsoft.com/poster'},
+        Image_Hero:{URL:'http://store-images.s-microsoft.com/hero'},
+    }}}})
+    assert.equal(game.cover,'https://store-images.s-microsoft.com/poster')
+    assert.equal(game.hero,undefined)
+    assert.equal(game.description,'A short description')
+    assert.equal(game.entitled,true)
+})
 test('search and sorting respect entitlement and do not mutate the source',()=>{
     const titles=normalizeCloudTitles({data:{results:[row('b','B',true),row('a','A'),row('c','C',true)]}})
     const hydrated=hydrateCloudTitles(titles,{data:{Products:{A:{ProductTitle:'Alpha',PublisherName:'Studio'},B:{ProductTitle:'Beta',PublisherName:'Studio'},C:{ProductTitle:'Charlie'}}}})

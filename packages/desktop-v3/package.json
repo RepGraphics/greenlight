@@ -24,6 +24,7 @@
     "@trpc/tanstack-react-query": "^11.18.0",
     "electron-serve": "^3.0.0",
     "electron-store": "^12.0.0",
+    "lucide-react": "^1.71.0",
     "react-qr-code": "^2.2.0",
     "wrangler": "^4.140.0"
   },
