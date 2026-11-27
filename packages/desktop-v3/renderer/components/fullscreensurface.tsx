@@ -9,9 +9,10 @@ export default function FullscreenSurface({children,enabled,fullscreenActions}:{
     const [error,setError]=useState(false)
     useEffect(()=>{
         setError(false)
-        if(!enabled||!surface.current){setState({active:false,available:false,busy:false});return}
+        if(!surface.current){setState({active:false,available:false,busy:false});return}
         const current=new WebFullscreen(document,surface.current)
         controller.current=current
+        current.setEnabled(enabled)
         const refresh=()=>setState(current.state())
         document.addEventListener('fullscreenchange',refresh)
         refresh()
@@ -20,6 +21,10 @@ export default function FullscreenSurface({children,enabled,fullscreenActions}:{
             controller.current=null
             current.dispose()
         }
+    },[])
+    useEffect(()=>{
+        const current=controller.current
+        if(current){current.setEnabled(enabled);setState(current.state())}
     },[enabled])
     const toggle=async()=>{
         const current=controller.current

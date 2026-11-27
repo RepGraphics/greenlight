@@ -4,6 +4,7 @@ import Head from 'next/head'
 import {ArrowLeft, Play} from 'lucide-react'
 import DashboardInput from '../../../desktop/renderer/components/ui/dashboardinput'
 import CaptureControls from './capturecontrols'
+import type {WebCaptureSession} from '../utils/webcapture'
 import FullscreenSurface from './fullscreensurface'
 import StreamDiagnostics from './streamdiagnostics'
 import {webQualityAdvice} from '../utils/webqualityadvice'
@@ -56,6 +57,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     const [defaultsUpdated,setDefaultsUpdated]=useState(false)
     const [setupMessage,setSetupMessage]=useState('')
     const [captureRetained,setCaptureRetained]=useState(false)
+    const captureSession=useRef<WebCaptureSession|null>(null)
     const captureRetainedRef=useRef(false)
     const captureChanged=useCallback((retained:boolean)=>{captureRetainedRef.current=retained;setCaptureRetained(retained)},[])
     const [leaveRequested,setLeaveRequested]=useState(false)
@@ -159,6 +161,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         if(destination==='browse'&&captureRetainedRef.current)destination='setup'
         if(phaseRef.current!=='stopFailed'||destination!==exitDestination.current||nextBitrate!==undefined)pendingSetupBitrate.current=destination==='setup'?nextBitrate:undefined
         exitDestination.current=destination
+        captureSession.current?.suspendLiveCapture()
         transition('stopping');setMic('off');setAdapter(null)
         const stopped=await lifecycle.current.end()
         if(!mounted.current)return
@@ -265,7 +268,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
                     onStatusChanged={value=>{
                         if(phaseRef.current!=='playing')return
                         setStatus(value)
-                        if(value!=='Connected')setMic('off')
+                        if(value!=='Connected'){captureSession.current?.suspendLiveCapture();setMic('off')}
                     }}
                     useWebGpu={false}
                     {...inputOptions}
@@ -308,7 +311,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         {phase==='playing'&&status==='Connected'&&<VideoAppearance value={filters} onChange={setFilters}/>}
         {phase==='playing'&&status==='Connected'&&<PictureInPictureControl surface={()=>playerSurface.current}/>}
         {phase==='playing'&&status==='Connected'&&<div className="my-2"><button type="button" className={button} onClick={rememberCurrentSetup}>Remember current setup for this sign-in</button>{setupMessage&&<p role="status">{setupMessage}</p>}</div>}
-        <CaptureControls surface={()=>playerSurface.current} connected={phase==='playing'&&status==='Connected'} onRetainedChange={captureChanged}/>
+        <CaptureControls surface={()=>playerSurface.current} connected={phase==='playing'&&status==='Connected'} onRetainedChange={captureChanged} sessionRef={captureSession}/>
         {phase!=='idle'&&<StreamDiagnostics samples={samples} type={target.type} status={status} reason={failureReason} recommendedCap={advice} onApplyRecommendation={applyAdvice}/>}
         {guideMissing&&<p role='status'>Connect a controller or enable the on-screen or keyboard controller to open the guide.</p>}
         {phase!=='idle'&&phase!=='startFailed'&&<div className="v3-actions">

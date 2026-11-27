@@ -1,11 +1,11 @@
-import {useEffect,useRef,useState} from 'react'
+import {useEffect,useRef,useState,type MutableRefObject} from 'react'
 import ClipPreview from './clippreview'
 import {canShareCapture,shareCapture,type ShareResult} from '../utils/webcaptureshare'
 import {WebCaptureSession,webCaptureMedia,downloadWebCapture,isWebCaptureClip,webRecordingDurations,webRecordingBitrates,webReplayDurations,type WebCaptureState} from '../utils/webcapture'
 import {recordingMimeType} from '../../../desktop/renderer/lib/streamrecording'
 import {useStreamPreferences} from '../contexts/StreamPreferencesContext'
 
-export default function CaptureControls({surface,connected,onRetainedChange}:{surface:()=>HTMLElement|null;connected:boolean;onRetainedChange:(retained:boolean)=>void}){
+export default function CaptureControls({surface,connected,onRetainedChange,sessionRef}:{surface:()=>HTMLElement|null;connected:boolean;onRetainedChange:(retained:boolean)=>void;sessionRef:MutableRefObject<WebCaptureSession|null>}){
     const {preferences}=useStreamPreferences()
     const [state,setState]=useState<WebCaptureState>({phase:'idle'})
     const [supported,setSupported]=useState(false)
@@ -25,14 +25,16 @@ export default function CaptureControls({surface,connected,onRetainedChange}:{su
     const trimmedCopy=trim?.phase==='ready'?trim:null
     useEffect(()=>{
         mounted.current=true
-        const capture=new WebCaptureSession(setState)
-        session.current=capture
+        const capture=new WebCaptureSession(next=>{
+            onRetainedChange(next.phase!=='idle'&&next.phase!=='failed')
+            setState(next)
+        })
+        session.current=capture;sessionRef.current=capture
         setState({phase:'idle'})
         try{setSupported(Boolean(recordingMimeType()))}catch{setSupported(false)}
-        return()=>{mounted.current=false;session.current=null;capture.reset()}
+        return()=>{mounted.current=false;session.current=null;if(sessionRef.current===capture)sessionRef.current=null;capture.reset()}
     },[])
     useEffect(()=>{if(!connected)session.current?.suspendLiveCapture()},[connected])
-    useEffect(()=>{onRetainedChange(state.phase!=='idle'&&state.phase!=='failed')},[state.phase,onRetainedChange])
     useEffect(()=>{
         setPreview(false)
     },[blob])

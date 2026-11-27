@@ -36,7 +36,7 @@ export class WebCaptureSession{
         this.publish({phase:'capturing'})
         try{
             const blob=await this.screenshot(video)
-            if(generation===this.generation)this.publish({phase:'ready',blob,filename:screenshotFilename()})
+            if(generation===this.generation)this.publish(blob.size>0&&blob.size<=recordingLimitBytes&&blob.type==='image/png'?{phase:'ready',blob,filename:screenshotFilename()}:{phase:'failed'})
         }catch{if(generation===this.generation)this.publish({phase:'failed'})}
     }
     startRecording(video:HTMLVideoElement|null,audio:HTMLAudioElement|null,preferences?:{seconds?:unknown;videoBitsPerSecond?:unknown;includeAudio?:boolean}){
@@ -47,7 +47,7 @@ export class WebCaptureSession{
             const recording=this.record(video,(blob,error)=>{
                 if(generation!==this.generation)return
                 this.recording=undefined
-                this.publish(blob&&!error?{phase:'ready',blob,filename:recordingFilename()}:{phase:'failed'})
+                this.publish(isWebCaptureClip(blob??undefined)&&!error?{phase:'ready',blob:blob!,filename:recordingFilename()}:{phase:'failed'})
             },audio,{
                 ...webRecordingPreferences(preferences?.seconds,preferences?.videoBitsPerSecond),
                 ...(preferences?.includeAudio===false?{includeAudio:false}:{}),
@@ -100,7 +100,9 @@ export class WebCaptureSession{
     stop(){
         if(this.state.phase!=='recording'||!this.recording)return
         this.publish({phase:'stopping'})
-        this.recording.stop()
+        try{this.recording.stop()}catch{
+            this.generation++;this.recording=undefined;this.publish({phase:'failed'})
+        }
     }
     // Stop live media work when the stream ceases to be connected. Completed
     // captures and local clip edits belong to the current page, not the peer.

@@ -182,3 +182,16 @@ test('local clip trimming can finish after the stream is disconnected',async()=>
     assert.equal(f.states.at(-1)?.blob,clip)
     assert.equal(f.states.at(-1)?.trim?.phase,'ready')
 })
+
+test('invalid recorder output is not exposed as a completed clip',()=>{
+    for(const blob of [new Blob([],{type:'video/webm'}),new Blob(['x'],{type:'text/plain'})]){
+        const f=fixture();f.session.startRecording(video,audio);f.finish(blob)
+        assert.deepEqual(f.states.at(-1),{phase:'failed'})
+    }
+})
+test('invalid screenshot output is rejected',async()=>{
+    const states:WebCaptureState[]=[]
+    const session=new WebCaptureSession(state=>states.push(state),async()=>new Blob(['x'],{type:'text/plain'}))
+    await session.takeScreenshot(video)
+    assert.deepEqual(states.at(-1),{phase:'failed'})
+})
