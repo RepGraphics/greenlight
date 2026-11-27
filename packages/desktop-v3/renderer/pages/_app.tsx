@@ -5,6 +5,7 @@ import App from './app'
 
 
 import '../styles/globals.css'
+import '../styles/v3-shell.css'
 
 function GreenlightDesktop({ Component, pageProps }: AppProps) {
 

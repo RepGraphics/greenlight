@@ -1,6 +1,7 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import {AuthAttempt,clearLegacyUserToken} from '../../../desktop-v3/renderer/contexts/authattempt'
+import {deviceSignInUrl,isDeviceSignInUrl} from '../../../desktop-v3/shared/devicesignin'
 import {isRpcPath,rpcRequestAllowed,rpcHeaders} from '../../../pages/src/rpcpolicy'
 
 test('superseding device authorization aborts the old generation and ignores late results',()=>{
@@ -16,6 +17,21 @@ test('legacy browser token is deleted without reading or persisting credentials'
     clearLegacyUserToken(()=>({removeItem:key=>removed.push(key)}))
     assert.deepEqual(removed,['userToken'])
     assert.doesNotThrow(()=>clearLegacyUserToken(()=>{throw Error('Storage disabled')}))
+})
+test('device sign-in opens only the supported Microsoft pages with no code in the URL',()=>{
+    const standard='https://microsoft.com/devicelogin',xbox='https://www.microsoft.com/link'
+    assert.equal(deviceSignInUrl('https://www.microsoft.com/devicelogin'),standard)
+    assert.equal(deviceSignInUrl('https://microsoft.com/link/'),xbox)
+    assert.equal(isDeviceSignInUrl(standard),true)
+    assert.equal(isDeviceSignInUrl(xbox),true)
+    for(const url of [
+        'https://microsoft.com.evil.test/link', 'http://www.microsoft.com/link',
+        'https://www.microsoft.com:444/link', 'https://example@www.microsoft.com/link',
+        'https://www.microsoft.com/link?otc=CODE', 'https://www.microsoft.com/link#CODE',
+    ]){
+        assert.equal(deviceSignInUrl(url),standard)
+        assert.equal(isDeviceSignInUrl(url),false)
+    }
 })
 test('web RPC requires POST with only the supported batch query marker',()=>{
     assert.equal(isRpcPath('/trpc/auth_msal_verify'),true)

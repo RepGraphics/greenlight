@@ -1,8 +1,9 @@
 import path from 'path'
-import { app, ipcMain } from 'electron'
+import { app, ipcMain, shell } from 'electron'
 import serve from 'electron-serve'
 import { createWindow } from './helpers/create-window'
 import { setupTrpcHandler } from './trpc-handler'
+import { isDeviceSignInUrl } from '../shared/devicesignin'
 
 const isProd = process.env.NODE_ENV === 'production'
 
@@ -19,9 +20,18 @@ if (isProd) {
   const mainWindow = createWindow('main', {
     width: 1000,
     height: 600,
+    title: 'Greenlight V3',
+    backgroundColor: '#0e1713',
+    autoHideMenuBar: true,
+    icon: isProd ? path.join(import.meta.dirname, 'images', 'logo.png') : undefined,
     webPreferences: {
       preload: path.join(import.meta.dirname, 'preload.js'),
     },
+  })
+
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (isDeviceSignInUrl(url)) void shell.openExternal(url).catch(() => {})
+    return { action: 'deny' }
   })
 
   if (isProd) {

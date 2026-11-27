@@ -70,11 +70,10 @@ export default function HomePage(){
     if(selected)return <RemotePlay target={{id:selected.id,name:selected.name,type:'cloud',entitled:selected.entitled}} onExit={()=>setSelected(null)}/>
     return <>
         <Head><title>Greenlight — Cloud Gaming library</title></Head>
-        <div className="flex h-[100dvh] flex-col md:flex-row bg-[#0d0d0d] text-white overflow-hidden">
+        <div className="v3-dashboard">
             <Sidebar/>
-            <main className="flex-1 min-h-0 min-w-0 overflow-y-auto p-4 md:p-8">
+            <main className="v3-dashboard-content">
                 <h1 className="text-2xl font-bold">Cloud Gaming library</h1>
-                <p className="text-white/60 mt-2">Experimental web client — Cloud Gaming launch is unverified on hardware.</p>
                 {!token?<p className="mt-5" role="status">Cloud Gaming authorization is unavailable for this account.</p>:<>
                     <div className="flex flex-wrap gap-3 my-5 items-center">
                         <input type="search" maxLength={100} value={search} onChange={event=>{setSearch(event.target.value);setPage(0)}} aria-label="Search games" placeholder="Search games or publishers" className="min-w-0 flex-1 rounded border border-white/20 bg-white/5 p-2"/>

@@ -43,13 +43,12 @@ export default function ConsolesPage(){
     if(selected)return <RemotePlay target={{id:selected.id,name:selected.name,type:'home'}} onExit={()=>setSelected(null)}/>
     return <React.Fragment>
         <Head><title>Greenlight — My Consoles</title></Head>
-        <div className="flex min-h-screen flex-col md:h-screen md:flex-row bg-[#0d0d0d] text-white">
+        <div className="v3-dashboard">
             <Sidebar/>
-            <main className="flex-1 min-w-0 overflow-y-auto">
-                <div className="p-4 md:p-8 max-w-5xl mx-auto">
+            <main className="v3-dashboard-content">
+                <div className="max-w-5xl mx-auto">
                     <h1 className="text-2xl font-bold">My Consoles</h1>
-                    <p className="text-white/60 mt-2">Discover Xbox consoles associated with your signed-in account.</p>
-                    <p className="text-white/50 mt-2 text-sm">Experimental web client — Remote Play is unverified on hardware. Console power commands are not available here.</p>
+                    <p className="text-white/70 mt-2">Choose a console to start Remote Play.</p>
                     <div className="flex flex-wrap gap-3 my-5">
                         <input type="search" aria-label="Search consoles" placeholder="Search consoles" value={search} onChange={event=>setSearch(event.target.value)} className="min-w-0 flex-1 rounded border border-white/20 bg-white/5 p-2"/>
                         <button type="button" disabled={loading||!token||!uhs} onClick={()=>void load()} className="rounded border border-white/20 px-4 py-2 disabled:opacity-50">{loading?'Refreshing…':'Refresh'}</button>
