@@ -8,6 +8,17 @@ Open [PC and Android test builds](https://github.com/RepGraphics/greenlight/acti
 
 Download the four component artifacts and the verification artifact. Extract each component ZIP into a directory named exactly as its artifact (including the commit suffix), alongside SHA256SUMS.txt and BUILD-COMMIT.txt from the verification artifact. On a POSIX shell, run `sha256sum -c SHA256SUMS.txt` from that directory. On Windows, use `Get-FileHash -Algorithm SHA256` on individual extracted files and compare with the corresponding checksum entry. Checksums verify matching bytes, not publisher identity or code signing. The APK and development installers may be unsigned or debug-signed; the local smoke test is not a real Xbox or Android device test.
 
+## Electron boot smoke checks
+
+The matching Windows build workflow now runs the isolated-profile V2 and V3 Electron boot checks after compilation and before packaging. These verify the signed-out screen and local Electron IPC without requiring Xbox sign-in. They do not prove real streaming or validate the packaged installer on physical hardware. To reproduce against already-built local apps, run:
+
+```powershell
+node packages/desktop/tests/smoke.cjs v2
+node packages/desktop/tests/smoke.cjs v3
+```
+
+The runner creates and removes a temporary local profile. Never run the smoke script against an existing user profile.
+
 ## Windows (PowerShell)
 
 Install Git, Node.js 24 and Yarn Classic 1.22.22. From the repository root:
