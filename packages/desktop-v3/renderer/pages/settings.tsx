@@ -1,6 +1,7 @@
 import {useState, type ReactNode} from 'react'
 import Head from 'next/head'
-import {AudioLines, Cloud, Gamepad2, HardDrive, LayoutGrid, Video} from 'lucide-react'
+import DeviceCompatibility from '../components/devicecompatibility'
+import {AudioLines, Cloud, Gamepad2, HardDrive, LayoutGrid, Video, Monitor} from 'lucide-react'
 import ControllerBindings from '../components/controllerbindings'
 import ControllerCalibration from '../components/controllercalibration'
 import DashboardLayout from '../components/dashboardlayout'
@@ -22,6 +23,7 @@ const categories = [
     {id: 'captures', label: 'Captures', Icon: Video},
     {id: 'library', label: 'Library', Icon: LayoutGrid},
     {id: 'backup', label: 'Backup', Icon: HardDrive},
+    {id: 'device', label: 'Compatibility', Icon: Monitor},
 ] as const
 const languageNames = new Intl.DisplayNames(['en'], {type: 'language'})
 const backupFormat = 'greenlight-v3-preferences'
@@ -224,6 +226,7 @@ export default function SettingsPage() {
             </Row>
             <Toggle id="library-unavailable" title="Show games without cloud access" description="Include games your current Xbox account can’t play." checked={preferences.showUnavailable} onChange={showUnavailable => update({showUnavailable})}/>
         </Section>}
+        {category === 'device' && <DeviceCompatibility/>}
         {category === 'backup' && <Section title="Local preferences">
             <Row title="Export settings" description="Download a JSON file containing your preferences.">
                 <button type="button" className="v3-button v3-button-secondary" onClick={exportBackup}>Export settings</button>

@@ -54,6 +54,8 @@ In a compatible browser, open a WebM recording or replay preview, choose the sta
 
 With a standard-mapped controller and the browser tab focused, use the D-pad or left stick to move focus and A to activate a link or button. Use left and right to change a focused dropdown, and B to leave a form field or return from My Consoles to the Dashboard. Some browsers detect a controller only after a physical button press. After opening or refocusing a page, release any held controls before pressing again. Use the keyboard, mouse or touch to configure and start a session after opening it.
 
+Settings includes a Compatibility category with local API and H.264 receiver capability checks and a shareable credential-free report. Where the browser supports file sharing, Share capture and Share trimmed copy use the native chooser; no application upload service is used. Android WebView support varies.
+
 ## Development
 
 From the repository root, use Node.js 24 and Yarn Classic 1.22.22:
