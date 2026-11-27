@@ -220,7 +220,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
             <button type="button" className={button} onClick={()=>setKeyframe(value=>value+1)}>Request video refresh</button>
         </div>}
         {phase==='playing'&&status==='Connected'&&<div className="text-sm text-white/60 my-2">
-            {micAvailable?<p>Microphone chat is opt-in and requires browser permission and Xbox support. Playback mute does not mute your microphone. Android companion microphone permission remains disabled.</p>:<p>Microphone capture is unavailable in this browser or insecure context.</p>}
+            {micAvailable?<p>Microphone chat is opt-in and requires browser permission and Xbox support. Playback mute does not mute your microphone. Android companion voice chat requires a compatible app build and native permission.</p>:<p>Microphone capture is unavailable in this browser or insecure context.</p>}
             {mic==='requesting'&&<p role="status">Requesting microphone permission and negotiating voice chat…</p>}
             {mic==='active'&&<p role="status" className="font-semibold text-white">Microphone active — your voice may be transmitted to Xbox.</p>}
             {mic==='failed'&&<p role="alert">Microphone unavailable or disconnected. Check permissions, device and Xbox chat support before retrying.</p>}
