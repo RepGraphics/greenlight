@@ -2,7 +2,7 @@ interface SessionAttempt {
     start:()=>Promise<unknown>
     stop:(sessionId:string)=>Promise<unknown>
     onSession:(sessionId:string)=>void
-    onError:(reason:'start'|'stop')=>void
+    onError:(reason:'start'|'stop',cause?:unknown)=>void
 }
 
 // Serialize provisioning and teardown, including sessions returned after a
@@ -61,15 +61,15 @@ export class SessionLifecycle {
         this.enqueue(async()=>{
             if(disposed)return
             try{await this.closeActive()}
-            catch{if(!disposed)attempt.onError('stop');return}
+            catch(cause){if(!disposed)attempt.onError('stop',cause);return}
             if(disposed)return
             timer=this.schedule(()=>{if(!disposed){dispose();attempt.onError('start')}},this.timeoutMs)
             let result:unknown
             try{
                 result=await attempt.start()
                 if(typeof result!=='string'||!result)throw Error('Invalid session identifier')
-            }catch{
-                if(!disposed)attempt.onError('start')
+            }catch(cause){
+                if(!disposed)attempt.onError('start',cause)
                 return
             }finally{clear()}
             this.active={id:result as string,owner,stop:attempt.stop}

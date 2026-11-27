@@ -1,4 +1,4 @@
-import { initTRPC } from '@trpc/server';
+import { initTRPC, TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
 import pkg from '../package.json';
@@ -58,6 +58,19 @@ const xCloudStreamConfig = z.object({
     resolution: z.union([z.literal(720), z.literal(1080)])
 })
 
+function provisionError(cause: unknown) {
+    const status = (cause as {error?: {status?: unknown}} | null)?.error?.status
+    switch (status) {
+        case 400: return new TRPCError({code:'BAD_REQUEST',message:'Xbox rejected the streaming target.'})
+        case 401:
+        case 403: return new TRPCError({code:'UNAUTHORIZED',message:'Xbox rejected stream authorization.'})
+        case 404: return new TRPCError({code:'NOT_FOUND',message:'The Xbox streaming target was unavailable.'})
+        case 409: return new TRPCError({code:'CONFLICT',message:'Xbox reported a session conflict.'})
+        case 429: return new TRPCError({code:'TOO_MANY_REQUESTS',message:'Xbox is limiting new sessions.'})
+        default: return new TRPCError({code:'INTERNAL_SERVER_ERROR',message:'Xbox session startup could not be confirmed.'})
+    }
+}
+
 export const appRouter = router({
     ping: publicProcedure.query(() => 'pong'),
     version: publicProcedure.query(() => pkg.version),
@@ -82,7 +95,10 @@ export const appRouter = router({
     gamepass_resolve_productid: publicProcedure.input(z.object({ token: zodXhomeToken, productId: z.string().min(1).max(128) })).query(async ({ input }) => await gamepass.resolveTitle(input.token, input.productId)),
 
     streaming_stop_stream: publicProcedure.input(z.object({ token: zodXhomeToken, xCloudStreamConfig: xCloudStreamConfig, sessionPath: z.string().max(256) })).mutation(async ({ input }) => await stopStream(input.token, input.xCloudStreamConfig, input.sessionPath)),
-    streaming_start_stream: publicProcedure.input(z.object({ token: zodXhomeToken, xCloudStreamConfig: xCloudStreamConfig })).mutation(async ({ input }) => await startStream(input.token, input.xCloudStreamConfig)),
+    streaming_start_stream: publicProcedure.input(z.object({ token: zodXhomeToken, xCloudStreamConfig: xCloudStreamConfig })).mutation(async ({ input }) => {
+        try {return await startStream(input.token, input.xCloudStreamConfig)}
+        catch (cause) {throw provisionError(cause)}
+    }),
     streaming_get_status: publicProcedure.input(z.object({ token: zodXhomeToken, xCloudStreamConfig: xCloudStreamConfig, sessionPath: z.string().max(256) })).mutation(async ({ input }) => await getStreamStatus(input.token, input.xCloudStreamConfig, input.sessionPath)),
     streaming_send_sdp_offer: publicProcedure.input(z.object({ token: zodXhomeToken, xCloudStreamConfig: xCloudStreamConfig, sessionPath: z.string().max(256), sdpOffer: z.any() })).mutation(async ({ input }) => await sendSDPOffer(input.token, input.xCloudStreamConfig, input.sessionPath, input.sdpOffer)),
     streaming_send_chat_sdp: publicProcedure.input(z.object({ token: zodXhomeToken, xCloudStreamConfig: xCloudStreamConfig, sessionPath: z.string().max(256), offer: z.object({type:z.literal('offer'),sdp:z.string().min(1).max(262144)}) })).mutation(async ({input})=>await sendChatSDP(input.token,input.xCloudStreamConfig,input.sessionPath,input.offer)),

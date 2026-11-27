@@ -307,6 +307,9 @@
 .v3-session-setup { width: min(100%, 920px); }
 .v3-session-setup > .v3-button { justify-self: start; }
 .v3-session-setup > .v3-muted { font-size: .89rem; }
+.v3-start-failure { display: grid; gap: 15px; width: min(100%, 920px); padding: 18px; border-color: #755350; }
+.v3-start-failure h2 { margin-bottom: 5px; font-size: 1.1rem; font-weight: 650; }
+.v3-start-failure p { color: var(--v3-muted); }
 .v3-profile { display: flex; gap: 12px; align-items: center; padding: 15px; }
 .v3-avatar { position: relative; overflow: hidden; border-radius: 50%; font-weight: 720; }
 .v3-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }

@@ -1,6 +1,8 @@
 import type { StreamMetrics } from '../../../player/src/client/metrics'
 
 export type DiagnosticSample = StreamMetrics & { elapsedSeconds: number }
+export const startupFailureReasons = ['start-authorization','start-target','start-region','start-conflict','start-busy','start-unconfirmed'] as const
+export const streamFailureReasons = ['media','transport','stats','heartbeat','server','closed','keepalive',...startupFailureReasons] as readonly string[]
 export function sanitizeSample(metrics: StreamMetrics, elapsedSeconds: number): DiagnosticSample {
     const number = (value: number) => Number.isFinite(value) ? Math.max(0, Math.round(value * 100) / 100) : 0
     return { elapsedSeconds: number(elapsedSeconds), width: number(metrics.width), height: number(metrics.height), fps: number(metrics.fps), bitrate: number(metrics.bitrate), jitter: number(metrics.jitter), loss: number(metrics.loss), rtt: number(metrics.rtt), ...(typeof metrics.statsFresh==='boolean'?{statsFresh:metrics.statsFresh,statsAgeMs:number(metrics.statsAgeMs??0)}:{}), ...(typeof metrics.peerState==='string'&&['new','connecting','connected','disconnected','failed','closed'].includes(metrics.peerState)?{peerState:metrics.peerState}:{}), ...(typeof metrics.iceState==='string'&&['new','checking','connected','completed','disconnected','failed','closed'].includes(metrics.iceState)?{iceState:metrics.iceState}:{}), ...(typeof metrics.signalingState==='string'&&['stable','have-local-offer','have-remote-offer','have-local-pranswer','have-remote-pranswer','closed'].includes(metrics.signalingState)?{signalingState:metrics.signalingState}:{}) }

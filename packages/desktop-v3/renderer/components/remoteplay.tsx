@@ -17,6 +17,7 @@ import {useStreamPreferences} from '../contexts/StreamPreferencesContext'
 import {preferredControllerProfile, preferredStreamQuality} from '../../shared/streampreferences'
 import {useTRPCClient} from '../utils/trpc'
 import {createRemoteSession,selectStreamCredentials,type WebStreamTarget} from '../utils/remotesession'
+import {startFailureDetails,startFailureReason,type StartFailureReason} from '../utils/startfailure'
 import {SessionLifecycle} from '../../../desktop/renderer/lib/sessionlifecycle'
 import {parseSessionBitrate,sessionBitrates,sessionBitrateLabel} from '../../../desktop/renderer/lib/sessionquality'
 import {webSessionInputOptions,type WebTouchMode} from '../utils/sessionoptions'
@@ -28,8 +29,8 @@ import type {communicationHandler} from '@greenlight/player/client'
 const SharedPlayer=dynamic(()=>import('@greenlight/player/client').then(module=>module.StreamPlayer),{ssr:false})
 type Phase='idle'|'starting'|'playing'|'startFailed'|'stopping'|'stopFailed'
 export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExit:()=>void}){
-    const {getxHomeToken,getxCloudToken,getUserRefreshToken,authState}=useAuth()
-    const {preferences}=useStreamPreferences()
+    const {getxHomeToken,getxCloudToken,getUserRefreshToken,authState,desktop}=useAuth()
+    const {preferences,savePreferences,storageAvailable}=useStreamPreferences()
     const cloud=target.type==='cloud'
     const quality=preferredStreamQuality(preferences,target.type)
     const mode=cloud?'Cloud Gaming':'Remote Play'
@@ -43,6 +44,9 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     const [status,setStatus]=useState('Initializing')
     const [samples,setSamples]=useState<DiagnosticSample[]>([])
     const [failureReason,setFailureReason]=useState('')
+    const [startupFailure,setStartupFailure]=useState<StartFailureReason>('start-unconfirmed')
+    const [defaultsUpdated,setDefaultsUpdated]=useState(false)
+    const exitDestination=useRef<'browse'|'setup'>('browse')
     const diagnosticStart=useRef(0)
     const [adapter,setAdapter]=useState<communicationHandler|null>(null)
     const [resolution,setResolution]=useState(quality.resolution)
@@ -71,6 +75,13 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
     const [guide,setGuide]=useState(0)
     const [guideMissing,setGuideMissing]=useState(false)
     const transition=(value:Phase)=>{phaseRef.current=value;if(mounted.current)setPhase(value)}
+    const failStart=(cause:unknown)=>{
+        const reason=startFailureReason(cause)
+        setStartupFailure(reason)
+        setFailureReason(reason)
+        setStatus('Failed')
+        transition('startFailed')
+    }
     useEffect(()=>{
         mounted.current=true
         setMicAvailable(webMicrophoneSupported(window.isSecureContext,navigator.mediaDevices))
@@ -93,7 +104,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
                 home:authState?.streamingTokens?.xHomeToken?.data.offeringSettings?.regions,
                 cloud:authState?.streamingTokens?.xCloudToken?.data.offeringSettings?.regions,
             })
-            const refresh=getUserRefreshToken()
+            const authorization=desktop?{kind:'desktop' as const}:{kind:'web' as const,refreshToken:getUserRefreshToken()||''}
             const remote=createRemoteSession({
                 start:input=>client.streaming_start_stream.mutate(input),
                 stop:input=>client.streaming_stop_stream.mutate(input),
@@ -103,7 +114,7 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
                 ice:input=>client.streaming_send_ice_candidates.mutate(input),
                 connect:input=>client.streaming_send_msal_token.mutate(input),
                 keepalive:input=>client.streaming_send_keepalive.mutate(input),
-            },{id:target.id,type:target.type,host,language:preferences.gameLanguage||token.language,resolution},token,refresh||'',message=>{
+            },{id:target.id,type:target.type,host,language:preferences.gameLanguage||token.language,resolution},token,authorization,message=>{
                 if(mounted.current&&phaseRef.current==='playing')setStatus(message)
             })
             transition('starting');setStatus('Provisioning')
@@ -114,18 +125,30 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
                     if(!mounted.current||phaseRef.current!=='starting')return
                     setAdapter(remote.player(path));transition('playing')
                 },
-                onError:reason=>transition(reason==='stop'?'stopFailed':'startFailed'),
+                onError:(reason,cause)=>{
+                    if(!mounted.current||phaseRef.current!=='starting')return
+                    if(reason==='stop')transition('stopFailed')
+                    else failStart(cause)
+                },
             })
-        }catch{transition('startFailed')}
+        }catch(cause){failStart(cause)}
     }
-    const end=async()=>{
+    const end=async(destination:'browse'|'setup'='browse')=>{
         if(phaseRef.current==='stopping')return
         if(phaseRef.current==='idle'){onExit();return}
+        exitDestination.current=destination
         transition('stopping');setMic('off');setAdapter(null)
         const stopped=await lifecycle.current.end()
         if(!mounted.current)return
-        if(stopped){transition('idle');onExit()}
+        if(stopped){
+            transition('idle')
+            if(destination==='browse')onExit()
+        }
         else transition('stopFailed')
+    }
+    const saveSetupDefaults=()=>{
+        savePreferences(cloud?{...preferences,resolution,bitrate}:{...preferences,remoteResolution:resolution,remoteBitrate:bitrate,consolePaired})
+        setDefaultsUpdated(true)
     }
     const button='v3-button v3-button-secondary'
     return <main className="v3-session" ref={setupScope}>
@@ -157,12 +180,22 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
             </div></details>}
             <p className="v3-muted">Xbox and your connection determine the actual stream quality.</p>
             {!inputOptions.consoleController&&<ControllerCalibration deadzone={profile.v3_deadzone} onApply={value=>{setProfile(previous=>({...previous,v3_deadzone:value}));setPreset('custom')}}/>}
-            <button type="button" className="v3-button v3-button-primary" onClick={start}><Play size={17} aria-hidden="true"/> Start {mode}</button>
+            <div className="v3-actions">
+                <button type="button" className="v3-button v3-button-primary" onClick={start}><Play size={17} aria-hidden="true"/> Start {mode}</button>
+                <button type="button" className={button} onClick={saveSetupDefaults}>Save stream defaults</button>
+            </div>
+            {defaultsUpdated&&<p className="v3-muted" role="status">{storageAvailable?'Defaults updated for '+mode+'.':'Defaults updated for this window. Storage is unavailable.'}</p>}
         </div>}
         {cloud&&phase!=='idle'&&<p className="text-sm text-white/60">Cloud queues may take several minutes. Cancelling will request termination of the current session; starting again may rejoin the queue.</p>}
         {phase==='starting'&&<p role="status">Starting Xbox session…</p>}
         {phase==='playing'&&<p role="status">{status==='Error'?'Connection failed. End the session before trying again.':status}</p>}
-        {phase==='startFailed'&&<p role="alert">Unable to start. If the provisioning response was lost, check for an existing Xbox session before retrying.</p>}
+        {phase==='startFailed'&&<section className="v3-panel v3-start-failure">
+            <div role="alert"><h2>Couldn’t start {mode}</h2><p>{startFailureDetails[startupFailure].message}</p></div>
+            <div className="v3-actions">
+                <button type="button" className={button} onClick={()=>void end()}>Back to {cloud?'library':'consoles'}</button>
+                {startFailureDetails[startupFailure].canReturnToSetup&&<button type="button" className={button} onClick={()=>void end('setup')}>Back to stream setup</button>}
+            </div>
+        </section>}
         {phase==='stopping'&&<p role="status">Waiting for Xbox to acknowledge session termination…</p>}
         {phase==='stopFailed'&&<p role="alert">Xbox termination is not confirmed. A previous request may still be pending. Retry before leaving.</p>}
         {phase==='playing'&&adapter&&status!=='Error'&&<FullscreenSurface enabled={status==='Connected'}>
@@ -218,6 +251,9 @@ export default function RemotePlay({target,onExit}:{target:WebStreamTarget;onExi
         {phase==='playing'&&status==='Connected'&&<CaptureControls surface={()=>playerSurface.current}/>}
         {phase!=='idle'&&<StreamDiagnostics samples={samples} type={target.type} status={status} reason={failureReason}/>}
         {guideMissing&&<p role='status'>Connect a controller or enable the on-screen or keyboard controller to open the guide.</p>}
-        {phase!=='idle'&&<button type="button" className={button} disabled={phase==='stopping'} onClick={()=>void end()}>{phase==='stopFailed'?'Retry ending session':phase==='starting'?'Cancel and end session':'End session'}</button>}
+        {phase!=='idle'&&phase!=='startFailed'&&<div className="v3-actions">
+            <button type="button" className={button} disabled={phase==='stopping'} onClick={()=>void end(phase==='stopFailed'?exitDestination.current:'browse')}>{phase==='stopFailed'?'Retry ending session':phase==='starting'?'Cancel and end session':'End session'}</button>
+            {phase==='playing'&&status==='Error'&&<button type="button" className={button} onClick={()=>void end('setup')}>Back to stream setup</button>}
+        </div>}
     </main>
 }

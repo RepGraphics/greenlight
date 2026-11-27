@@ -34,6 +34,8 @@ The Cloud Gaming library offers Favourites and Recently opened collections. Thes
 
 Settings saves streaming quality by mode, preferred game language, video filters, audio, controller mappings, capture defaults, and library layout on this device. Export or import these preferences from Backup. The backup contains only settings. Changes made in stream setup apply to that session. Recording and replay still start only when you enable them during playback.
 
+Use Save stream defaults in setup to reuse the selected resolution and bitrate for that mode. For Remote Play, it also saves the console-paired controller choice. After a connection failure, Back to stream setup waits for Xbox to acknowledge termination and retains your choices. Startup failures can be exported to diagnostics before any video metrics arrive.
+
 Open the Windows preview with the same local app profile to keep settings and saved accounts between launches. The first launch with native settings imports any preferences already saved in that profile. On startup, choose a saved Xbox account or add one through Microsoft sign-in. Use the account control in the sidebar to return to the picker. Remove a profile from the picker to delete its saved sign-in on this device. The web preview signs in again after a reload.
 
 Before connecting, open Controller test and stick drift calibration to inspect the four axes of a standard-mapped physical controller. Measure drift with both sticks untouched for three seconds, then explicitly apply the suggested deadzone. A lost controller, interrupted sampling, unfocused tab or large stick movement invalidates the measurement. The recommendation applies to all local controllers for this session only.
