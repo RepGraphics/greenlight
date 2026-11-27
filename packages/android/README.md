@@ -51,6 +51,10 @@ Main-frame failures show a local error category and private-network troubleshoot
 
 Use Share connection diagnostics from the connection screen or connected toolbar to preview and explicitly share a plain-text report containing Android API level, application and WebView versions, connection mode, native page state and fullscreen state. It excludes the endpoint, credentials, account/game identifiers and raw WebView error descriptions. Do not interpret PAGE_LOADED as successful Xbox playback. On launch and disconnect, the app clears site storage and waits for the asynchronous cookie removal callback before allowing a new connection. Real-device cleanup and authentication behavior remain to be tested.
 
+## Experimental microphone support
+
+Private V3 mode supports explicit audio-only permission requests from the selected trusted HTTPS origin while the activity is foregrounded. Enable microphone in the web streaming controls, approve the app confirmation, then allow Android microphone access if requested. If the Android permission dialog interrupts the WebView request, enable the microphone again after returning. Every new web request requires explicit app consent; Android's runtime permission may remain granted between sessions. Requests from other origins, desktop companion mode, camera or mixed/unknown resources are denied. Pending requests are cancelled when leaving the activity or disconnecting. Disable the microphone in the web client or disconnect to stop capture; a granted stream's actual background behavior depends on Android and WebView and is not verified. No microphone permission is requested at launch. Only connect to a backend you trust.
+
 ## Standalone roadmap
 
 A truly backend-independent Android client still needs native authentication/token storage, Xbox signaling, media and input integration. Private V3 mode is an intermediate architecture, not a native standalone client or a production release.
